@@ -23,13 +23,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light">
           <AuthProvider>
             <UniversityProvider>
               <ProductProvider>{children}</ProductProvider>
             </UniversityProvider>
           </AuthProvider>
-        </ThemeProvider>
       </body>
     </html>
   )

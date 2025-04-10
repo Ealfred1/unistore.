@@ -339,7 +339,7 @@ export default function LandingPage() {
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center text-white">
             <div className="space-y-2">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Ready to Get Started?</h2>
+              <h2 className="text-3xl text-white font-bold tracking-tighter sm:text-4xl md:text-5xl">Ready to Get Started?</h2>
               <p className="max-w-[600px] text-white/80 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
                 Join thousands of students who are already using <span className="text-[#f58220]">Uni</span>store to
                 buy, sell, and connect.
@@ -353,7 +353,7 @@ export default function LandingPage() {
                 </Button>
               </Link>
               <Link href="/auth/login">
-                <Button variant="outline" className="text-white border-white hover:bg-white/10">
+                <Button variant="outline" className="text-white bg-transparent border-white hover:bg-white/10">
                   Log In
                 </Button>
               </Link>
