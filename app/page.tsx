@@ -1,11 +1,53 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowRight, ShoppingBag, Users, Shield, ChevronRight, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/ui/logo"
+import { UniversityPopup } from "@/components/university-popup"
 
 export default function LandingPage() {
+  const [showUniversityPopup, setShowUniversityPopup] = useState(false)
+
+  // Check if it's the first visit
+  useEffect(() => {
+    const hasVisited = localStorage.getItem("unistore_visited")
+    if (!hasVisited) {
+      // Show popup after a short delay
+      const timer = setTimeout(() => {
+        setShowUniversityPopup(true)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
+  // Handle university selection
+  const handleSelectUniversity = (universityId: number) => {
+    // In a real app, you would store the selected university in state/context
+    // and use it to filter products, etc.
+    console.log("Selected university:", universityId)
+
+    // Mark as visited
+    localStorage.setItem("unistore_visited", "true")
+
+    // Close popup
+    setShowUniversityPopup(false)
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
+      {/* University selection popup */}
+      {showUniversityPopup && (
+        <UniversityPopup
+          onClose={() => {
+            setShowUniversityPopup(false)
+            localStorage.setItem("unistore_visited", "true")
+          }}
+          onSelect={handleSelectUniversity}
+        />
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
         <div className="container flex h-16 items-center justify-between">
