@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
 import { Eye, EyeOff, ArrowRight, UserPlus, Facebook, Twitter, Mail, Check } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
+import { toast } from "@/hooks/use-toast"
 
 export default function SignupPage() {
   const [step, setStep] = useState(1)
@@ -21,11 +22,11 @@ export default function SignupPage() {
     confirmPassword: "",
     agreeTerms: false,
     university: "",
-    userType: "",
+    userType: "PERSONAL",
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { signUp, isAuthenticated } = useAuth()
+  const { signUp } = useAuth()
   const router = useRouter()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,18 +43,38 @@ export default function SignupPage() {
     if (step === 1) {
       // Validate first step
       if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
+        toast({
+          title: "Missing Information",
+          description: "Please fill in all required fields",
+          variant: "destructive",
+        })
         return
       }
 
       if (!formData.password || formData.password.length < 8) {
+        toast({
+          title: "Password Too Short",
+          description: "Password must be at least 8 characters long",
+          variant: "destructive",
+        })
         return
       }
 
       if (formData.password !== formData.confirmPassword) {
+        toast({
+          title: "Passwords Don't Match",
+          description: "Please make sure your passwords match",
+          variant: "destructive",
+        })
         return
       }
 
       if (!formData.agreeTerms) {
+        toast({
+          title: "Terms Agreement Required",
+          description: "You must agree to the terms of service",
+          variant: "destructive",
+        })
         return
       }
 
@@ -64,16 +85,27 @@ export default function SignupPage() {
     if (step === 2) {
       // Validate second step
       if (!formData.university || !formData.userType) {
+        toast({
+          title: "Missing Information",
+          description: "Please select your university and account type",
+          variant: "destructive",
+        })
         return
       }
 
       setIsSubmitting(true)
 
       try {
-        await signUp(formData)
-        router.push("/auth/login")
-      } catch (error) {
+        const phoneNumber = await signUp(formData)
+        // Redirect to OTP verification page with phone number
+        router.push(`/auth/verify-otp?phone=${encodeURIComponent(phoneNumber)}`)
+      } catch (error: any) {
         console.error(error)
+        toast({
+          title: "Registration Failed",
+          description: error.response?.data?.detail || "An error occurred during registration",
+          variant: "destructive",
+        })
       } finally {
         setIsSubmitting(false)
       }
@@ -192,10 +224,17 @@ export default function SignupPage() {
                 >
                   2
                 </div>
+                <div className={`flex-1 h-1 mx-2 ${step >= 3 ? "bg-[#f58220]" : "bg-gray-200"}`}></div>
+                <div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full ${step >= 3 ? "bg-[#f58220] text-white" : "bg-gray-200 text-gray-500"}`}
+                >
+                  3
+                </div>
               </div>
               <div className="flex justify-between mt-2">
                 <span className="text-xs text-gray-500">Personal Info</span>
                 <span className="text-xs text-gray-500">University & Preferences</span>
+                <span className="text-xs text-gray-500">Verify OTP</span>
               </div>
             </div>
 
@@ -362,19 +401,19 @@ export default function SignupPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div
                         className={`border rounded-xl p-4 cursor-pointer transition-all ${
-                          formData.userType === "personal"
+                          formData.userType === "PERSONAL"
                             ? "border-[#f58220] bg-[#f58220]/5"
                             : "border-gray-300 hover:border-[#f58220]/50"
                         }`}
-                        onClick={() => setFormData((prev) => ({ ...prev, userType: "personal" }))}
+                        onClick={() => setFormData((prev) => ({ ...prev, userType: "PERSONAL" }))}
                       >
                         <div className="flex items-center mb-2">
                           <div
                             className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                              formData.userType === "personal" ? "border-[#f58220]" : "border-gray-300"
+                              formData.userType === "PERSONAL" ? "border-[#f58220]" : "border-gray-300"
                             }`}
                           >
-                            {formData.userType === "personal" && (
+                            {formData.userType === "PERSONAL" && (
                               <div className="w-3 h-3 rounded-full bg-[#f58220]"></div>
                             )}
                           </div>
@@ -385,19 +424,19 @@ export default function SignupPage() {
 
                       <div
                         className={`border rounded-xl p-4 cursor-pointer transition-all ${
-                          formData.userType === "merchant"
+                          formData.userType === "MERCHANT"
                             ? "border-[#f58220] bg-[#f58220]/5"
                             : "border-gray-300 hover:border-[#f58220]/50"
                         }`}
-                        onClick={() => setFormData((prev) => ({ ...prev, userType: "merchant" }))}
+                        onClick={() => setFormData((prev) => ({ ...prev, userType: "MERCHANT" }))}
                       >
                         <div className="flex items-center mb-2">
                           <div
                             className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                              formData.userType === "merchant" ? "border-[#f58220]" : "border-gray-300"
+                              formData.userType === "MERCHANT" ? "border-[#f58220]" : "border-gray-300"
                             }`}
                           >
-                            {formData.userType === "merchant" && (
+                            {formData.userType === "MERCHANT" && (
                               <div className="w-3 h-3 rounded-full bg-[#f58220]"></div>
                             )}
                           </div>

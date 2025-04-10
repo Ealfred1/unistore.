@@ -1,74 +1,72 @@
 "use client"
+
 import Image from "next/image"
 import Link from "next/link"
-import { Heart, Star } from "lucide-react"
+import { Heart } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface ProductCardProps {
   product: {
-    id: string
+    id: number
     name: string
-    price: number
-    images: string[]
-    category: string
-    rating: number
-    discount?: number
-    isFavorite?: boolean
+    price: string
+    primary_image?: string
+    category_name: string
+    condition: string
+    price_negotiable: boolean
+    is_favorited: boolean
+    merchant_name: string
   }
-  onFavoriteToggle?: (id: string) => void
+  onFavoriteToggle: (id: number) => void
 }
 
 export default function ProductCard({ product, onFavoriteToggle }: ProductCardProps) {
-  const { id, name, price, images, category, rating, discount, isFavorite } = product
+  const { id, name, price, primary_image, category_name, condition, price_negotiable, is_favorited } = product
 
   const formattedPrice = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-  }).format(price)
-
-  const discountedPrice = discount
-    ? new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(price * (1 - discount / 100))
-    : null
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number.parseFloat(price))
 
   return (
-    <div className="product-card">
-      {discount && <div className="discount-badge">-{discount}%</div>}
-      <button
-        className="favorite-button"
-        onClick={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          onFavoriteToggle?.(id)
-        }}
-      >
-        <Heart className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`} />
-      </button>
-      <Link href={`/dashboard/products/${id}`}>
-        <div className="relative aspect-square overflow-hidden bg-gray-100">
-          <Image
-            src={images[0] || "/placeholder.svg?height=400&width=300"}
-            alt={name}
-            fill
-            className="product-card-image object-cover"
-          />
-        </div>
-        <div className="product-card-content">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs uppercase text-gray-500 dark:text-gray-400">{category}</span>
-            <div className="rating">
-              <Star className="rating-star w-4 h-4" />
-              <span className="text-sm font-medium">{rating.toFixed(1)}</span>
+    <div className="bg-white rounded-xl overflow-hidden border border-gray-200 group hover:shadow-md transition-all">
+      <div className="relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-2 right-2 z-10 bg-white/80 backdrop-blur-sm shadow-sm"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onFavoriteToggle(id)
+          }}
+        >
+          <Heart className={`w-5 h-5 ${is_favorited ? "fill-red-500 text-red-500" : "text-gray-400"}`} />
+        </Button>
+        <Link href={`/products/${id}`}>
+          <div className="relative aspect-square overflow-hidden bg-gray-100">
+            <Image
+              src={primary_image || "/placeholder.svg?height=400&width=300&text=No+Image"}
+              alt={name}
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          </div>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs uppercase text-gray-500">{category_name}</span>
+              <div className="text-xs px-2 py-0.5 bg-gray-100 rounded-full">{condition.replace("_", " ")}</div>
+            </div>
+            <h3 className="font-medium text-base mb-1 truncate">{name}</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-bold">{formattedPrice}</span>
+              {price_negotiable && <span className="text-xs text-gray-500">(Negotiable)</span>}
             </div>
           </div>
-          <h3 className="font-medium text-base mb-1 truncate">{name}</h3>
-          <div className="flex items-center gap-2">
-            <span className={`font-bold ${discount ? "text-red-500" : ""}`}>{discountedPrice || formattedPrice}</span>
-            {discount && <span className="text-sm text-gray-500 line-through">{formattedPrice}</span>}
-          </div>
-        </div>
-      </Link>
+        </Link>
+      </div>
     </div>
   )
 }
