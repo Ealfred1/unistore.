@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import ProductCard from "@/components/products/product-card"   
+import axiosInstance from "@/lib/axios"
 
 export default function ProductDetailPage() {
   const params = useParams()
@@ -61,9 +63,8 @@ export default function ProductDetailPage() {
         setProduct(productData)
 
         // Fetch similar products (same category)
-        if (productData.category) {
-          const response = await fetch(`/api/products/products/?category=${productData.category}&limit=4`)
-          const data = await response.json()
+        if (productData?.category) {
+          const { data } = await axiosInstance.get(`/products/products/?category=${productData.category}&limit=4`)
           // Filter out the current product
           const filtered = data.results.filter((p: any) => p.id !== productId)
           setSimilarProducts(filtered.slice(0, 3))
@@ -124,19 +125,54 @@ export default function ProductDetailPage() {
     setMessage("")
   }
 
-  // Copy contact number
-  const copyContactNumber = () => {
-    if (product?.merchant_info?.contact_number) {
-      navigator.clipboard.writeText(product.merchant_info.contact_number)
-      setContactCopied(true)
-      setTimeout(() => setContactCopied(false), 2000)
+  // Copy contact number or make a call on mobile
+  const copyOrCallContactNumber = () => {
+    if (product?.merchant_info?.phone_number) {
+      // Check if it's a mobile device
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // On mobile, make a phone call
+        window.location.href = `tel:${product.merchant_info.phone_number}`;
+      } else {
+        // On desktop, copy to clipboard
+        navigator.clipboard.writeText(product.merchant_info.phone_number);
+        setContactCopied(true);
+        setTimeout(() => setContactCopied(false), 2000);
 
-      toast({
-        title: "Contact Copied",
-        description: "Seller's contact number copied to clipboard",
-      })
+        toast({
+          title: "Contact Copied",
+          description: "Seller's contact number copied to clipboard",
+        });
+      }
     }
-  }
+  };
+
+  // Handle share functionality
+  const handleShare = async () => {
+    const productUrl = window.location.href;
+    const title = `Check out this product: ${product.name}`;
+    
+    // Check if Web Share API is available (mostly on mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title,
+          text: `${product.name} - $${product.price} - ${product.university_name}`,
+          url: productUrl,
+        });
+      } catch (error) {
+        console.error("Error sharing:", error);
+      }
+    } else {
+      // Fallback for desktop - copy link to clipboard
+      navigator.clipboard.writeText(productUrl);
+      toast({
+        title: "Link Copied",
+        description: "Product link copied to clipboard",
+      });
+    }
+  };
 
   // Loading state
   if (isLoading) {
@@ -226,6 +262,22 @@ export default function ProductDetailPage() {
                 ))}
               </div>
             )}
+            
+            {/* Similar Products Section */}
+            {similarProducts.length > 0 && (
+              <div className="mt-8 hidden lg:block">
+                <h2 className="text-xl font-bold mb-4">Similar Products</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {similarProducts.slice(0, 3).map((similarProduct) => (
+                    <ProductCard 
+                      key={similarProduct.id} 
+                      product={similarProduct} 
+                      onFavoriteToggle={() => toggleFavorite(similarProduct.id)} 
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Product details */}
@@ -247,7 +299,7 @@ export default function ProductDetailPage() {
                   <Button variant="ghost" size="icon" onClick={handleToggleFavorite} className="relative">
                     <Heart className={`h-5 w-5 ${product.is_favorited ? "fill-red-500 text-red-500" : ""}`} />
                   </Button>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" onClick={handleShare}>
                     <Share2 className="h-5 w-5" />
                   </Button>
                 </div>
@@ -298,16 +350,16 @@ export default function ProductDetailPage() {
                 <div className="flex items-center p-4 bg-gray-50 rounded-xl mb-6">
                   <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4">
                     <Image
-                      src={product.merchant_info.profile_picture || "/placeholder.svg?height=48&width=48&text=Seller"}
-                      alt={product.merchant_info.full_name}
+                      src={product.merchant_info.profile_image || "/placeholder.svg?height=48&width=48&text=Seller"}
+                      alt={product.merchant_info.first_name}
                       fill
                       className="object-cover"
                     />
                   </div>
                   <div>
-                    <h3 className="font-medium">{product.merchant_info.full_name}</h3>
+                    <h3 className="font-medium">{product.merchant_info.first_name} {product.merchant_info.last_name}</h3>
                     <p className="text-sm text-gray-500">
-                      Member since {new Date(product.merchant_info.joined_date).getFullYear()}
+                      Member since {new Date(product.merchant_info.date_joined).getFullYear()}
                     </p>
                   </div>
                 </div>
@@ -384,68 +436,34 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <Button onClick={copyContactNumber} className="w-full bg-[#0a2472] hover:bg-[#0a2472]/90 text-white">
+                <Button onClick={copyOrCallContactNumber} className="w-full bg-[#0a2472] hover:bg-[#0a2472]/90 text-white">
                   <Copy className="h-5 w-5 mr-2" />
-                  {contactCopied ? "Contact Copied!" : "Copy Seller Contact"}
+                  {contactCopied ? "Contact Copied!" : (
+                    /iPhone|iPad|iPod|Android/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '')
+                    ? "Call Seller" : "Copy Seller Contact"
+                  )}
                 </Button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Similar products */}
+        {/* Similar Products Section */}
         {similarProducts.length > 0 && (
-          <div className="mt-12">
-            <h2 className="text-xl font-bold mb-6">Similar Products</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {similarProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="bg-white rounded-xl overflow-hidden shadow-md border border-gray-100 group"
-                >
-                  <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 right-2 z-10 bg-white/80 backdrop-blur-sm shadow-sm"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        toggleFavorite(product.id)
-                      }}
-                    >
-                      <Heart
-                        className={`w-5 h-5 ${product.is_favorited ? "fill-red-500 text-red-500" : "text-gray-400"}`}
-                      />
-                    </Button>
-                    <Link href={`/products/${product.id}`}>
-                      <div className="relative aspect-square overflow-hidden">
-                        <Image
-                          src={product.primary_image || "/placeholder.svg?height=200&width=200&text=No+Image"}
-                          alt={product.name}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <div className="p-4">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs uppercase text-gray-500">{product.category_name}</span>
-                          <div className="flex items-center">
-                            <span className="text-sm font-medium">${Number.parseFloat(product.price).toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <h3 className="font-medium text-base mb-1 truncate">{product.name}</h3>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-500">{product.merchant_name}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  </div>
+              <div className="mt-8 lg:hidden">
+                <h2 className="text-xl font-bold mb-4">Similar Products</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {similarProducts.slice(0, 3).map((similarProduct) => (
+                    <ProductCard 
+                      key={similarProduct.id} 
+                      product={similarProduct} 
+                      onFavoriteToggle={() => toggleFavorite(similarProduct.id)} 
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
+        
       </div>
 
       {/* Contact modal */}

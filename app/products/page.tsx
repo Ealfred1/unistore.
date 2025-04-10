@@ -46,7 +46,7 @@ export default function ProductsPage() {
     }
   }, [searchParams])
 
-  // Fetch products with filters
+  // Fetch products with filters 
   useEffect(() => {
     const getProducts = async () => {
       const filters: Record<string, any> = {}
