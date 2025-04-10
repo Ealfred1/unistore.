@@ -1,18 +1,24 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import axios from "@/lib/axios"
 
 // Define user type
 interface User {
   id: string
-  firstName: string
-  lastName: string
+  first_name: string
+  last_name: string
   email: string
-  phone: string
-  university?: string
-  avatar?: string
-  userType: "personal" | "merchant"
-  createdAt: Date
+  phone_number: string
+  university?: {
+    id: number
+    name: string
+  }
+  profile_picture?: string
+  user_type: "PERSONAL" | "MERCHANT"
+  merchant_name?: string
+  created_at: string
+  phone_verified: boolean
 }
 
 // Define auth context type
@@ -20,10 +26,12 @@ interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (credentials: { phone: string; password: string }) => Promise<void>
-  signUp: (userData: any) => Promise<void>
+  login: (credentials: { phone_number: string; password: string }) => Promise<void>
+  signUp: (userData: any) => Promise<string>
   logout: () => void
-  verifyOtp: (otp: string) => Promise<boolean>
+  verifyOtp: (otp: string, phone_number: string) => Promise<boolean>
+  updateUniversity: (universityId: number) => Promise<void>
+  upgradeToMerchant: (merchantName: string) => Promise<void>
 }
 
 // Create auth context
@@ -42,15 +50,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // In a real app, you would check for a token in localStorage or cookies
-        // and validate it with your backend
-        const storedUser = localStorage.getItem("unistore_user")
-
-        if (storedUser) {
-          setUser(JSON.parse(storedUser))
+        const token = localStorage.getItem("access_token")
+        if (!token) {
+          setIsLoading(false)
+          return
         }
+
+        // Fetch user profile
+        const response = await axios.get("/users/profile/")
+        setUser(response.data)
       } catch (error) {
         console.error("Authentication error:", error)
+        localStorage.removeItem("access_token")
+        localStorage.removeItem("refresh_token")
       } finally {
         setIsLoading(false)
       }
@@ -60,29 +72,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   // Login function
-  const login = async (credentials: { phone: string; password: string }) => {
+  const login = async (credentials: { phone_number: string; password: string }) => {
     setIsLoading(true)
 
     try {
-      // In a real app, you would make an API call to your backend
-      // This is a mock implementation
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await axios.post("/users/auth/login/", credentials)
+      const { access_token, refresh_token } = response.data
 
-      // Mock user data
-      const mockUser: User = {
-        id: "user_123",
-        firstName: "John",
-        lastName: "Doe",
-        email: "john.doe@example.com",
-        phone: credentials.phone,
-        university: "University of Lagos",
-        avatar: "/placeholder.svg?height=200&width=200",
-        userType: "personal",
-        createdAt: new Date(),
-      }
+      // Store tokens
+      localStorage.setItem("access_token", access_token)
+      localStorage.setItem("refresh_token", refresh_token)
 
-      setUser(mockUser)
-      localStorage.setItem("unistore_user", JSON.stringify(mockUser))
+      // Fetch user profile
+      const userResponse = await axios.get("/users/profile/")
+      setUser(userResponse.data)
     } catch (error) {
       console.error("Login error:", error)
       throw error
@@ -96,28 +99,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(true)
 
     try {
-      // In a real app, you would make an API call to your backend
-      // This is a mock implementation
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Mock user creation
-      const mockUser: User = {
-        id: "user_" + Math.random().toString(36).substr(2, 9),
-        firstName: userData.firstName,
-        lastName: userData.lastName,
+      const response = await axios.post("/users/auth/register/", {
+        first_name: userData.firstName,
+        last_name: userData.lastName,
         email: userData.email,
-        phone: userData.phone,
-        university: userData.university,
-        userType: userData.userType as "personal" | "merchant",
-        createdAt: new Date(),
-      }
+        phone_number: userData.phone,
+        password: userData.password,
+        confirm_password: userData.confirmPassword,
+        user_type: userData.userType.toUpperCase(),
+      })
 
-      // In a real app, we would not automatically log in the user after signup
-      // They would need to verify their email/phone first
-      console.log("User registered:", mockUser)
-
-      // For demo purposes, we're not setting the user here
-      // as they would typically need to verify their account first
+      // Return the phone number for OTP verification
+      return userData.phone
     } catch (error) {
       console.error("Signup error:", error)
       throw error
@@ -127,30 +120,80 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   // Verify OTP function
-  const verifyOtp = async (otp: string) => {
+  const verifyOtp = async (otp: string, phone_number: string) => {
     setIsLoading(true)
 
     try {
-      // In a real app, you would make an API call to your backend
-      // This is a mock implementation
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await axios.post("/users/auth/verify-phone/", {
+        phone_number,
+        verification_code: otp,
+      })
 
-      // Mock OTP verification (accept any 6-digit code)
-      const isValid = /^\d{6}$/.test(otp)
+      const { access_token, refresh_token } = response.data
 
-      return isValid
+      // Store tokens
+      localStorage.setItem("access_token", access_token)
+      localStorage.setItem("refresh_token", refresh_token)
+
+      // Fetch user profile
+      const userResponse = await axios.get("/users/profile/")
+      setUser(userResponse.data)
+
+      return true
     } catch (error) {
       console.error("OTP verification error:", error)
-      throw error
+      return false
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Update university function
+  const updateUniversity = async (universityId: number) => {
+    try {
+      await axios.post("/users/profile/update-university/", {
+        university_id: universityId,
+      })
+
+      // Update user state with new university
+      const userResponse = await axios.get("/users/profile/")
+      setUser(userResponse.data)
+    } catch (error) {
+      console.error("University update error:", error)
+      throw error
+    }
+  }
+
+  // Upgrade to merchant function
+  const upgradeToMerchant = async (merchantName: string) => {
+    try {
+      await axios.post("/users/profile/upgrade-to-merchant/", {
+        merchant_name: merchantName,
+      })
+
+      // Update user state with new merchant status
+      const userResponse = await axios.get("/users/profile/")
+      setUser(userResponse.data)
+    } catch (error) {
+      console.error("Merchant upgrade error:", error)
+      throw error
+    }
+  }
+
   // Logout function
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem("unistore_user")
+  const logout = async () => {
+    try {
+      const refreshToken = localStorage.getItem("refresh_token")
+      if (refreshToken) {
+        await axios.post("/users/auth/logout/", { refresh_token: refreshToken })
+      }
+    } catch (error) {
+      console.error("Logout error:", error)
+    } finally {
+      localStorage.removeItem("access_token")
+      localStorage.removeItem("refresh_token")
+      setUser(null)
+    }
   }
 
   return (
@@ -163,6 +206,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         signUp,
         logout,
         verifyOtp,
+        updateUniversity,
+        upgradeToMerchant,
       }}
     >
       {children}
