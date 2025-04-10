@@ -49,7 +49,7 @@ export default function LandingPage() {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 w-full border-b border-b-gray-100 bg-white/80 backdrop-blur-md">
         <div className="container flex h-16 items-center justify-between">
           <Logo size="lg" />
           <nav className="hidden md:flex items-center gap-6">
@@ -65,19 +65,19 @@ export default function LandingPage() {
           </nav>
           <div className="flex items-center gap-4">
             <Link href="/auth/login">
-              <Button variant="outline" className="hidden sm:flex">
+              <Button variant="outline" className="hidden bg-transparent sm:flex">
                 Log In
               </Button>
             </Link>
             <Link href="/auth/signup">
-              <Button className="bg-[#0a2472] hover:bg-[#0a2472]/90">Sign Up</Button>
+              <Button className="bg-[#0a2472] text-white hover:bg-[#0a2472]/90">Sign Up</Button>
             </Link>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="relative py-20 md:py-32 overflow-hidden">
+      <section className="relative bg-white py-20 md:py-32 overflow-hidden">
         <div className="container px-4 md:px-6">
           <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center">
             <div className="space-y-4">
@@ -94,13 +94,13 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
                 <Link href="/auth/signup">
-                  <Button className="bg-[#0a2472] hover:bg-[#0a2472]/90">
+                  <Button className="bg-[#0a2472] text-white hover:bg-[#0a2472]/90">
                     Get Started
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowRight className="ml-2 text-white bg-transparent h-4 w-4" />
                   </Button>
                 </Link>
                 <Link href="#how-it-works">
-                  <Button variant="outline">Learn More</Button>
+                  <Button className="bg-transparent" variant="outline">Learn More</Button>
                 </Link>
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function LandingPage() {
             ].map((feature, index) => (
               <div
                 key={index}
-                className="flex flex-col items-center space-y-4 rounded-lg border p-6 bg-white shadow-sm"
+                className="flex flex-col items-center space-y-4 rounded-lg border-gray-300 p-6 bg-white shadow-sm"
               >
                 <div className="p-3 rounded-full bg-[#f58220]/10">{feature.icon}</div>
                 <h3 className="text-xl font-bold">{feature.title}</h3>
