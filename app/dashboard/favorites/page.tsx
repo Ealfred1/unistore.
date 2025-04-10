@@ -6,6 +6,10 @@ import { useProducts } from "@/providers/product-provider"
 import ProductCard from "@/components/products/product-card"
 import { Heart, Search, Filter, ChevronDown, Grid, List, Trash2 } from "lucide-react"
 import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export default function FavoritesPage() {
   const { products } = useProducts()
@@ -51,7 +55,7 @@ export default function FavoritesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Favorites</h1>
+          <h1 className="text-2xl font-bold text-[#0a2472]">Favorites</h1>
           <p className="text-gray-500">
             {favoriteProducts.length} {favoriteProducts.length === 1 ? "item" : "items"} saved
           </p>
@@ -62,72 +66,64 @@ export default function FavoritesPage() {
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-gray-400" />
             </div>
-            <input
+            <Input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search favorites..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
+              className="pl-10 pr-4 py-2"
             />
           </div>
 
           <div className="flex gap-2">
-            <div className="relative">
-              <button
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="px-4 py-2 border border-gray-300 rounded-xl flex items-center gap-2 hover:bg-gray-50 transition-colors"
-              >
-                <Filter className="h-4 w-4" />
-                <span>Sort</span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
-              </button>
-              {showSortDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        setSortBy("newest")
-                        setShowSortDropdown(false)
-                      }}
-                      className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "newest" ? "bg-gray-100 font-medium" : ""}`}
-                    >
-                      Newest First
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSortBy("price_low")
-                        setShowSortDropdown(false)
-                      }}
-                      className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "price_low" ? "bg-gray-100 font-medium" : ""}`}
-                    >
-                      Price: Low to High
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSortBy("price_high")
-                        setShowSortDropdown(false)
-                      }}
-                      className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "price_high" ? "bg-gray-100 font-medium" : ""}`}
-                    >
-                      Price: High to Low
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex border border-gray-300 rounded-xl overflow-hidden">
-              <button
+            <DropdownMenu open={showSortDropdown} onOpenChange={setShowSortDropdown}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="border border-gray-200 dark:border-gray-700">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Sort
+                  <ChevronDown
+                    className={`h-4 w-4 ml-2 transition-transform ${showSortDropdown ? "rotate-180" : ""}`}
+                  />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="border border-gray-200 dark:border-gray-700">
+                <DropdownMenuItem
+                  onClick={() => setSortBy("newest")}
+                  className={sortBy === "newest" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
+                >
+                  Newest First
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("price_low")}
+                  className={sortBy === "price_low" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
+                >
+                  Price: Low to High
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("price_high")}
+                  className={sortBy === "price_high" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
+                >
+                  Price: High to Low
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="flex border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setViewMode("grid")}
-                className={`px-3 py-2 ${viewMode === "grid" ? "bg-gray-100" : "hover:bg-gray-50"} transition-colors`}
+                className={viewMode === "grid" ? "bg-gray-100 dark:bg-gray-800" : ""}
               >
                 <Grid className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setViewMode("list")}
-                className={`px-3 py-2 ${viewMode === "list" ? "bg-gray-100" : "hover:bg-gray-50"} transition-colors`}
+                className={viewMode === "list" ? "bg-gray-100 dark:bg-gray-800" : ""}
               >
                 <List className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -139,12 +135,12 @@ export default function FavoritesPage() {
           {Array.from({ length: 8 }).map((_, index) => (
             <div
               key={index}
-              className="bg-white rounded-xl overflow-hidden shadow-md border border-gray-100 animate-pulse"
+              className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
             >
-              <div className="aspect-square bg-gray-200"></div>
+              <div className="aspect-square bg-gray-200 dark:bg-gray-700"></div>
               <div className="p-4 space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
               </div>
             </div>
           ))}
@@ -163,7 +159,7 @@ export default function FavoritesPage() {
                 <ProductCard product={product} />
                 <button
                   onClick={() => handleRemoveFavorite(product.id)}
-                  className="absolute top-2 right-2 p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  className="absolute top-2 right-2 p-2 rounded-full bg-white/80 backdrop-blur-sm border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                 >
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </button>
@@ -178,7 +174,7 @@ export default function FavoritesPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.1 }}
-                className="bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-md transition-all relative group"
+                className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-[#f58220]/50 transition-all relative group"
               >
                 <div className="flex">
                   <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
@@ -212,7 +208,7 @@ export default function FavoritesPage() {
                       </div>
                       <button
                         onClick={() => handleRemoveFavorite(product.id)}
-                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
                         <Trash2 className="h-5 w-5 text-red-500" />
                       </button>
@@ -224,16 +220,16 @@ export default function FavoritesPage() {
           </div>
         )
       ) : (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-pink-100 flex items-center justify-center">
-            <Heart className="h-8 w-8 text-pink-500" />
-          </div>
-          <h3 className="text-lg font-medium mb-2">No favorites yet</h3>
-          <p className="text-gray-500 mb-6">Items you save will appear here</p>
-          <button className="px-4 py-2 bg-[#f58220] text-white font-medium rounded-lg hover:bg-[#f58220]/90 transition-all">
-            Browse Products
-          </button>
-        </div>
+        <Card className="text-center py-16 border border-gray-200 dark:border-gray-700">
+          <CardContent>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-pink-100 flex items-center justify-center">
+              <Heart className="h-8 w-8 text-pink-500" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No favorites yet</h3>
+            <p className="text-gray-500 mb-6">Items you save will appear here</p>
+            <Button className="bg-[#f58220] hover:bg-[#f58220]/90">Browse Products</Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

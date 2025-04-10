@@ -6,6 +6,11 @@ import Link from "next/link"
 import Image from "next/image"
 import { useProducts } from "@/providers/product-provider"
 import { Plus, Search, Filter, ChevronDown, Grid, List, Edit, Trash2, Eye, EyeOff, Package } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
 
 export default function MyProductsPage() {
   const { products } = useProducts()
@@ -71,13 +76,13 @@ export default function MyProductsPage() {
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-800"
+        return "bg-green-100 text-green-800 border-green-200"
       case "inactive":
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800 border-gray-200"
       case "sold":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800 border-blue-200"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800 border-gray-200"
     }
   }
 
@@ -86,64 +91,67 @@ export default function MyProductsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">My Products</h1>
+          <h1 className="text-2xl font-bold text-[#0a2472]">My Products</h1>
           <p className="text-gray-500">
             {myProducts.length} {myProducts.length === 1 ? "product" : "products"} listed
           </p>
         </div>
 
-        <Link
-          href="/dashboard/my-products/new"
-          className="inline-flex items-center px-4 py-2 rounded-xl bg-gradient-to-r from-[#f58220] to-[#0a2472] text-white font-medium shadow-md hover:shadow-lg transition-all"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Add New Product
+        <Link href="/dashboard/my-products/new">
+          <Button className="bg-[#f58220] hover:bg-[#f58220]/90">
+            <Plus className="h-5 w-5 mr-2" />
+            Add New Product
+          </Button>
         </Link>
       </div>
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex overflow-x-auto pb-2 md:pb-0 space-x-2">
-          <button
+          <Button
+            variant={activeFilter === "all" ? "default" : "outline"}
             onClick={() => setActiveFilter("all")}
-            className={`px-4 py-2 rounded-xl whitespace-nowrap ${
+            className={
               activeFilter === "all"
-                ? "bg-[#f58220] text-white"
-                : "bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
-            }`}
+                ? "bg-[#f58220] hover:bg-[#f58220]/90"
+                : "border border-gray-200 dark:border-gray-700"
+            }
           >
             All Products
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={activeFilter === "active" ? "default" : "outline"}
             onClick={() => setActiveFilter("active")}
-            className={`px-4 py-2 rounded-xl whitespace-nowrap ${
+            className={
               activeFilter === "active"
-                ? "bg-[#f58220] text-white"
-                : "bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
-            }`}
+                ? "bg-[#f58220] hover:bg-[#f58220]/90"
+                : "border border-gray-200 dark:border-gray-700"
+            }
           >
             Active
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={activeFilter === "inactive" ? "default" : "outline"}
             onClick={() => setActiveFilter("inactive")}
-            className={`px-4 py-2 rounded-xl whitespace-nowrap ${
+            className={
               activeFilter === "inactive"
-                ? "bg-[#f58220] text-white"
-                : "bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
-            }`}
+                ? "bg-[#f58220] hover:bg-[#f58220]/90"
+                : "border border-gray-200 dark:border-gray-700"
+            }
           >
             Inactive
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={activeFilter === "sold" ? "default" : "outline"}
             onClick={() => setActiveFilter("sold")}
-            className={`px-4 py-2 rounded-xl whitespace-nowrap ${
+            className={
               activeFilter === "sold"
-                ? "bg-[#f58220] text-white"
-                : "bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
-            }`}
+                ? "bg-[#f58220] hover:bg-[#f58220]/90"
+                : "border border-gray-200 dark:border-gray-700"
+            }
           >
             Sold
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-1 flex-col sm:flex-row gap-3">
@@ -151,81 +159,70 @@ export default function MyProductsPage() {
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-gray-400" />
             </div>
-            <input
+            <Input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search products..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
+              className="pl-10 pr-4 py-2"
             />
           </div>
 
           <div className="flex gap-2">
-            <div className="relative">
-              <button
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="px-4 py-2 border border-gray-300 rounded-xl flex items-center gap-2 hover:bg-gray-50 transition-colors"
-              >
-                <Filter className="h-4 w-4" />
-                <span>Sort</span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
-              </button>
-              {showSortDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        setSortBy("newest")
-                        setShowSortDropdown(false)
-                      }}
-                      className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "newest" ? "bg-gray-100 font-medium" : ""}`}
-                    >
-                      Newest First
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSortBy("price_low")
-                        setShowSortDropdown(false)
-                      }}
-                      className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "price_low" ? "bg-gray-100 font-medium" : ""}`}
-                    >
-                      Price: Low to High
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSortBy("price_high")
-                        setShowSortDropdown(false)
-                      }}
-                      className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "price_high" ? "bg-gray-100 font-medium" : ""}`}
-                    >
-                      Price: High to Low
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSortBy("popular")
-                        setShowSortDropdown(false)
-                      }}
-                      className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "popular" ? "bg-gray-100 font-medium" : ""}`}
-                    >
-                      Most Popular
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex border border-gray-300 rounded-xl overflow-hidden">
-              <button
+            <DropdownMenu open={showSortDropdown} onOpenChange={setShowSortDropdown}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="border border-gray-200 dark:border-gray-700">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Sort
+                  <ChevronDown
+                    className={`h-4 w-4 ml-2 transition-transform ${showSortDropdown ? "rotate-180" : ""}`}
+                  />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="border border-gray-200 dark:border-gray-700">
+                <DropdownMenuItem
+                  onClick={() => setSortBy("newest")}
+                  className={sortBy === "newest" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
+                >
+                  Newest First
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("price_low")}
+                  className={sortBy === "price_low" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
+                >
+                  Price: Low to High
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("price_high")}
+                  className={sortBy === "price_high" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
+                >
+                  Price: High to Low
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("popular")}
+                  className={sortBy === "popular" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
+                >
+                  Most Popular
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="flex border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setViewMode("grid")}
-                className={`px-3 py-2 ${viewMode === "grid" ? "bg-gray-100" : "hover:bg-gray-50"} transition-colors`}
+                className={viewMode === "grid" ? "bg-gray-100 dark:bg-gray-800" : ""}
               >
                 <Grid className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setViewMode("list")}
-                className={`px-3 py-2 ${viewMode === "list" ? "bg-gray-100" : "hover:bg-gray-50"} transition-colors`}
+                className={viewMode === "list" ? "bg-gray-100 dark:bg-gray-800" : ""}
               >
                 <List className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -237,12 +234,12 @@ export default function MyProductsPage() {
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="bg-white rounded-xl overflow-hidden shadow-md border border-gray-100 animate-pulse"
+              className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
             >
-              <div className="aspect-square bg-gray-200"></div>
+              <div className="aspect-square bg-gray-200 dark:bg-gray-700"></div>
               <div className="p-4 space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
               </div>
             </div>
           ))}
@@ -256,7 +253,7 @@ export default function MyProductsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.1 }}
-                className="bg-white rounded-xl overflow-hidden shadow-md border border-gray-100 group"
+                className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-[#f58220]/50 transition-all group"
               >
                 <div className="relative">
                   <div className="aspect-square relative">
@@ -268,38 +265,38 @@ export default function MyProductsPage() {
                     />
                   </div>
                   <div className="absolute top-2 left-2">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                        product.status,
-                      )}`}
-                    >
+                    <Badge variant="outline" className={`${getStatusBadgeColor(product.status)}`}>
                       {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
-                    </span>
+                    </Badge>
                   </div>
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="flex space-x-1">
-                      <button
+                      <Button
+                        variant="outline"
+                        size="icon"
                         onClick={() => handleToggleVisibility(product.id)}
-                        className="p-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm hover:bg-white transition-colors"
+                        className="h-8 w-8 bg-white/90 backdrop-blur-sm border border-gray-200"
                       >
                         {product.status === "active" ? (
                           <EyeOff className="h-4 w-4 text-gray-700" />
                         ) : (
                           <Eye className="h-4 w-4 text-gray-700" />
                         )}
-                      </button>
+                      </Button>
                       <Link
                         href={`/dashboard/my-products/edit/${product.id}`}
-                        className="p-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm hover:bg-white transition-colors"
+                        className="h-8 w-8 flex items-center justify-center rounded-md bg-white/90 backdrop-blur-sm border border-gray-200 hover:bg-white transition-colors"
                       >
                         <Edit className="h-4 w-4 text-gray-700" />
                       </Link>
-                      <button
+                      <Button
+                        variant="outline"
+                        size="icon"
                         onClick={() => handleDeleteProduct(product.id)}
-                        className="p-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm hover:bg-white transition-colors"
+                        className="h-8 w-8 bg-white/90 backdrop-blur-sm border border-gray-200"
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -323,7 +320,7 @@ export default function MyProductsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.1 }}
-                className="bg-white rounded-xl overflow-hidden shadow-md border border-gray-100"
+                className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-[#f58220]/50 transition-all"
               >
                 <div className="flex">
                   <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
@@ -334,41 +331,41 @@ export default function MyProductsPage() {
                       className="object-cover"
                     />
                     <div className="absolute top-2 left-2">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                          product.status,
-                        )}`}
-                      >
+                      <Badge variant="outline" className={`${getStatusBadgeColor(product.status)}`}>
                         {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                   <div className="flex-1 p-4 flex flex-col">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs uppercase text-gray-500">{product.category}</span>
                       <div className="flex items-center space-x-2">
-                        <button
+                        <Button
+                          variant="outline"
+                          size="icon"
                           onClick={() => handleToggleVisibility(product.id)}
-                          className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                          className="h-8 w-8 border border-gray-200 dark:border-gray-700"
                         >
                           {product.status === "active" ? (
                             <EyeOff className="h-4 w-4 text-gray-700" />
                           ) : (
                             <Eye className="h-4 w-4 text-gray-700" />
                           )}
-                        </button>
+                        </Button>
                         <Link
                           href={`/dashboard/my-products/edit/${product.id}`}
-                          className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                          className="h-8 w-8 flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                         >
                           <Edit className="h-4 w-4 text-gray-700" />
                         </Link>
-                        <button
+                        <Button
+                          variant="outline"
+                          size="icon"
                           onClick={() => handleDeleteProduct(product.id)}
-                          className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                          className="h-8 w-8 border border-gray-200 dark:border-gray-700"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                     <h3 className="font-medium text-lg mb-1">{product.name}</h3>
@@ -395,20 +392,21 @@ export default function MyProductsPage() {
           </div>
         )
       ) : (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-            <Package className="h-8 w-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium mb-2">No products yet</h3>
-          <p className="text-gray-500 mb-6">You haven't listed any products for sale yet</p>
-          <Link
-            href="/dashboard/my-products/new"
-            className="px-4 py-2 bg-[#f58220] text-white font-medium rounded-lg hover:bg-[#f58220]/90 transition-all inline-flex items-center"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Add New Product
-          </Link>
-        </div>
+        <Card className="text-center py-16 border border-gray-200 dark:border-gray-700">
+          <CardContent>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+              <Package className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No products yet</h3>
+            <p className="text-gray-500 mb-6">You haven't listed any products for sale yet</p>
+            <Link href="/dashboard/my-products/new">
+              <Button className="bg-[#f58220] hover:bg-[#f58220]/90">
+                <Plus className="h-5 w-5 mr-2" />
+                Add New Product
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

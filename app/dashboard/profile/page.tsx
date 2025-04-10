@@ -7,6 +7,9 @@ import { useAuth } from "@/providers/auth-provider"
 import { useProducts } from "@/providers/product-provider"
 import { Camera, Edit, MapPin, Calendar, Star, ShoppingBag, MessageCircle, Share2 } from "lucide-react"
 import ProductCard from "@/components/products/product-card"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -44,30 +47,30 @@ export default function ProfilePage() {
     <div className="space-y-8">
       {/* Profile header */}
       <div className="relative">
-        <div className="h-48 rounded-xl overflow-hidden bg-gradient-to-r from-[#f58220] to-[#0a2472]">
-          <div className="absolute inset-0 bg-gradient-to-r from-[#f58220]/20 to-[#0a2472]/20 backdrop-blur-sm"></div>
+        <div className="h-48 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-[#0a2472]/10">
+          <div className="absolute inset-0 bg-pattern opacity-10"></div>
         </div>
         <div className="absolute bottom-0 left-8 transform translate-y-1/2 flex items-end">
           <div className="relative">
-            <div className="w-24 h-24 rounded-xl overflow-hidden border-4 border-white shadow-lg bg-white">
+            <div className="w-24 h-24 rounded-xl overflow-hidden border-4 border-white dark:border-gray-900 bg-white">
               <Image
                 src={user?.avatar || "/placeholder.svg?height=96&width=96"}
-                alt={user?.firstName || "User"}
+                alt={user?.first_name || "User"}
                 width={96}
                 height={96}
                 className="w-full h-full object-cover"
               />
             </div>
-            <button className="absolute bottom-2 right-2 p-1.5 rounded-full bg-[#f58220] text-white shadow-md">
+            <button className="absolute bottom-2 right-2 p-1.5 rounded-full bg-[#f58220] text-white border border-white">
               <Camera className="h-4 w-4" />
             </button>
           </div>
         </div>
         <div className="absolute bottom-4 right-4">
-          <button className="flex items-center px-4 py-2 rounded-xl bg-white/80 backdrop-blur-sm text-[#0a2472] font-medium shadow-md hover:bg-white transition-colors">
+          <Button className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-[#0a2472]">
             <Edit className="h-4 w-4 mr-2" />
             Edit Profile
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -75,8 +78,8 @@ export default function ProfilePage() {
       <div className="pt-16 px-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
-              {user?.firstName} {user?.lastName}
+            <h1 className="text-2xl font-bold text-[#0a2472]">
+              {user?.first_name} {user?.last_name}
             </h1>
             <div className="flex items-center mt-1 text-gray-500">
               <MapPin className="h-4 w-4 mr-1" />
@@ -87,35 +90,37 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="flex items-center mt-4 md:mt-0 space-x-2">
-            <div className="flex items-center px-3 py-1.5 rounded-lg bg-[#f58220]/10 text-[#f58220]">
+            <div className="flex items-center px-3 py-1.5 rounded-lg bg-[#f58220]/10 text-[#f58220] border border-[#f58220]/20">
               <Star className="h-4 w-4 mr-1 fill-[#f58220]" />
               <span className="font-medium">4.8</span>
               <span className="text-xs ml-1">(24 reviews)</span>
             </div>
-            <button className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+            <Button variant="outline" size="icon" className="border border-gray-200 dark:border-gray-700">
               <Share2 className="h-5 w-5" />
-            </button>
-            <button className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+            </Button>
+            <Button variant="outline" size="icon" className="border border-gray-200 dark:border-gray-700">
               <MessageCircle className="h-5 w-5" />
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="mt-6 bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold mb-4">About</h2>
-          <p className="text-gray-600">
-            Hi there! I'm a student at {user?.university || "University"} studying Computer Science. I sell textbooks,
-            electronics, and other items that I no longer need. Feel free to message me if you have any questions!
-          </p>
-        </div>
+        <Card className="mt-6 border border-gray-200 dark:border-gray-700">
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold mb-4">About</h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Hi there! I'm a student at {user?.university || "University"} studying Computer Science. I sell textbooks,
+              electronics, and other items that I no longer need. Feel free to message me if you have any questions!
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <div className="flex space-x-8">
-          <button
-            onClick={() => setActiveTab("listings")}
-            className={`py-4 px-1 font-medium text-sm border-b-2 transition-colors ${
+      <Tabs defaultValue="listings" onValueChange={(value) => setActiveTab(value as "listings" | "reviews")}>
+        <TabsList className="border-b border-gray-200 dark:border-gray-700 w-full justify-start rounded-none bg-transparent p-0">
+          <TabsTrigger
+            value="listings"
+            className={`py-4 px-6 font-medium text-sm border-b-2 rounded-none transition-colors ${
               activeTab === "listings"
                 ? "border-[#f58220] text-[#f58220]"
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -125,10 +130,10 @@ export default function ProfilePage() {
               <ShoppingBag className="h-4 w-4 mr-2" />
               Listings
             </div>
-          </button>
-          <button
-            onClick={() => setActiveTab("reviews")}
-            className={`py-4 px-1 font-medium text-sm border-b-2 transition-colors ${
+          </TabsTrigger>
+          <TabsTrigger
+            value="reviews"
+            className={`py-4 px-6 font-medium text-sm border-b-2 rounded-none transition-colors ${
               activeTab === "reviews"
                 ? "border-[#f58220] text-[#f58220]"
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -138,48 +143,45 @@ export default function ProfilePage() {
               <Star className="h-4 w-4 mr-2" />
               Reviews
             </div>
-          </button>
-        </div>
-      </div>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Tab content */}
-      <div>
-        {activeTab === "listings" ? (
-          <div>
-            <h2 className="text-xl font-semibold mb-6">My Listings</h2>
-            {userProducts.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {userProducts.map((product, index) => (
-                  <motion.div
-                    key={product.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.1 }}
-                  >
-                    <ProductCard product={product} />
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-xl">
+        <TabsContent value="listings" className="mt-6">
+          <h2 className="text-xl font-semibold mb-6">My Listings</h2>
+          {userProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {userProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <Card className="text-center py-12 border border-gray-200 dark:border-gray-700">
+              <CardContent>
                 <ShoppingBag className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No listings yet</h3>
                 <p className="text-gray-500 mb-6">You haven't listed any products for sale yet.</p>
-                <button className="px-4 py-2 rounded-xl bg-[#f58220] text-white font-medium shadow-md hover:shadow-lg transition-all">
-                  Create Listing
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            <h2 className="text-xl font-semibold mb-6">Reviews</h2>
-            {reviews.length > 0 ? (
-              <div className="space-y-4">
-                {reviews.map((review) => (
-                  <div key={review.id} className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
+                <Button className="bg-[#f58220] hover:bg-[#f58220]/90">Create Listing</Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="reviews" className="mt-6">
+          <h2 className="text-xl font-semibold mb-6">Reviews</h2>
+          {reviews.length > 0 ? (
+            <div className="space-y-4">
+              {reviews.map((review) => (
+                <Card key={review.id} className="border border-gray-200 dark:border-gray-700">
+                  <CardContent className="p-6">
                     <div className="flex items-start">
-                      <div className="w-10 h-10 rounded-full overflow-hidden mr-4">
+                      <div className="w-10 h-10 rounded-full overflow-hidden mr-4 border border-gray-200 dark:border-gray-700">
                         <Image
                           src={review.reviewer.avatar || "/placeholder.svg"}
                           alt={review.reviewer.name}
@@ -204,19 +206,21 @@ export default function ProfilePage() {
                         <p className="text-gray-600">{review.comment}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-xl">
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="text-center py-12 border border-gray-200 dark:border-gray-700">
+              <CardContent>
                 <Star className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No reviews yet</h3>
                 <p className="text-gray-500">You haven't received any reviews yet.</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
