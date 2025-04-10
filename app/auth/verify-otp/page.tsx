@@ -11,7 +11,7 @@ import { ArrowLeft, CheckCircle } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 
 export default function VerifyOTPPage() {
-  const [otp, setOtp] = useState(["", "", "", ""])
+  const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isVerifying, setIsVerifying] = useState(false)
   const [isVerified, setIsVerified] = useState(false)
   const [error, setError] = useState("")
@@ -70,11 +70,11 @@ export default function VerifyOTPPage() {
       return
     }
 
-    const digits = pastedData.slice(0, 4).split("")
+    const digits = pastedData.slice(0, 7).split("")
     const newOtp = [...otp]
 
     digits.forEach((digit, index) => {
-      if (index < 4) {
+      if (index < 6) {
         newOtp[index] = digit
       }
     })
@@ -96,7 +96,7 @@ export default function VerifyOTPPage() {
 
     const otpValue = otp.join("")
 
-    if (otpValue.length !== 4) {
+    if (otpValue.length !== 6) {
       setError("Please enter all 4 digits of the OTP")
       return
     }

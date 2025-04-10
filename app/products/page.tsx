@@ -78,7 +78,7 @@ export default function ProductsPage() {
       // Handle sorting
       switch (sortBy) {
         case "newest":
-          filters.ordering = "-created_at"
+          filters.ordering = "created_at"
           break
         case "price_low":
           filters.ordering = "price"
@@ -99,7 +99,7 @@ export default function ProductsPage() {
     }
 
     getProducts()
-  }, [searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy, fetchProducts])
+  }, [searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy])
 
   // Update filtered products when products change
   useEffect(() => {
