@@ -2,11 +2,10 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
-import { useProducts } from "@/providers/product-provider"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Home,
@@ -23,10 +22,14 @@ import {
   ChevronRight,
   Grid3X3,
   Sparkles,
+  Plus,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Logo } from "@/components/ui/logo"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,14 +45,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { Logo } from "@/components/ui/logo"
-import { useMediaQuery } from "@/hooks/use-media-query"
-import Image from "next/image"
+import { Input } from "@/components/ui/input"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
-  const { categories } = useProducts()
   const pathname = usePathname()
   const router = useRouter()
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -57,7 +56,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [expanded, setExpanded] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
   const [requestForm, setRequestForm] = useState({
     productName: "",
     description: "",
@@ -69,40 +67,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setExpanded(!isMobile)
   }, [isMobile])
 
-  // Close mobile sidebar when route changes
-  useEffect(() => {
-    if (isMobile && mobileOpen) {
-      setMobileOpen(false)
-    }
-  }, [pathname, isMobile, mobileOpen])
-
   // Get user initials for avatar fallback
   const getUserInitials = () => {
     if (!user) return "U"
-    return `${user.first_name?.charAt(0)}${user.last_name?.charAt(0)}`
-  }
-
-  // Handle search submit
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      router.push(`/dashboard/products?search=${encodeURIComponent(searchQuery)}`)
-    }
+    return `${user.first_name?.charAt(0) || ""}${user.last_name?.charAt(0) || ""}`.toUpperCase()
   }
 
   // Handle request submit
   const handleRequestSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, you would call an API to submit the request
-    alert(`Request submitted: ${requestForm.productName}`)
+    // TODO: Implement request submission
     setShowRequestModal(false)
-    setRequestForm({
-      productName: "",
-      description: "",
-      category: "",
-    })
   }
 
+  // Navigation items - using the correct items from the snippet
   const navItems = [
     {
       name: "Dashboard",
@@ -164,96 +142,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     },
   ]
 
-  // Sidebar variants for animations
-  const sidebarVariants = {
-    expanded: {
-      width: "280px",
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-      },
-    },
-    collapsed: {
-      width: "80px",
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-      },
-    },
-    mobileOpen: {
-      x: 0,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-      },
-    },
-    mobileClosed: {
-      x: "-100%",
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-      },
-    },
-  }
+  // Categories
+  const categories = [
+    { id: "1", name: "Electronics", product_count: 120, icon: <Grid3X3 className="h-4 w-4" /> },
+    { id: "2", name: "Clothing", product_count: 84, icon: <Grid3X3 className="h-4 w-4" /> },
+    { id: "3", name: "Books", product_count: 56, icon: <Grid3X3 className="h-4 w-4" /> },
+    { id: "4", name: "Furniture", product_count: 32, icon: <Grid3X3 className="h-4 w-4" /> },
+    { id: "5", name: "Sports", product_count: 28, icon: <Grid3X3 className="h-4 w-4" /> },
+    { id: "6", name: "Beauty", product_count: 24, icon: <Grid3X3 className="h-4 w-4" /> },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Navbar */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-800 z-40 border-b border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      {/* Mobile header */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 lg:px-6 z-30">
+        <div className="flex items-center">
           <button
-            onClick={() => (isMobile ? setMobileOpen(!mobileOpen) : setExpanded(!expanded))}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 lg:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <Logo className="text-xl" />
+          <div className="ml-3 lg:hidden">
+            <Logo className="text-xl" />
+          </div>
         </div>
 
-        <div className="hidden md:flex relative w-96">
-          <form onSubmit={handleSearchSubmit} className="w-full">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
-              />
-            </div>
-          </form>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="relative">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowRequestModal(true)}
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+          <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 relative">
             <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white">
-              5
-            </span>
-          </Button>
-
+            <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
+          </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full">
+              <button className="flex items-center">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.profile_picture} alt={user?.first_name} />
+                  <AvatarImage src={user?.profile_picture || ""} alt={user?.first_name || "User"} />
                   <AvatarFallback>{getUserInitials()}</AvatarFallback>
                 </Avatar>
-              </Button>
+              </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <div className="flex items-center justify-start gap-2 p-2">
-                <div className="flex flex-col space-y-1 leading-none">
-                  <p className="font-medium">
-                    {user?.first_name} {user?.last_name}
-                  </p>
-                  <p className="w-[200px] truncate text-sm text-gray-500">{user?.email}</p>
-                </div>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="p-2">
+                <p className="font-medium">{user?.first_name} {user?.last_name}</p>
+                <p className="text-xs text-gray-500">{user?.email}</p>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
@@ -263,7 +201,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Link href="/dashboard/settings">Settings</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-500 focus:text-red-500" onSelect={() => logout()}>
+              <DropdownMenuItem onClick={logout} className="text-red-500">
                 Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -271,68 +209,78 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </header>
 
-      {/* Sidebar Overlay */}
+      {/* Overlay for mobile - closes sidebar when clicked outside */}
       <AnimatePresence>
-        {isMobile && mobileOpen && (
+        {mobileOpen && isMobile && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 z-30 lg:hidden"
             onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
           />
         )}
       </AnimatePresence>
 
       {/* Sidebar */}
       <motion.div
-        variants={sidebarVariants}
-        initial={isMobile ? "mobileClosed" : "expanded"}
-        animate={isMobile ? (mobileOpen ? "mobileOpen" : "mobileClosed") : expanded ? "expanded" : "collapsed"}
-        className={`fixed top-0 left-0 h-full z-50 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 pt-16 overflow-hidden ${
-          isMobile ? "w-[280px]" : ""
+        className={`fixed top-0 left-0 bottom-0 z-40 w-[280px] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm ${
+          isMobile ? "pt-16" : "pt-0"
         }`}
+        initial={isMobile ? { x: -280 } : { x: expanded ? 0 : -200 }}
+        animate={
+          isMobile
+            ? { x: mobileOpen ? 0 : -280 }
+            : { x: 0, width: expanded ? 280 : 80 }
+        }
+        transition={{ duration: 0.3 }}
       >
-        <div className="h-full flex flex-col">
-          {/* User info */}
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col h-full">
+          {/* Sidebar header */}
+          <div className="p-4 flex items-center justify-between">
             <div className="flex items-center">
-              <div className="relative">
-                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#f58220]/30">
-                  <Image
-                    src={user?.profile_picture || "/placeholder.svg?height=40&width=40"}
-                    alt={user?.first_name || "User"}
-                    width={40}
-                    height={40}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-              </div>
+              <Logo className={`${expanded || isMobile ? "text-xl" : "hidden"}`} />
+              {isMobile && (
+                <button 
+                  onClick={() => setMobileOpen(false)}
+                  className="absolute top-4 right-4 p-1 rounded-full bg-gray-100 text-gray-500"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {!isMobile && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <ChevronRight
+                  className={`h-5 w-5 transition-transform ${expanded ? "rotate-180" : ""}`}
+                />
+              </button>
+            )}
+          </div>
 
-              <AnimatePresence>
-                {(expanded || isMobile) && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="ml-3 flex-1 min-w-0"
-                  >
-                    <p className="font-medium truncate">
-                      {user?.first_name} {user?.last_name}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {user?.user_type === "MERCHANT" ? "Merchant" : "Personal User"}
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+          {/* User profile */}
+          <div className="px-4 py-2">
+            <div className={`flex items-center ${expanded || isMobile ? "space-x-3" : "justify-center"}`}>
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={user?.profile_picture || ""} alt={user?.first_name || "User"} />
+                <AvatarFallback>{getUserInitials()}</AvatarFallback>
+              </Avatar>
+              {(expanded || isMobile) && (
+                <div className="overflow-hidden">
+                  <p className="font-medium truncate">{user?.first_name} {user?.last_name}</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Navigation */}
-          <div className="flex-1 overflow-y-auto py-4 px-3">
+          <div className="flex-1 overflow-y-auto py-4 px-3 no-scrollbar">
             <nav className="space-y-1">
               {navItems.map((item) => (
                 <Link
@@ -341,11 +289,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={`flex items-center rounded-xl px-3 py-2.5 transition-all relative group ${
                     pathname === item.href ? `${item.bgColor} ${item.color} font-medium` : `hover:${item.bgColor}`
                   }`}
+                  onClick={() => isMobile && setMobileOpen(false)}
                 >
                   <div
                     className={`flex items-center justify-center ${
                       expanded || isMobile ? "mr-3" : "mx-auto"
-                    } transition-all ${item.color}`}
+                    } transition-all ${pathname === item.href ? item.color : "text-gray-500"}`}
                   >
                     {item.icon}
                   </div>
@@ -385,30 +334,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.8 }}
                           transition={{ duration: 0.2 }}
-                          className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white"
+                          className="absolute -top-1 -right-1"
                         >
-                          {item.badge}
+                          <Badge variant="secondary" className="bg-red-500 text-white hover:bg-red-600 h-5 w-5 p-0 flex items-center justify-center rounded-full">
+                            {item.badge}
+                          </Badge>
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  )}
-
-                  {/* Active indicator */}
-                  {pathname === item.href && (
-                    <motion.div
-                      layoutId="activeIndicator"
-                      className={`absolute left-0 top-0 bottom-0 w-1 rounded-r-full ${item.color.replace("text-", "bg-")}`}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  )}
-
-                  {/* Tooltip for collapsed state */}
-                  {!expanded && !isMobile && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                      {item.name}
-                    </div>
                   )}
                 </Link>
               ))}
@@ -422,6 +355,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Link
                     href="/dashboard/categories"
                     className="text-xs text-[#f58220] hover:text-[#f58220]/80 flex items-center"
+                    onClick={() => isMobile && setMobileOpen(false)}
                   >
                     View All
                     <ChevronRight className="h-3 w-3 ml-1" />
@@ -438,8 +372,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           ? "bg-[#f58220]/10 text-[#f58220] font-medium"
                           : "hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
+                      onClick={() => isMobile && setMobileOpen(false)}
                     >
-                      <span className="mr-2">{category.icon || <Grid3X3 className="h-4 w-4" />}</span>
+                      <span className="mr-2 text-gray-500">{category.icon || <Grid3X3 className="h-4 w-4" />}</span>
                       <span>{category.name}</span>
                       <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">{category.product_count}</span>
                     </Link>

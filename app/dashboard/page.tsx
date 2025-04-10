@@ -1,505 +1,426 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
-import Image from "next/image"
+import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
+import { useProducts } from "@/providers/product-provider"
 import { useAuth } from "@/providers/auth-provider"
-import { Camera, Save, Lock, Bell, Globe, CreditCard, Shield, Moon, Sun, Smartphone, MessageCircle } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import Link from "next/link"
+import Image from "next/image"
+import ProductCard from "@/components/products/product-card"
+import {
+  ArrowRight,
+  TrendingUp,
+  Users,
+  ShoppingBag,
+  Heart,
+  Clock,
+  Layers,
+  Plus,
+  Filter,
+  SlidersHorizontal,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-export default function SettingsPage() {
+export default function DashboardPage() {
+  const { products, categories } = useProducts()
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<string>("profile")
-  const [profileForm, setProfileForm] = useState({
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
-    email: user?.email || "",
-    phone: user?.phone || "",
-    university: user?.university || "",
-    bio: "Hi there! I'm a student at University studying Computer Science. I sell textbooks, electronics, and other items that I no longer need.",
-  })
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("overview")
 
-  // Handle profile form change
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setProfileForm((prev) => ({ ...prev, [name]: value }))
-  }
+  // Simulate loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 1000)
 
-  // Notification settings
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
-    pushNotifications: true,
-    messageNotifications: true,
-    offerNotifications: true,
-    favoriteNotifications: false,
-    systemNotifications: true,
-  })
+    return () => clearTimeout(timer)
+  }, [])
 
-  // Handle notification toggle
-  const handleNotificationToggle = (setting: keyof typeof notificationSettings) => {
-    setNotificationSettings((prev) => ({ ...prev, [setting]: !prev[setting] }))
-  }
+  // Get the first 4 products
+  const featuredProducts = products.slice(0, 4)
 
-  // Privacy settings
-  const [privacySettings, setPrivacySettings] = useState({
-    showProfile: true,
-    showUniversity: true,
-    showActivity: false,
-    allowMessages: true,
-  })
+  // Recent activity (mock data)
+  const recentActivity = [
+    {
+      id: 1,
+      type: "view",
+      product: "MacBook Pro 2021",
+      time: "2 hours ago",
+      image: "/placeholder.svg?height=40&width=40&text=Mac",
+    },
+    {
+      id: 2,
+      type: "favorite",
+      product: "iPhone 13 Pro",
+      time: "Yesterday",
+      image: "/placeholder.svg?height=40&width=40&text=iPhone",
+    },
+    {
+      id: 3,
+      type: "message",
+      product: "Sony Headphones",
+      time: "2 days ago",
+      image: "/placeholder.svg?height=40&width=40&text=Sony",
+    },
+  ]
 
-  // Handle privacy toggle
-  const handlePrivacyToggle = (setting: keyof typeof privacySettings) => {
-    setPrivacySettings((prev) => ({ ...prev, [setting]: !prev[setting] }))
-  }
+  // Stats (mock data)
+  const stats = [
+    {
+      title: "Products Viewed",
+      value: 128,
+      change: "+12%",
+      icon: <TrendingUp className="h-5 w-5 text-emerald-500" />,
+      color: "bg-emerald-500/10",
+      textColor: "text-emerald-500",
+    },
+    {
+      title: "Active Listings",
+      value: 5,
+      change: "+2",
+      icon: <ShoppingBag className="h-5 w-5 text-blue-500" />,
+      color: "bg-blue-500/10",
+      textColor: "text-blue-500",
+    },
+    {
+      title: "Saved Items",
+      value: 24,
+      change: "+3",
+      icon: <Heart className="h-5 w-5 text-pink-500" />,
+      color: "bg-pink-500/10",
+      textColor: "text-pink-500",
+    },
+    {
+      title: "New Connections",
+      value: 18,
+      change: "+5",
+      icon: <Users className="h-5 w-5 text-purple-500" />,
+      color: "bg-purple-500/10",
+      textColor: "text-purple-500",
+    },
+  ]
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage your account settings and preferences</p>
-      </div>
+    <div className="space-y-8">
+      <Tabs defaultValue="overview" className="space-y-6" onValueChange={setActiveTab}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <TabsList className="bg-gray-100 dark:bg-gray-800">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        <Card className="w-full lg:w-64 h-fit">
-          <CardContent className="p-0">
-            <Tabs
-              defaultValue="profile"
-              value={activeTab}
-              onValueChange={setActiveTab}
-              orientation="vertical"
-              className="w-full"
-            >
-              <TabsList className="flex flex-col h-auto items-stretch p-0 bg-transparent space-y-1">
-                <TabsTrigger
-                  value="profile"
-                  className="justify-start px-4 py-3 data-[state=active]:bg-muted data-[state=active]:text-[#f58220] data-[state=active]:shadow-none"
-                >
-                  Profile
-                </TabsTrigger>
-                <TabsTrigger
-                  value="account"
-                  className="justify-start px-4 py-3 data-[state=active]:bg-muted data-[state=active]:text-[#f58220] data-[state=active]:shadow-none"
-                >
-                  Account
-                </TabsTrigger>
-                <TabsTrigger
-                  value="notifications"
-                  className="justify-start px-4 py-3 data-[state=active]:bg-muted data-[state=active]:text-[#f58220] data-[state=active]:shadow-none"
-                >
-                  Notifications
-                </TabsTrigger>
-                <TabsTrigger
-                  value="privacy"
-                  className="justify-start px-4 py-3 data-[state=active]:bg-muted data-[state=active]:text-[#f58220] data-[state=active]:shadow-none"
-                >
-                  Privacy
-                </TabsTrigger>
-                <TabsTrigger
-                  value="payment"
-                  className="justify-start px-4 py-3 data-[state=active]:bg-muted data-[state=active]:text-[#f58220] data-[state=active]:shadow-none"
-                >
-                  Payment Methods
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardContent>
-        </Card>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-9">
+              <Filter className="h-4 w-4 mr-2" />
+              Filter
+            </Button>
+            <Button variant="outline" size="sm" className="h-9">
+              <SlidersHorizontal className="h-4 w-4 mr-2" />
+              Sort
+            </Button>
+            <Button size="sm" className="h-9 bg-[#f58220] hover:bg-[#f58220]/90">
+              <Plus className="h-4 w-4 mr-2" />
+              New Product
+            </Button>
+          </div>
+        </div>
 
-        <div className="flex-1 space-y-6">
-          {activeTab === "profile" && (
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>Update your personal information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6 pt-6">
-                <div className="flex justify-center">
-                  <div className="relative">
-                    <div className="h-24 w-24 rounded-full border overflow-hidden">
+        <TabsContent value="overview" className="space-y-8">
+          <Card className="border border-gray-200 dark:border-gray-700">
+            <CardContent className="p-6 md:p-8">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-[#0a2472]">Welcome back, {user?.first_name}!</h1>
+                  <p className="text-gray-600 dark:text-gray-400 mt-2">
+                    Discover products and services from fellow students at {user?.university}.
+                  </p>
+                </div>
+                <div className="mt-4 md:mt-0">
+                  <Link href="/dashboard/products">
+                    <Button className="bg-[#f58220] hover:bg-[#f58220]/90">
+                      Browse Products
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {stats.map((stat, index) => (
+              <motion.div
+                key={stat.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <Card className="border border-gray-200 dark:border-gray-700">
+                  <CardContent className="p-6">
+                    <div className="flex items-start">
+                      <div className={`p-2 rounded-lg ${stat.color} mr-3`}>{stat.icon}</div>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{stat.title}</p>
+                        <div className="flex items-baseline">
+                          <h3 className="text-2xl font-bold">{stat.value}</h3>
+                          <span className={`ml-2 text-xs font-medium ${stat.textColor}`}>{stat.change}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Categories</h2>
+              <Link
+                href="/dashboard/categories"
+                className="text-[#f58220] hover:text-[#f58220]/80 text-sm font-medium flex items-center"
+              >
+                View All <ArrowRight className="h-4 w-4 ml-1" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {categories.slice(0, 5).map((category, index) => (
+                <motion.div
+                  key={category.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
+                >
+                  <Link
+                    href={`/dashboard/categories/${category.id}`}
+                    className="rounded-xl p-4 h-full flex flex-col items-center justify-center text-center border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-[#f58220]/50 transition-all"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#f58220]/10 flex items-center justify-center mb-3">
+                      <span className="text-xl">{category.icon || <Layers className="h-5 w-5 text-[#f58220]" />}</span>
+                    </div>
+                    <h3 className="font-medium">{category.name}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{category.product_count} items</p>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Featured Products</h2>
+              <Link
+                href="/dashboard/products"
+                className="text-[#f58220] hover:text-[#f58220]/80 text-sm font-medium flex items-center"
+              >
+                View All <ArrowRight className="h-4 w-4 ml-1" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {isLoading
+                ? Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
+                    >
+                      <div className="aspect-square bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))
+                : featuredProducts.map((product, index) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                    >
+                      <ProductCard product={product} />
+                    </motion.div>
+                  ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="products" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Your Products</h2>
+            <Link href="/dashboard/my-products/new">
+              <Button className="bg-[#f58220] hover:bg-[#f58220]/90">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {isLoading
+              ? Array.from({ length: 8 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
+                  >
+                    <div className="aspect-square bg-gray-200 dark:bg-gray-700"></div>
+                    <div className="p-4 space-y-3">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                    </div>
+                  </div>
+                ))
+              : products.slice(0, 8).map((product, index) => (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                  >
+                    <ProductCard product={product} />
+                  </motion.div>
+                ))}
+          </div>
+          {products.length > 8 && (
+            <div className="flex justify-center mt-8">
+              <Button variant="outline">Load More</Button>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Recent Activity</h2>
+            <Button variant="outline" size="sm">
+              <Filter className="h-4 w-4 mr-2" />
+              Filter
+            </Button>
+          </div>
+
+          <Card className="border border-gray-200 dark:border-gray-700">
+            <CardHeader className="pb-3">
+              <CardTitle>Activity Feed</CardTitle>
+              <CardDescription>Your recent interactions on the platform</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {recentActivity.map((activity) => (
+                  <div key={activity.id} className="p-4 flex items-center">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden mr-3 border border-gray-200 dark:border-gray-700">
                       <Image
-                        src={user?.avatar || "/placeholder.svg?height=96&width=96&text=Avatar"}
-                        alt={user?.firstName || "User"}
-                        width={96}
-                        height={96}
-                        className="object-cover"
+                        src={activity.image || "/placeholder.svg"}
+                        alt={activity.product}
+                        width={40}
+                        height={40}
+                        className="w-full h-full object-cover"
                       />
                     </div>
-                    <Button
-                      size="icon"
-                      className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-[#f58220] hover:bg-[#f58220]/90 border-2 border-white"
-                    >
-                      <Camera className="h-4 w-4" />
-                      <span className="sr-only">Upload photo</span>
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        {activity.type === "view"
+                          ? "You viewed"
+                          : activity.type === "favorite"
+                            ? "You saved"
+                            : "You messaged about"}{" "}
+                        <span className="text-[#f58220]">{activity.product}</span>
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {activity.time}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm">
+                      View
                     </Button>
                   </div>
-                </div>
+                ))}
+              </div>
+            </CardContent>
+            <CardFooter className="border-t border-gray-200 dark:border-gray-700 p-4">
+              <Button variant="outline" className="w-full">
+                View All Activity
+              </Button>
+            </CardFooter>
+          </Card>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      name="firstName"
-                      value={profileForm.firstName}
-                      onChange={handleProfileChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" name="lastName" value={profileForm.lastName} onChange={handleProfileChange} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={profileForm.email}
-                      onChange={handleProfileChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      value={profileForm.phone}
-                      onChange={handleProfileChange}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="university">University</Label>
-                  <Select
-                    value={profileForm.university}
-                    onValueChange={(value) => setProfileForm((prev) => ({ ...prev, university: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select your university" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="University of Lagos">University of Lagos</SelectItem>
-                      <SelectItem value="University of Ibadan">University of Ibadan</SelectItem>
-                      <SelectItem value="Obafemi Awolowo University">Obafemi Awolowo University</SelectItem>
-                      <SelectItem value="University of Benin">University of Benin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    name="bio"
-                    rows={4}
-                    value={profileForm.bio}
-                    onChange={handleProfileChange}
-                    className="resize-none"
-                  />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border border-gray-200 dark:border-gray-700">
+              <CardHeader>
+                <CardTitle>Messages</CardTitle>
+                <CardDescription>Recent conversations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={`/placeholder.svg?height=40&width=40&text=User${i}`} />
+                        <AvatarFallback>U{i}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">User {i}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                          Hey, I'm interested in your product...
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="ml-auto">
+                        New
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end border-t p-6">
-                <Button className="bg-[#0a2472] hover:bg-[#0a2472]/90">
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+              <CardFooter className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <Button variant="outline" className="w-full">
+                  View All Messages
                 </Button>
               </CardFooter>
             </Card>
-          )}
 
-          {activeTab === "account" && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle>Password</CardTitle>
-                  <CardDescription>Update your password</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6 pt-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Current Password</Label>
-                    <Input id="currentPassword" type="password" />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <Input id="newPassword" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                      <Input id="confirmPassword" type="password" />
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-end border-t p-6">
-                  <Button className="bg-[#0a2472] hover:bg-[#0a2472]/90">
-                    <Lock className="mr-2 h-4 w-4" />
-                    Update Password
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle>Appearance</CardTitle>
-                  <CardDescription>Customize your experience</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      {isDarkMode ? (
-                        <Moon className="h-5 w-5 text-[#0a2472]" />
-                      ) : (
-                        <Sun className="h-5 w-5 text-[#f58220]" />
-                      )}
-                      <div>
-                        <p className="font-medium">Dark Mode</p>
-                        <p className="text-sm text-muted-foreground">Switch between light and dark themes</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={isDarkMode}
-                      onCheckedChange={setIsDarkMode}
-                      className="data-[state=checked]:bg-[#0a2472]"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle>Language</CardTitle>
-                  <CardDescription>Choose your preferred language</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="flex items-center space-x-4">
-                    <Globe className="h-5 w-5 text-[#0a2472]" />
-                    <div className="flex-1">
-                      <Select defaultValue="en">
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select language" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="fr">French</SelectItem>
-                          <SelectItem value="es">Spanish</SelectItem>
-                          <SelectItem value="de">German</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {activeTab === "notifications" && (
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>Manage how you receive notifications</CardDescription>
+            <Card className="border border-gray-200 dark:border-gray-700">
+              <CardHeader>
+                <CardTitle>Saved Products</CardTitle>
+                <CardDescription>Products you've favorited</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6 pt-6">
+              <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <Bell className="h-5 w-5 text-[#f58220]" />
-                      <div>
-                        <p className="font-medium">Email Notifications</p>
-                        <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-600">
+                        <Image
+                          src={`/placeholder.svg?height=48&width=48&text=P${i}`}
+                          alt={`Product ${i}`}
+                          width={48}
+                          height={48}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                    </div>
-                    <Switch
-                      checked={notificationSettings.emailNotifications}
-                      onCheckedChange={() => handleNotificationToggle("emailNotifications")}
-                      className="data-[state=checked]:bg-[#0a2472]"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <Smartphone className="h-5 w-5 text-[#0a2472]" />
-                      <div>
-                        <p className="font-medium">Push Notifications</p>
-                        <p className="text-sm text-muted-foreground">Receive notifications on your device</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">Product {i}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">$199.99</p>
                       </div>
+                      <Button variant="ghost" size="icon">
+                        <Heart className="h-5 w-5 text-pink-500 fill-pink-500" />
+                      </Button>
                     </div>
-                    <Switch
-                      checked={notificationSettings.pushNotifications}
-                      onCheckedChange={() => handleNotificationToggle("pushNotifications")}
-                      className="data-[state=checked]:bg-[#0a2472]"
-                    />
-                  </div>
-                </div>
-
-                <div className="border-t pt-6">
-                  <h3 className="font-medium mb-4">Notification Types</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Messages</p>
-                        <p className="text-sm text-muted-foreground">Notifications for new messages</p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.messageNotifications}
-                        onCheckedChange={() => handleNotificationToggle("messageNotifications")}
-                        className="data-[state=checked]:bg-[#0a2472]"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Offers</p>
-                        <p className="text-sm text-muted-foreground">Notifications for offers on your listings</p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.offerNotifications}
-                        onCheckedChange={() => handleNotificationToggle("offerNotifications")}
-                        className="data-[state=checked]:bg-[#0a2472]"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Favorites</p>
-                        <p className="text-sm text-muted-foreground">
-                          Notifications when someone favorites your listing
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.favoriteNotifications}
-                        onCheckedChange={() => handleNotificationToggle("favoriteNotifications")}
-                        className="data-[state=checked]:bg-[#0a2472]"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">System Updates</p>
-                        <p className="text-sm text-muted-foreground">Notifications about UniStore updates</p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.systemNotifications}
-                        onCheckedChange={() => handleNotificationToggle("systemNotifications")}
-                        className="data-[state=checked]:bg-[#0a2472]"
-                      />
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </CardContent>
+              <CardFooter className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <Button variant="outline" className="w-full">
+                  View All Favorites
+                </Button>
+              </CardFooter>
             </Card>
-          )}
-
-          {activeTab === "privacy" && (
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle>Privacy Settings</CardTitle>
-                <CardDescription>Manage your privacy preferences</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6 pt-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <Shield className="h-5 w-5 text-[#f58220]" />
-                      <div>
-                        <p className="font-medium">Profile Visibility</p>
-                        <p className="text-sm text-muted-foreground">Allow others to view your profile</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={privacySettings.showProfile}
-                      onCheckedChange={() => handlePrivacyToggle("showProfile")}
-                      className="data-[state=checked]:bg-[#0a2472]"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <Globe className="h-5 w-5 text-[#0a2472]" />
-                      <div>
-                        <p className="font-medium">Show University</p>
-                        <p className="text-sm text-muted-foreground">Display your university on your profile</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={privacySettings.showUniversity}
-                      onCheckedChange={() => handlePrivacyToggle("showUniversity")}
-                      className="data-[state=checked]:bg-[#0a2472]"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <Bell className="h-5 w-5 text-[#f58220]" />
-                      <div>
-                        <p className="font-medium">Activity Status</p>
-                        <p className="text-sm text-muted-foreground">Show when you're active on UniStore</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={privacySettings.showActivity}
-                      onCheckedChange={() => handlePrivacyToggle("showActivity")}
-                      className="data-[state=checked]:bg-[#0a2472]"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <MessageCircle className="h-5 w-5 text-[#0a2472]" />
-                      <div>
-                        <p className="font-medium">Direct Messages</p>
-                        <p className="text-sm text-muted-foreground">Allow others to send you messages</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={privacySettings.allowMessages}
-                      onCheckedChange={() => handlePrivacyToggle("allowMessages")}
-                      className="data-[state=checked]:bg-[#0a2472]"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {activeTab === "payment" && (
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle>Payment Methods</CardTitle>
-                <CardDescription>Manage your payment methods</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-4">
-                    <CreditCard className="h-10 w-10 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-2">No payment methods</h3>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-md">
-                    You haven't added any payment methods yet. Add a payment method to make purchases easier.
-                  </p>
-                  <Button className="bg-[#0a2472] hover:bg-[#0a2472]/90">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Add Payment Method
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
