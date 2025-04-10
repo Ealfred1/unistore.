@@ -97,8 +97,12 @@ export default function SignupPage() {
 
       try {
         const phoneNumber = await signUp(formData)
-        // Redirect to OTP verification page with phone number
-        router.push(`/auth/verify-otp?phone=${encodeURIComponent(phoneNumber)}`)
+        
+        // Store phone number in local storage
+        localStorage.setItem("verification_phone_number", phoneNumber)
+        
+        // Redirect to OTP verification page
+        router.push(`/auth/verify-otp`)
       } catch (error: any) {
         console.error(error)
         toast({

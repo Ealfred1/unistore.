@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import axios from "@/lib/axios"
+import { useRouter } from "next/navigation"
 
 // Define user type
 interface User {
@@ -45,6 +46,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
 
   // Check if user is logged in on mount
   useEffect(() => {
@@ -56,13 +58,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
 
-        // Fetch user profile
+        // Try to get user from localStorage first for immediate UI update
+        const storedUser = localStorage.getItem("user")
+        if (storedUser) {
+          setUser(JSON.parse(storedUser))
+        }
+
+        // Then fetch fresh user profile from API
         const response = await axios.get("/users/profile/")
         setUser(response.data)
+        localStorage.setItem("user", JSON.stringify(response.data))
       } catch (error) {
         console.error("Authentication error:", error)
         localStorage.removeItem("access_token")
         localStorage.removeItem("refresh_token")
+        localStorage.removeItem("user")
       } finally {
         setIsLoading(false)
       }
@@ -74,21 +84,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Login function
   const login = async (credentials: { phone_number: string; password: string }) => {
     setIsLoading(true)
-
+ 
     try {
       const response = await axios.post("/users/auth/login/", credentials)
-      const { access_token, refresh_token } = response.data
+      
+      // Extract tokens from the response based on the actual structure
+      const { authentication, user_id, user_type } = response.data
+      const { access_token, refresh_token } = authentication
 
       // Store tokens
       localStorage.setItem("access_token", access_token)
       localStorage.setItem("refresh_token", refresh_token)
+      
+      // Store basic user info temporarily
+      const tempUser = {
+        id: user_id,
+        user_type: user_type
+      }
+      localStorage.setItem("user", JSON.stringify(tempUser))
 
-      // Fetch user profile
+      // Fetch complete user profile
       const userResponse = await axios.get("/users/profile/")
       setUser(userResponse.data)
+      
+      // Update user data in localStorage with complete profile
+      localStorage.setItem("user", JSON.stringify(userResponse.data))
+      
+      return Promise.resolve()
     } catch (error) {
       console.error("Login error:", error)
-      throw error
+      return Promise.reject(error)
     } finally {
       setIsLoading(false)
     }
@@ -96,104 +121,96 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Sign up function
   const signUp = async (userData: any) => {
-    setIsLoading(true)
-
     try {
-      const response = await axios.post("/users/auth/register/", {
+      // Transform the form data to match API expectations
+      const apiData = {
         first_name: userData.firstName,
         last_name: userData.lastName,
         email: userData.email,
         phone_number: userData.phone,
         password: userData.password,
-        confirm_password: userData.confirmPassword,
-        user_type: userData.userType.toUpperCase(),
-      })
+        user_type: userData.userType,
+      }
 
-      // Return the phone number for OTP verification
-      return userData.phone
+      const response = await axios.post("/users/auth/register/", apiData)
+      return userData.phone // Return phone number for OTP verification
     } catch (error) {
       console.error("Signup error:", error)
-      throw error
-    } finally {
-      setIsLoading(false)
+      return Promise.reject(error)
     }
   }
 
   // Verify OTP function
   const verifyOtp = async (otp: string, phone_number: string) => {
-    setIsLoading(true)
-
     try {
-      const response = await axios.post("/users/auth/verify-phone/", {
+      const response = await axios.post("/users/auth/verify-otp/", {
         phone_number,
-        verification_code: otp,
+        otp,
       })
-
-      const { access_token, refresh_token } = response.data
-
-      // Store tokens
-      localStorage.setItem("access_token", access_token)
-      localStorage.setItem("refresh_token", refresh_token)
-
-      // Fetch user profile
-      const userResponse = await axios.get("/users/profile/")
-      setUser(userResponse.data)
-
+      
+      // Handle the response based on the actual structure
+      if (response.data.authentication?.access_token) {
+        localStorage.setItem("access_token", response.data.authentication.access_token)
+        localStorage.setItem("refresh_token", response.data.authentication.refresh_token)
+        
+        // Store basic user info temporarily
+        if (response.data.user_id) {
+          const tempUser = {
+            id: response.data.user_id,
+            user_type: response.data.user_type || "PERSONAL"
+          }
+          localStorage.setItem("user", JSON.stringify(tempUser))
+        }
+        
+        // Fetch complete user profile
+        const userResponse = await axios.get("/users/profile/")
+        setUser(userResponse.data)
+        localStorage.setItem("user", JSON.stringify(userResponse.data))
+      }
+      
       return true
     } catch (error) {
       console.error("OTP verification error:", error)
       return false
-    } finally {
-      setIsLoading(false)
     }
   }
 
   // Update university function
   const updateUniversity = async (universityId: number) => {
     try {
-      await axios.post("/users/profile/update-university/", {
+      const response = await axios.patch("/users/profile/", {
         university_id: universityId,
       })
-
-      // Update user state with new university
-      const userResponse = await axios.get("/users/profile/")
-      setUser(userResponse.data)
+      setUser(response.data)
+      localStorage.setItem("user", JSON.stringify(response.data))
     } catch (error) {
-      console.error("University update error:", error)
-      throw error
+      console.error("Update university error:", error)
+      return Promise.reject(error)
     }
   }
 
   // Upgrade to merchant function
   const upgradeToMerchant = async (merchantName: string) => {
     try {
-      await axios.post("/users/profile/upgrade-to-merchant/", {
+      const response = await axios.patch("/users/profile/", {
+        user_type: "MERCHANT",
         merchant_name: merchantName,
       })
-
-      // Update user state with new merchant status
-      const userResponse = await axios.get("/users/profile/")
-      setUser(userResponse.data)
+      setUser(response.data)
+      localStorage.setItem("user", JSON.stringify(response.data))
     } catch (error) {
-      console.error("Merchant upgrade error:", error)
-      throw error
+      console.error("Upgrade to merchant error:", error)
+      return Promise.reject(error)
     }
   }
 
   // Logout function
-  const logout = async () => {
-    try {
-      const refreshToken = localStorage.getItem("refresh_token")
-      if (refreshToken) {
-        await axios.post("/users/auth/logout/", { refresh_token: refreshToken })
-      }
-    } catch (error) {
-      console.error("Logout error:", error)
-    } finally {
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("refresh_token")
-      setUser(null)
-    }
+  const logout = () => {
+    localStorage.removeItem("access_token")
+    localStorage.removeItem("refresh_token")
+    localStorage.removeItem("user")
+    setUser(null)
+    router.push("/auth/login")
   }
 
   return (
@@ -216,12 +233,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 }
 
 // Custom hook to use auth context
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext)
-
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }
-
   return context
 }

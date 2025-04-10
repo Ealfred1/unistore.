@@ -6,19 +6,36 @@ import { useState, useEffect } from "react"
 import { Plus, Bell } from "lucide-react"
 import { useAuth } from "@/providers/auth-provider"
 import EnhancedSidebar from "@/components/dashboard/enhanced-sidebar"
+import { useRouter } from "next/navigation"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const router = useRouter()
 
   // Check if user is authenticated
   useEffect(() => {
-    if (!user) {
-      // In a real app, you would redirect to login page
-      console.log("User not authenticated")
+    // Wait until loading is complete before checking authentication
+    if (!isLoading && !user) {
+      router.push("/auth/login")
     }
-  }, [user])
+  }, [user, isLoading, router])
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#f58220]"></div>
+      </div>
+    )
+  }
+
+  // If not authenticated and not loading, the useEffect will redirect
+  // This is just a fallback in case the redirect hasn't happened yet
+  if (!user && !isLoading) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

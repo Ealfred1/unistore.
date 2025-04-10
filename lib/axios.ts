@@ -41,7 +41,16 @@ axiosInstance.interceptors.response.use(
           refresh_token: refreshToken,
         })
 
-        const { access_token } = response.data
+        // Handle the response based on the actual structure
+        let access_token
+        if (response.data.authentication?.access_token) {
+          access_token = response.data.authentication.access_token
+        } else if (response.data.access_token) {
+          access_token = response.data.access_token
+        } else {
+          throw new Error("Invalid token response format")
+        }
+
         localStorage.setItem("access_token", access_token)
 
         // Retry original request with new token
@@ -51,6 +60,9 @@ axiosInstance.interceptors.response.use(
         // If refresh fails, clear tokens and redirect to login
         localStorage.removeItem("access_token")
         localStorage.removeItem("refresh_token")
+        localStorage.removeItem("user")
+        
+        // Use window.location for hard redirect to ensure complete page refresh
         window.location.href = "/auth/login"
         return Promise.reject(refreshError)
       }

@@ -9,9 +9,10 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
 import { Eye, EyeOff, ArrowRight, LogIn, Facebook, Twitter } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
+import { toast } from "sonner"
 
 export default function LoginPage() {
-  const [phone, setPhone] = useState("+234")
+  const [phone_number, setPhoneNumber] = useState("+234")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -22,17 +23,45 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!phone || !password) {
+    if (!phone_number || !password) {
+      toast.error("Please fill in all required fields")
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      await login({ phone, password })
+      await login({ phone_number, password })
+      toast.success("Login successful! Redirecting to dashboard...")
       router.push("/dashboard")
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      
+      // Handle different error scenarios
+      if (error.response?.status === 401) {
+        toast.error("Invalid credentials. Please check your phone number and password.")
+      } else if (error.response?.status === 400) {
+        // Handle validation errors
+        const errorData = error.response.data
+        if (typeof errorData === 'object') {
+          // Extract field-specific errors
+          Object.entries(errorData).forEach(([field, messages]) => {
+            if (Array.isArray(messages) && messages.length > 0) {
+              toast.error(`${field}: ${messages[0]}`)
+            }
+          })
+        } else {
+          toast.error("Invalid input. Please check your details.")
+        }
+      } else if (error.response?.data?.detail) {
+        // API returned a specific error message
+        toast.error(error.response.data.detail)
+      } else if (error.message === "Network Error") {
+        toast.error("Network error. Please check your internet connection.")
+      } else {
+        // Fallback error message
+        toast.error("Login failed. Please try again later.")
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -79,9 +108,9 @@ export default function LoginPage() {
                 <input
                   id="phone"
                   type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  value={phone_number}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
                   placeholder="+234 XXX XXX XXXX"
                   required
                 />
@@ -248,21 +277,11 @@ export default function LoginPage() {
                         />
                       </div>
                       <div>
-                        <p className="font-medium">Textbooks Bundle</p>
-                        <p className="text-xs text-gray-500">$89.99</p>
+                        <p className="font-medium">iPhone 13</p>
+                        <p className="text-xs text-gray-500">$799.00</p>
                       </div>
                     </div>
-                    <div className="bg-green-500/10 text-green-600 text-xs px-2 py-1 rounded-full">Popular</div>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-500">Balance</p>
-                      <p className="font-bold">$6,421.50</p>
-                    </div>
-                    <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full w-3/4 bg-[#f58220] rounded-full"></div>
-                    </div>
+                    <div className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">Popular</div>
                   </div>
                 </div>
               </div>
@@ -287,3 +306,4 @@ export default function LoginPage() {
     </div>
   )
 }
+
