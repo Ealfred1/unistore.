@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "UniStore - Campus Marketplace",
   description: "Buy, sell, and discover products within your university community",
-    generator: 'v0.dev'
+    generator: 'Eric Alfred'
 }
 
 export default function RootLayout({
