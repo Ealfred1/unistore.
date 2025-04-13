@@ -11,6 +11,8 @@ import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import axios from "@/lib/axios"
+import { toast } from "sonner"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -29,16 +31,30 @@ export default function ForgotPasswordPage() {
 
     try {
       setIsLoading(true)
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      
+      // Call the API to send reset code
+      await axios.post("/users/auth/reset-password/", { 
+        phone_number: phoneNumber 
+      })
 
-      // In a real app, you would call your API to send a reset code
-      // const response = await axios.post('/api/auth/forgot-password', { phone: phoneNumber })
-
+      // Store phone number in local storage for the next step
+      localStorage.setItem("reset_phone_number", phoneNumber)
+      
+      // Navigate to reset code page
       router.push(`/auth/reset-code?phone=${encodeURIComponent(phoneNumber)}`)
-    } catch (error) {
-      setError("Something went wrong. Please try again.")
+      
+      toast.success("Reset code sent to your phone")
+    } catch (error: any) {
       console.error(error)
+      
+      // Handle specific error cases
+      if (error.response?.data?.detail) {
+        setError(error.response.data.detail)
+      } else if (error.response?.data?.phone_number) {
+        setError(error.response.data.phone_number[0])
+      } else {
+        setError("Something went wrong. Please try again.")
+      }
     } finally {
       setIsLoading(false)
     }

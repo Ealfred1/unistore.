@@ -33,6 +33,13 @@ interface AuthContextType {
   verifyOtp: (otp: string, phone_number: string) => Promise<boolean>
   updateUniversity: (universityId: number) => Promise<void>
   upgradeToMerchant: (merchantName: string) => Promise<void>
+  requestPasswordReset: (phone_number: string) => Promise<void>
+  verifyPasswordReset: (data: {
+    phone_number: string;
+    verification_code: string;
+    new_password: string;
+    confirm_password: string;
+  }) => Promise<void>
 }
 
 // Create auth context
@@ -205,6 +212,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  // Request password reset function
+  const requestPasswordReset = async (phone_number: string) => {
+    try {
+      await axios.post("/users/auth/reset-password/", { phone_number })
+    } catch (error) {
+      console.error("Password reset request error:", error)
+      return Promise.reject(error)
+    }
+  }
+
+  // Verify password reset function
+  const verifyPasswordReset = async (data: {
+    phone_number: string;
+    verification_code: string;
+    new_password: string;
+    confirm_password: string;
+  }) => {
+    try {
+      await axios.post("/users/auth/reset-password/verify/", data)
+    } catch (error) {
+      console.error("Password reset verification error:", error)
+      return Promise.reject(error)
+    }
+  }
+
   // Logout function
   const logout = () => {
     localStorage.removeItem("access_token")
@@ -226,6 +258,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         verifyOtp,
         updateUniversity,
         upgradeToMerchant,
+        requestPasswordReset,
+        verifyPasswordReset,
       }}
     >
       {children}

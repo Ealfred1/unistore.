@@ -6,17 +6,25 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, RefreshCw, Loader2, Eye, EyeOff } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import axios from "@/lib/axios"
+import { toast } from "sonner"
 
 export default function ResetCodePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const phone = searchParams.get("phone") || ""
-
+  const phone = searchParams.get("phone") || localStorage.getItem("reset_phone_number") || ""
+  
+  const [step, setStep] = useState(1) // Step 1: Verification code, Step 2: New password
   const [code, setCode] = useState(["", "", "", "", "", ""])
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [countdown, setCountdown] = useState(60)
@@ -79,15 +87,26 @@ export default function ResetCodePage() {
   const handleResendCode = async () => {
     setCanResend(false)
     setCountdown(60)
+    setError("")
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // In a real app, you would call your API to resend the code
-    // await axios.post('/api/auth/resend-code', { phone })
+    try {
+      // Call API to resend code
+      await axios.post("/users/auth/reset-password/", { 
+        phone_number: phone 
+      })
+      
+      toast.success("Reset code sent to your phone")
+    } catch (error: any) {
+      console.error(error)
+      if (error.response?.data?.detail) {
+        setError(error.response.data.detail)
+      } else {
+        setError("Failed to resend code. Please try again.")
+      }
+    }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
@@ -99,16 +118,74 @@ export default function ResetCodePage() {
 
     try {
       setIsLoading(true)
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // In a real app, you would call your API to verify the code
-      // const response = await axios.post('/api/auth/verify-reset-code', { phone, code: fullCode })
-
-      router.push("/auth/reset-success")
-    } catch (error) {
-      setError("Invalid code. Please try again.")
+      
+      // We don't actually call the API here, just store the code and move to step 2
+      localStorage.setItem("reset_verification_code", fullCode)
+      
+      // Move to password reset step
+      setStep(2)
+    } catch (error: any) {
       console.error(error)
+      setError("Invalid code. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+
+    if (!newPassword) {
+      setError("Please enter a new password")
+      return
+    }
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters long")
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match")
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      
+      const storedCode = localStorage.getItem("reset_verification_code")
+      
+      // Call API to reset password
+      await axios.post("/users/auth/reset-password/verify/", {
+        phone_number: phone,
+        verification_code: storedCode,
+        new_password: newPassword,
+        confirm_password: confirmPassword
+      })
+      
+      // Clear stored data
+      localStorage.removeItem("reset_phone_number")
+      localStorage.removeItem("reset_verification_code")
+      
+      // Redirect to success page
+      router.push("/auth/reset-success")
+      
+      toast.success("Password reset successful")
+    } catch (error: any) {
+      console.error(error)
+      
+      if (error.response?.data?.detail) {
+        setError(error.response.data.detail)
+      } else if (error.response?.data?.verification_code) {
+        setError(error.response.data.verification_code[0])
+        // Go back to code entry if verification code is invalid
+        setStep(1)
+      } else if (error.response?.data?.new_password) {
+        setError(error.response.data.new_password[0])
+      } else {
+        setError("Something went wrong. Please try again.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -125,77 +202,165 @@ export default function ResetCodePage() {
 
           <div className="mb-8">
             <Link
-              href="/auth/forgot-password"
+              href={step === 1 ? "/auth/forgot-password" : "#"}
+              onClick={step === 2 ? () => setStep(1) : undefined}
               className="inline-flex items-center text-sm text-gray-600 hover:text-[#f58220]"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              {step === 1 ? "Back" : "Back to code verification"}
             </Link>
           </div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <h1 className="text-3xl font-bold mb-2 text-[#0a2472]">Enter reset code</h1>
-            <p className="text-gray-600 mb-8">
-              We've sent a 6-digit code to <span className="font-medium">{phone}</span>
-            </p>
+          <motion.div 
+            key={`step-${step}`}
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ duration: 0.5 }}
+          >
+            {step === 1 ? (
+              <>
+                <h1 className="text-3xl font-bold mb-2 text-[#0a2472]">Enter reset code</h1>
+                <p className="text-gray-600 mb-8">
+                  We've sent a 6-digit code to <span className="font-medium">{phone}</span>
+                </p>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex justify-between gap-2">
-                  {code.map((digit, index) => (
-                    <Input
-                      key={index}
-                      ref={(el) => (inputRefs.current[index] = el)}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleInputChange(index, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(index, e)}
-                      onPaste={index === 0 ? handlePaste : undefined}
-                      className="w-12 h-12 text-center text-lg font-medium"
-                      autoFocus={index === 0}
-                    />
-                  ))}
-                </div>
-                {error && <p className="text-red-500 text-sm">{error}</p>}
-              </div>
+                <form onSubmit={handleVerifyCode} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex justify-between gap-2">
+                      {code.map((digit, index) => (
+                        <Input
+                          key={index}
+                          ref={(el) => (inputRefs.current[index] = el)}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleInputChange(index, e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(index, e)}
+                          onPaste={index === 0 ? handlePaste : undefined}
+                          className="w-12 h-12 text-center text-lg font-medium"
+                          autoFocus={index === 0}
+                        />
+                      ))}
+                    </div>
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                  </div>
 
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-2">Didn't receive a code?</p>
-                {canResend ? (
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 mb-2">Didn't receive a code?</p>
+                    {canResend ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={handleResendCode}
+                        className="text-[#f58220] hover:text-[#f58220]/90 hover:bg-[#f58220]/10"
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Resend Code
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        Resend code in <span className="font-medium">{countdown}s</span>
+                      </p>
+                    )}
+                  </div>
+
                   <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={handleResendCode}
-                    className="text-[#f58220] hover:text-[#f58220]/90 hover:bg-[#f58220]/10"
+                    type="submit"
+                    className="w-full bg-[#f58220] hover:bg-[#f58220]/90"
+                    disabled={isLoading || code.join("").length !== 6}
                   >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Resend Code
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify Code"
+                    )}
                   </Button>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    Resend code in <span className="font-medium">{countdown}s</span>
-                  </p>
-                )}
-              </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <h1 className="text-3xl font-bold mb-2 text-[#0a2472]">Set new password</h1>
+                <p className="text-gray-600 mb-8">
+                  Create a new password for your account
+                </p>
 
-              <Button
-                type="submit"
-                className="w-full bg-[#f58220] hover:bg-[#f58220]/90"
-                disabled={isLoading || code.join("").length !== 6}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  "Verify Code"
-                )}
-              </Button>
-            </form>
+                <form onSubmit={handleResetPassword} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password">New Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="new-password"
+                          type={showPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="pr-10"
+                          placeholder="Enter new password"
+                        />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-5 w-5 text-gray-400" />
+                          ) : (
+                            <Eye className="h-5 w-5 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm-password">Confirm Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="confirm-password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="pr-10"
+                          placeholder="Confirm new password"
+                        />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-5 w-5 text-gray-400" />
+                          ) : (
+                            <Eye className="h-5 w-5 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-[#f58220] hover:bg-[#f58220]/90"
+                    disabled={isLoading || !newPassword || !confirmPassword}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Resetting Password...
+                      </>
+                    ) : (
+                      "Reset Password"
+                    )}
+                  </Button>
+                </form>
+              </>
+            )}
           </motion.div>
         </div>
       </div>
