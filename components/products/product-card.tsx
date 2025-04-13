@@ -16,19 +16,34 @@ interface ProductCardProps {
     price_negotiable: boolean
     is_favorited: boolean
     merchant_name: string
+    price_range: string
   }
   onFavoriteToggle: (id: number) => void
 }
 
 export default function ProductCard({ product, onFavoriteToggle }: ProductCardProps) {
-  const { id, name, price, primary_image, category_name, condition, price_negotiable, is_favorited } = product
+  const { id, name, price, primary_image, price_range, category_name, condition, price_negotiable, is_favorited } = product
 
-  const formattedPrice = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number.parseFloat(price))
+  // Format price in Naira
+  const formatPrice = (value: string | null | undefined) => {
+    if (!value) return "Price on request";
+    
+    // Check if it's a price range
+    if (value.includes("-") || value.includes("to")) {
+      return value; // Return the range as is
+    }
+    
+    // Format as Naira
+    return new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(Number.parseFloat(value));
+  }
+
+  // Display price or price range
+  const displayPrice = price_range || price ? formatPrice(price_range || price) : "Price on request";
 
   return (
     <div className="bg-white rounded-xl overflow-hidden border border-gray-200 group hover:shadow-md transition-all">
@@ -61,7 +76,7 @@ export default function ProductCard({ product, onFavoriteToggle }: ProductCardPr
             </div>
             <h3 className="font-medium text-base mb-1 truncate">{name}</h3>
             <div className="flex items-center gap-2">
-              <span className="font-bold">{formattedPrice}</span>
+              <span className="font-bold">{displayPrice}</span>
               {price_negotiable && <span className="text-xs text-gray-500">(Negotiable)</span>}
             </div>
           </div>
