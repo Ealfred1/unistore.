@@ -228,11 +228,22 @@ export default function ProductsPage() {
     return imageUrl
   }
 
-  // Format price for display
   const formatPrice = (price: string | number | null) => {
     if (price === null || price === undefined) return "N/A"
+    
+    // If price is already a string with proper formatting, return as-is
+    if (typeof price === "string" && price.includes(",")) {
+      return `₦${price}`
+    }
+    
+    // Convert to number if string without formatting
     const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
-    return `₦${numPrice.toLocaleString()}`
+    
+    // Format with commas and preserve decimals if present
+    return `₦${numPrice.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    })}`
   }
 
   return (

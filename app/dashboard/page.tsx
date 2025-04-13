@@ -55,6 +55,30 @@ export default function DashboardPage() {
   const [filteredProducts, setFilteredProducts] = useState(products)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
 
+  // Image handling function - same as in products page
+  const getProperImageUrl = (imageUrl: string | undefined) => {
+    if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
+
+    // Check if the URL contains both Appwrite and Cloudinary
+    if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
+      // Find the position of the nested https:// for cloudinary
+      const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
+      if (cloudinaryStart !== -1) {
+        // Extract everything from the cloudinary URL start
+        return imageUrl.substring(cloudinaryStart).split("/view")[0]
+      }
+    }
+
+    return imageUrl
+  }
+
+  // Format price for display - same as in products page
+  const formatPrice = (price: string | number | null) => {
+    if (price === null || price === undefined) return "N/A"
+    const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
+    return `₦${numPrice.toLocaleString()}`
+  }
+
   // Fetch products with filters
   useEffect(() => {
     const getProducts = async () => {
@@ -108,7 +132,7 @@ export default function DashboardPage() {
     }
 
     getProducts()
-  }, [searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy, fetchProducts])
+  }, [searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy])
 
   // Update filtered products when products change
   useEffect(() => {
@@ -196,60 +220,38 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome Card with animated elements */}
-      <div
-        className="relative overflow-hidden rounded-2xl border bg-orange-100 border-[#0a2472]/20"
-      >
-
-
-        <div className="relative p-6 md:p-8 z-10">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isWelcomeInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <motion.div
-                  initial={{ rotate: 0 }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                  className="w-8 h-8 rounded-full bg-[#f58220]/20 flex items-center justify-center"
-                >
-                  <Sparkles className="h-4 w-4 text-[#f58220]" />
-                </motion.div>
-                <h1 className="text-2xl md:text-3xl font-bold text-white">Welcome, {user?.first_name}!</h1>
+      {/* Welcome Card */}
+      <div ref={welcomeRef} className="rounded-2xl border bg-orange-100 border-unistore-orange p-6 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-full bg-[#f58220]/20 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-[#f58220]" />
               </div>
-              <p className="text-white/80 mt-2 max-w-xl">
-                Discover amazing products from fellow students at {user?.university}. Browse the latest listings or
-                create your own.
-              </p>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Welcome, {user?.first_name}!</h1>
+            </div>
+            <p className="text-gray-600 mt-2 max-w-xl">
+              Discover amazing products from fellow students at {user?.university_name}. Browse the latest listings or
+              create your own.
+            </p>
+          </div>
 
-              
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={isWelcomeInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="flex flex-col sm:flex-row gap-3"
-            >
-              <Link href="/dashboard/my-products/new">
-                <Button className="bg-[#f58220] hover:bg-[#f58220]/90 border-none w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  List a Product
-                </Button>
-              </Link>
-              <Link href="/dashboard/products">
-                <Button
-                  variant="outline"
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 w-full sm:w-auto" 
-                >
-                  <LayoutGrid className="mr-2 h-4 w-4" />
-                  Browse All
-                </Button>
-              </Link>
-            </motion.div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link href="/dashboard/my-products/new">
+              <Button className="bg-[#f58220] hover:bg-[#f58220]/90 text-white border-none w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                List a Product
+              </Button>
+            </Link>
+            <Link href="/dashboard/products">
+              <Button
+                variant="outline"
+                className="border-[#0a2472] text-[#0a2472] hover:bg-[#0a2472]/5 w-full sm:w-auto"
+              >
+                <LayoutGrid className="mr-2 h-4 w-4" />
+                Browse All
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -293,12 +295,12 @@ export default function DashboardPage() {
                 <SelectItem value="popular">Most Popular</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+            <div className="flex h-10 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
               <Button
                 onClick={() => setViewMode("grid")}
                 variant="ghost"
                 size="icon"
-                className={viewMode === "grid" ? "bg-gray-100 dark:bg-gray-800" : ""}
+                className={`h-10 px-3 ${viewMode === "grid" ? "bg-gray-100 dark:bg-gray-800" : ""}`}
               >
                 <Grid className="h-5 w-5" />
               </Button>
@@ -306,7 +308,7 @@ export default function DashboardPage() {
                 onClick={() => setViewMode("list")}
                 variant="ghost"
                 size="icon"
-                className={viewMode === "list" ? "bg-gray-100 dark:bg-gray-800" : ""}
+                className={`h-10 px-3 ${viewMode === "list" ? "bg-gray-100 dark:bg-gray-800" : ""}`}
               >
                 <List className="h-5 w-5" />
               </Button>
@@ -561,7 +563,12 @@ export default function DashboardPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.05 }}
                     >
-                      <ProductCard product={product} />
+                      <ProductCard 
+                        product={{
+                          ...product,
+                          primary_image: getProperImageUrl(product.primary_image),
+                        }} 
+                      />
                     </motion.div>
                   ))}
                 </div>
@@ -577,11 +584,9 @@ export default function DashboardPage() {
                     >
                       <Link href={`/products/${product.id}`} className="flex">
                         <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
-                          <Image
-                            src={product.primary_image || "/placeholder.svg?height=200&width=200&text=No+Image"}
+                          <img
+                            src={getProperImageUrl(product.primary_image)}
                             alt={product.name}
-                            width={200}
-                            height={200}
                             className="w-full h-full object-cover"
                           />
                         </div>
@@ -605,7 +610,7 @@ export default function DashboardPage() {
                           </p>
                           <div className="mt-auto flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-lg">${Number.parseFloat(product.price).toFixed(2)}</span>
+                              <span className="font-bold text-lg">{formatPrice(product.price || product.price_range)}</span>
                               {product.price_negotiable && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">(Negotiable)</span>
                               )}

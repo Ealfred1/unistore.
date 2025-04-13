@@ -46,9 +46,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { useProducts } from "@/providers/product-provider"
+
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
+  const { products, categories, isLoading, fetchProducts } = useProducts()
   const pathname = usePathname()
   const router = useRouter()
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -140,16 +143,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       color: "text-gray-500",
       bgColor: "bg-gray-500/10",
     },
-  ]
-
-  // Categories
-  const categories = [
-    { id: "1", name: "Electronics", product_count: 120, icon: <Grid3X3 className="h-4 w-4" /> },
-    { id: "2", name: "Clothing", product_count: 84, icon: <Grid3X3 className="h-4 w-4" /> },
-    { id: "3", name: "Books", product_count: 56, icon: <Grid3X3 className="h-4 w-4" /> },
-    { id: "4", name: "Furniture", product_count: 32, icon: <Grid3X3 className="h-4 w-4" /> },
-    { id: "5", name: "Sports", product_count: 28, icon: <Grid3X3 className="h-4 w-4" /> },
-    { id: "6", name: "Beauty", product_count: 24, icon: <Grid3X3 className="h-4 w-4" /> },
   ]
 
   return (
@@ -375,7 +368,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       onClick={() => isMobile && setMobileOpen(false)}
                     >
                       <span className="mr-2 text-gray-500">{category.icon || <Grid3X3 className="h-4 w-4" />}</span>
-                      <span>{category.name}</span>
+                      <span className="truncate">{category.name}</span>
                       <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">{category.product_count}</span>
                     </Link>
                   ))}
@@ -412,8 +405,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </motion.div>
 
       {/* Main content */}
-      <main className={`pt-16 transition-all duration-300 ${expanded ? "lg:pl-[280px]" : "lg:pl-[80px]"}`}>
-        <div className="container py-8">{children}</div>
+      <main className={`pt-16 bg-white  transition-all duration-300 ${expanded ? "lg:pl-[280px]" : "lg:pl-[80px]"}`}>
+        <div className="container p-2 lg:p-4 py-8">{children}</div>
       </main>
 
       {/* Request product modal */}
