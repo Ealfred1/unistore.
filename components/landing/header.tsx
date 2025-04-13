@@ -25,7 +25,7 @@ export function Header() {
       transition={{ duration: 0.5 }}
       className="sticky top-0 z-50 w-full border-b border-b-gray-100 bg-white/80 backdrop-blur-md"
     >
-      <div className="container flex h-16 items-center justify-between">
+      <div className="container flex h-16 items-center justify-between px-2 sm:px-4 md:px-8">
         <Logo size="lg" />
 
         {/* Desktop Navigation */}
@@ -90,9 +90,9 @@ export function Header() {
                 <div className="flex items-center justify-between p-4 border-b">
                   <Logo size="md" />
                   <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon">
+                    {/* <Button variant="ghost" size="icon">
                       <X className="h-5 w-5" />
-                    </Button>
+                    </Button> */}
                   </SheetTrigger>
                 </div>
 
