@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Search, Filter, ChevronDown, Grid, List, ArrowUpDown, Heart, ChevronLeft, ChevronRight } from "lucide-react"
-import Navbar from "@/components/navbar"
+import { Header } from "@/components/landing/header"
 import ProductCard from "@/components/products/product-card"
 import { useProducts } from "@/providers/product-provider"
 import { useAuth } from "@/providers/auth-provider"
@@ -22,6 +22,7 @@ export default function ProductsPage() {
   const searchParams = useSearchParams()
   const { products, categories, isLoading, fetchProducts, toggleFavorite } = useProducts()
   const { isAuthenticated } = useAuth()
+  const [showUniversityPopup, setShowUniversityPopup] = useState(false)
 
   // State for UI
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -68,6 +69,15 @@ export default function ProductsPage() {
     const university = searchParams.get("university")
     if (university) {
       setSelectedUniversity(university)
+    } else {
+      // Check if university is stored in localStorage
+      const storedUniversity = localStorage.getItem("unistore_university")
+      if (storedUniversity) {
+        setSelectedUniversity(storedUniversity)
+      } else {
+        // Show university popup if no university is selected
+        setShowUniversityPopup(true)
+      }
     }
 
     const page = searchParams.get("page")
@@ -127,7 +137,7 @@ export default function ProductsPage() {
 
       try {
         const response = await fetchProducts(filters)
-        if (response) {
+        if (response && response.pagination) {
           setTotalPages(response.pagination.total_pages)
           setCurrentPage(response.pagination.current_page)
           setPageSize(response.pagination.page_size)
@@ -139,7 +149,17 @@ export default function ProductsPage() {
     }
 
     getProducts()
-  }, [searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy, currentPage, pageSize])
+  }, [
+    searchQuery,
+    selectedCategory,
+    selectedCondition,
+    selectedUniversity,
+    priceRange,
+    sortBy,
+    currentPage,
+    pageSize,
+
+  ])
 
   // Update filtered products when products change
   useEffect(() => {
@@ -188,6 +208,7 @@ export default function ProductsPage() {
   const handleSelectUniversity = (universityId: number) => {
     setSelectedUniversity(universityId.toString())
     localStorage.setItem("unistore_university", universityId.toString())
+    setShowUniversityPopup(false)
   }
 
   // Fix image URL function
@@ -217,7 +238,25 @@ export default function ProductsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <Navbar />
+      <Header />
+
+      {/* University selection popup */}
+      <AnimatePresence>
+        {showUniversityPopup && (
+          <UniversityPopup
+            onClose={() => {
+              setShowUniversityPopup(false)
+              // Set a default university if user closes without selecting
+              if (!selectedUniversity) {
+                const defaultUniversity = "1" // Set a default university ID
+                setSelectedUniversity(defaultUniversity)
+                localStorage.setItem("unistore_university", defaultUniversity)
+              }
+            }}
+            onSelect={handleSelectUniversity}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="container py-8">
         {/* Search and filters */}

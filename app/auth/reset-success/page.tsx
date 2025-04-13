@@ -256,7 +256,7 @@ export default function ResetSuccessPage() {
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <motion.path
                         d="M20 6L9 17L4 12"
-                        stroke="#10b981"
+                        stroke="#10b981" 
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
