@@ -36,10 +36,13 @@ axiosInstance.interceptors.response.use(
           throw new Error("No refresh token available")
         }
 
-        // Attempt to refresh token
-        const response = await axios.post("http://localhost:8000/api/users/auth/refresh-token/", {
-          refresh_token: refreshToken,
-        })
+        // Attempt to refresh token - using environment variable for API URL
+        const response = await axios.post(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/users/auth/refresh-token/`, 
+          {
+            refresh_token: refreshToken,
+          }
+        )
 
         // Handle the response based on the actual structure
         let access_token

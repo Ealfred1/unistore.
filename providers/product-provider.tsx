@@ -105,7 +105,19 @@ export function ProductProvider({ children }: ProductProviderProps) {
 
       const response = await axios.get(`/products/products/?${queryParams.toString()}`)
       setProducts(response.data.results)
-      return response.data.results
+      
+      // Return the complete response data including pagination info
+      return {
+        results: response.data.results,
+        pagination: {
+          count: response.data.count,
+          next: response.data.next,
+          previous: response.data.previous,
+          current_page: response.data.current_page,
+          total_pages: response.data.total_pages,
+          page_size: response.data.page_size
+        }
+      }
     } catch (error) {
       console.error("Error fetching products:", error)
       throw error
