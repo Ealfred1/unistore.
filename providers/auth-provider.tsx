@@ -130,6 +130,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         phone_number: userData.phone,
         password: userData.password,
         user_type: userData.userType,
+        university_id: userData.university,
       }
 
       const response = await axios.post("/users/auth/register/", apiData)
@@ -143,9 +144,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Verify OTP function
   const verifyOtp = async (otp: string, phone_number: string) => {
     try {
-      const response = await axios.post("/users/auth/verify-otp/", {
+      const response = await axios.post("/users/auth/verify-phone/", {
+        verification_code: otp,
         phone_number,
-        otp,
       })
       
       // Handle the response based on the actual structure

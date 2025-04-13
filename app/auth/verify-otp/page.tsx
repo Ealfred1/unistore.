@@ -125,7 +125,7 @@ export default function VerifyOTPPage() {
         // Clear the stored phone number after successful verification
         localStorage.removeItem("verification_phone_number")
         setTimeout(() => {
-          router.push("/auth/select-university")
+          router.push("/auth/welcome")
         }, 2000)
       } else {
         setError("Invalid OTP. Please try again.")

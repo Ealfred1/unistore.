@@ -8,7 +8,7 @@ import { useUniversities } from "@/providers/university-provider"
 
 interface UniversityPopupProps {
   onClose: () => void
-  onSelect: (universityId: number) => void
+  onSelect: (universityId: number, universityName: string, universityImage?: string) => void
 }
 
 export function UniversityPopup({ onClose, onSelect }: UniversityPopupProps) {
@@ -84,11 +84,27 @@ export function UniversityPopup({ onClose, onSelect }: UniversityPopupProps) {
                     {filteredUniversities.map((university) => (
                       <div
                         key={university.id}
-                        onClick={() => onSelect(university.id)}
+                        onClick={() => onSelect(university.id, university.name, university.image)}
                         className="flex items-center p-3 rounded-xl border cursor-pointer transition-all hover:border-[#f58220] hover:bg-[#f58220]/5"
                       >
                         <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-gray-100 mr-4 flex items-center justify-center">
-                          <span className="text-lg font-bold">{university.abbreviation}</span>
+                          {university.image ? (
+                            <img
+                              src={university.image || "/placeholder.svg"}
+                              alt={university.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-lg font-bold">
+                              {university.abbreviation ||
+                                university.name
+                                  .split(" ")
+                                  .map((word) => word[0])
+                                  .join("")
+                                  .substring(0, 2)
+                                  .toUpperCase()}
+                            </span>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium truncate">{university.name}</h4>

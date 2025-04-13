@@ -113,13 +113,13 @@ export default function WelcomePage() {
               transition={{ delay: 0.9, duration: 0.5 }}
               className="flex justify-center w-full"
             >
-              <Link href="/auth/login">
+              <Link href="/dashboard">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="px-8 py-3 bg-[#f58220] text-white font-medium rounded-xl hover:bg-[#f58220]/90 transition-all flex items-center"
                 >
-                  Proceed to Login
+                  Explore UniStore
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </motion.button>
               </Link>

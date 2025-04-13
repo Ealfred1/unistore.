@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/providers/auth-provider"
 import { ProductProvider } from "@/providers/product-provider"
 import { UniversityProvider } from "@/providers/university-provider"
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -28,6 +29,7 @@ export default function RootLayout({
               <ProductProvider>{children}</ProductProvider>
             </UniversityProvider>
           </AuthProvider>
+          <Toaster position="bottom-right" richColors />
       </body>
     </html>
   )

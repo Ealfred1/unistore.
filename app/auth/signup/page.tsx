@@ -3,13 +3,15 @@
 import type React from "react"
 
 import { useState } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
-import { Eye, EyeOff, ArrowRight, UserPlus, Facebook, Twitter, Mail, Check } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, UserPlus, Facebook, Twitter, Mail, Check, Building } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
-import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { UniversityPopup } from "@/components/university-popup"
 
 export default function SignupPage() {
   const [step, setStep] = useState(1)
@@ -22,10 +24,13 @@ export default function SignupPage() {
     confirmPassword: "",
     agreeTerms: false,
     university: "",
+    universityName: "", // Added to store the university name for display
+    universityImage: "", // Added to store the university image
     userType: "PERSONAL",
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showUniversityPopup, setShowUniversityPopup] = useState(false)
   const { signUp } = useAuth()
   const router = useRouter()
 
@@ -43,38 +48,22 @@ export default function SignupPage() {
     if (step === 1) {
       // Validate first step
       if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all required fields",
-          variant: "destructive",
-        })
+        toast.error("Please fill in all required fields")
         return
       }
 
       if (!formData.password || formData.password.length < 8) {
-        toast({
-          title: "Password Too Short",
-          description: "Password must be at least 8 characters long",
-          variant: "destructive",
-        })
+        toast.error("Password must be at least 8 characters long")
         return
       }
 
       if (formData.password !== formData.confirmPassword) {
-        toast({
-          title: "Passwords Don't Match",
-          description: "Please make sure your passwords match",
-          variant: "destructive",
-        })
+        toast.error("Please make sure your passwords match")
         return
       }
 
       if (!formData.agreeTerms) {
-        toast({
-          title: "Terms Agreement Required",
-          description: "You must agree to the terms of service",
-          variant: "destructive",
-        })
+        toast.error("You must agree to the terms of service")
         return
       }
 
@@ -85,11 +74,7 @@ export default function SignupPage() {
     if (step === 2) {
       // Validate second step
       if (!formData.university || !formData.userType) {
-        toast({
-          title: "Missing Information",
-          description: "Please select your university and account type",
-          variant: "destructive",
-        })
+        toast.error("Please select your university and account type")
         return
       }
 
@@ -97,32 +82,70 @@ export default function SignupPage() {
 
       try {
         const phoneNumber = await signUp(formData)
-        
+
         // Store phone number in local storage
         localStorage.setItem("verification_phone_number", phoneNumber)
-        
+
         // Redirect to OTP verification page
         router.push(`/auth/verify-otp`)
       } catch (error: any) {
         console.error(error)
-        toast({
-          title: "Registration Failed",
-          description: error.response?.data?.detail || "An error occurred during registration",
-          variant: "destructive",
-        })
+        
+        // Handle specific error cases
+        const errorData = error.response?.data
+        
+        if (errorData) {
+          // Handle phone number already exists error
+          if (errorData.phone_number && errorData.phone_number.includes("user with this phone number already exists")) {
+            toast.error("This phone number is already registered. Please use a different number.")
+            setStep(1) // Take user back to first step to change phone number
+            return
+          }
+          
+          // Handle email already exists error
+          if (errorData.email && errorData.email.includes("user with this email address already exists")) {
+            toast.error("This email is already registered. Please use a different email address.")
+            setStep(1) // Take user back to first step to change email
+            return
+          }
+          
+          // Handle other field-specific errors
+          const errorFields = Object.keys(errorData)
+          if (errorFields.length > 0) {
+            // Display the first error message we find
+            const firstErrorField = errorFields[0]
+            const errorMessage = Array.isArray(errorData[firstErrorField]) 
+              ? errorData[firstErrorField][0] 
+              : errorData[firstErrorField]
+            
+            toast.error(`${firstErrorField.replace('_', ' ')}: ${errorMessage}`)
+            
+            // If the error is related to fields in step 1, go back to step 1
+            if (['email', 'phone_number', 'first_name', 'last_name', 'password'].includes(firstErrorField)) {
+              setStep(1)
+            }
+            return
+          }
+        }
+        
+        // Generic error fallback
+        toast.error(error.response?.data?.detail || "An error occurred during registration")
       } finally {
         setIsSubmitting(false)
       }
     }
   }
 
-  const universities = [
-    "University of Lagos",
-    "University of Ibadan",
-    "Obafemi Awolowo University",
-    "University of Nigeria",
-    "Ahmadu Bello University",
-  ]
+  // Handle university selection from popup
+  const handleSelectUniversity = (universityId: number, universityName: string, universityImage?: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      university: universityId.toString(),
+      universityName: universityName,
+      universityImage: universityImage || "",
+    }))
+    setShowUniversityPopup(false)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
@@ -380,24 +403,47 @@ export default function SignupPage() {
               {step === 2 && (
                 <div className="space-y-6">
                   <div>
-                    <label htmlFor="university" className="block text-sm font-medium text-gray-700 mb-1">
-                      Select Your University
-                    </label>
-                    <select
-                      id="university"
-                      name="university"
-                      value={formData.university}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, university: e.target.value }))}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent transition-all"
-                      required
-                    >
-                      <option value="">Select a university</option>
-                      {universities.map((university) => (
-                        <option key={university} value={university}>
-                          {university}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Select Your University</label>
+
+                    {formData.university ? (
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-[#f58220] bg-[#f58220]/5">
+                        <div className="flex items-center">
+                          {formData.universityImage ? (
+                            <img
+                              src={formData.universityImage || "/placeholder.svg"}
+                              alt={formData.universityName}
+                              className="w-12 h-12 rounded-lg object-cover mr-3"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center mr-3">
+                              <span className="text-lg font-bold">
+                                {formData.universityName
+                                  .split(" ")
+                                  .map((word) => word[0])
+                                  .join("")
+                                  .substring(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium">{formData.universityName}</p>
+                          </div>
+                        </div>
+                        <Button type="button" variant="outline" size="sm" onClick={() => setShowUniversityPopup(true)}>
+                          Change
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={() => setShowUniversityPopup(true)}
+                        className="w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center"
+                      >
+                        <Building className="mr-2 h-5 w-5 text-gray-500" />
+                        Click to Select University
+                      </Button>
+                    )}
                   </div>
 
                   <div>
@@ -543,6 +589,18 @@ export default function SignupPage() {
           </motion.div>
         </div>
       </div>
+
+      {/* University Selection Popup */}
+      <AnimatePresence>
+        {showUniversityPopup && (
+          <UniversityPopup
+            onClose={() => setShowUniversityPopup(false)}
+            onSelect={(universityId, universityName, universityImage) =>
+              handleSelectUniversity(universityId, universityName, universityImage)
+            }
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

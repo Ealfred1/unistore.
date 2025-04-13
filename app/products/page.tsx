@@ -22,7 +22,6 @@ export default function ProductsPage() {
   const searchParams = useSearchParams()
   const { products, categories, isLoading, fetchProducts, toggleFavorite } = useProducts()
   const { isAuthenticated } = useAuth()
-  const [showUniversityPopup, setShowUniversityPopup] = useState(false)
 
   // State for UI
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -69,15 +68,6 @@ export default function ProductsPage() {
     const university = searchParams.get("university")
     if (university) {
       setSelectedUniversity(university)
-    } else {
-      // Check if university is stored in localStorage
-      const storedUniversity = localStorage.getItem("unistore_university")
-      if (storedUniversity) {
-        setSelectedUniversity(storedUniversity)
-      } else {
-        // Show university popup if no university is selected
-        setShowUniversityPopup(true)
-      }
     }
 
     const page = searchParams.get("page")
@@ -198,7 +188,6 @@ export default function ProductsPage() {
   const handleSelectUniversity = (universityId: number) => {
     setSelectedUniversity(universityId.toString())
     localStorage.setItem("unistore_university", universityId.toString())
-    setShowUniversityPopup(false)
   }
 
   // Fix image URL function
@@ -229,24 +218,6 @@ export default function ProductsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <Navbar />
-
-      {/* University selection popup */}
-      <AnimatePresence>
-        {showUniversityPopup && (
-          <UniversityPopup
-            onClose={() => {
-              setShowUniversityPopup(false)
-              // Set a default university if user closes without selecting
-              if (!selectedUniversity) {
-                const defaultUniversity = "1" // Set a default university ID
-                setSelectedUniversity(defaultUniversity)
-                localStorage.setItem("unistore_university", defaultUniversity)
-              }
-            }}
-            onSelect={handleSelectUniversity}
-          />
-        )}
-      </AnimatePresence>
 
       <div className="container py-8">
         {/* Search and filters */}
