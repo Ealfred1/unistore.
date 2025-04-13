@@ -43,7 +43,7 @@ export default function ProfilePage() {
     },
   ]
 
-  return (
+  return ( 
     <div className="space-y-8">
       {/* Profile header */}
       <div className="relative">

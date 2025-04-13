@@ -316,7 +316,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {/* Badge */}
                   {item.badge && (
                     <AnimatePresence>
-                      {expanded || isMobile ? (
+                      {expanded || isMobile ? (  
                         <motion.div
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
