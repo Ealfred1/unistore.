@@ -198,36 +198,9 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Welcome Card with animated elements */}
       <div
-        className="relative overflow-hidden rounded-2xl border border-[#0a2472]/20"
+        className="relative overflow-hidden rounded-2xl border bg-orange-100 border-[#0a2472]/20"
       >
-        <div className="absolute inset-0 overflow-hidden">
-          {/* Animated background elements */}
-          {Array.from({ length: 20 }).map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute rounded-full bg-white/5"
-              style={{
-                width: Math.random() * 100 + 50,
-                height: Math.random() * 100 + 50,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{
-                opacity: [0.1, 0.3, 0.1],
-                scale: [0, 1, 0],
-                x: [0, Math.random() * 50 - 25, 0],
-                y: [0, Math.random() * 50 - 25, 0],
-              }}
-              transition={{
-                duration: Math.random() * 5 + 5,
-                repeat: Number.POSITIVE_INFINITY,
-                repeatType: "loop",
-                delay: Math.random() * 5,
-              }}
-            />
-          ))}
-        </div>
+
 
         <div className="relative p-6 md:p-8 z-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -270,7 +243,7 @@ export default function DashboardPage() {
               <Link href="/dashboard/products">
                 <Button
                   variant="outline"
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 w-full sm:w-auto"
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 w-full sm:w-auto" 
                 >
                   <LayoutGrid className="mr-2 h-4 w-4" />
                   Browse All
