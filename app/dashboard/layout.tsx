@@ -49,11 +49,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { useProducts } from "@/providers/product-provider"
 import { useToast } from "@/components/ui/use-toast"
+import { useUniversities } from "@/providers/university-provider"
 
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, upgradeToMerchant } = useAuth()
   const { products, categories, isLoading, fetchProducts } = useProducts()
+  const { getUniversityById } = useUniversities()
   const pathname = usePathname()
   const router = useRouter()
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -70,11 +72,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [merchantName, setMerchantName] = useState("")
+  const [universityAbbreviation, setUniversityAbbreviation] = useState<string | null>(null)
 
   // Set expanded state based on screen size
   useEffect(() => {
     setExpanded(!isMobile)
   }, [isMobile])
+
+  // Get university abbreviation
+  useEffect(() => {
+    const getUniversityInfo = () => {
+      // First check if user has a university in their profile
+      if (user?.university) {
+        const university = getUniversityById(user.university)
+        if (university?.abbreviation) {
+          setUniversityAbbreviation(university.abbreviation)
+          return
+        }
+      }
+
+      // Otherwise check localStorage for selected university
+      const storedUniversityId = localStorage.getItem("unistore_university")
+      if (storedUniversityId) {
+        const university = getUniversityById(Number(storedUniversityId))
+        if (university?.abbreviation) {
+          setUniversityAbbreviation(university.abbreviation)
+          return
+        }
+      }
+
+      // Default to null if no university found
+      setUniversityAbbreviation(null)
+    }
+
+    getUniversityInfo()
+  }, [user, getUniversityById])
 
   // Get user initials for avatar fallback
   const getUserInitials = () => {
@@ -141,7 +173,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ] : []),
     {
       name: "Saved",
-      href: "/dashboard/saved",
+      href: "/dashboard/favorites",
       icon: <Heart className="h-5 w-5" />,
       color: "text-red-600",
       bgColor: "bg-red-100",
@@ -189,7 +221,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu className="h-5 w-5" />
           </button>
           <div className="ml-3 lg:hidden">
-            <Logo className="text-xl" />
+            <Logo size="lg" universityAbbreviation={universityAbbreviation} />
           </div>
         </div>
 
@@ -266,7 +298,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Sidebar header */}
           <div className="p-4 flex items-center justify-between">
             <div className="flex items-center">
-              <Logo className={`${expanded || isMobile ? "text-xl" : "hidden"}`} />
+              <Logo size="lg" universityAbbreviation={universityAbbreviation} />
               {isMobile && (
                 <button 
                   onClick={() => setMobileOpen(false)}
