@@ -57,7 +57,18 @@ export function useMessaging(token: string) {
   const [onlineMerchants, setOnlineMerchants] = useState<Merchant[]>([]);
   const [isStartingConversation, setIsStartingConversation] = useState(false);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
-  const [user, setUser] = useState<{id: string} | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUserId(payload.user_id);
+      } catch (e) {
+        console.error('Failed to decode token:', e);
+      }
+    }
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -104,14 +115,16 @@ export function useMessaging(token: string) {
       });
 
       wsRef.current.addMessageHandler('new_message', (data) => {
+        const newMessage = data.message;
         setCurrentMessages(prev => {
-          const messageExists = prev.some(msg => msg.id === data.message.id);
-          if (!messageExists) {
-            return [...prev].concat(data.message).sort((a, b) => 
-              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
+          // Check if message already exists
+          if (prev.some(msg => msg.id === newMessage.id)) {
+            return prev;
           }
-          return prev;
+          // Add new message and sort by creation time
+          return [...prev, newMessage].sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
         });
         
         setConversations(prev => prev.map(conv => 
@@ -122,18 +135,21 @@ export function useMessaging(token: string) {
       });
 
       wsRef.current.addMessageHandler('read_receipt', (data) => {
-        const { conversation_id, last_read_id, user_id } = data;
+        const { conversation_id, last_read_id, user_id: readByUserId } = data;
         
-        setCurrentMessages(prev => 
-          prev.map(msg => ({
-            ...msg,
-            is_read: msg.sender_id === user?.id && // Only update messages sent by current user
-                     msg.conversation_id === conversation_id &&
-                     msg.id <= last_read_id
-              ? true 
-              : msg.is_read
-          }))
-        );
+        // Only update if the receipt is from the other user
+        if (readByUserId !== userId) {
+          setCurrentMessages(prev => 
+            prev.map(msg => ({
+              ...msg,
+              is_read: msg.sender_id === userId && // Only update messages sent by current user
+                       msg.conversation_id === conversation_id &&
+                       msg.id <= last_read_id
+                ? true 
+                : msg.is_read
+            }))
+          );
+        }
       });
 
       wsRef.current.connect();
@@ -148,7 +164,7 @@ export function useMessaging(token: string) {
         wsRef.current = null;
       }
     };
-  }, [token, user?.id]);
+  }, [token, userId]);
 
   const getConversations = useCallback(() => {
     wsRef.current?.send('get_conversations', { page: 1 });

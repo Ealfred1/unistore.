@@ -18,12 +18,12 @@ export default function MessagesPage() {
   const { 
     conversations, 
     currentMessages, 
-    onlineMerchants = [],
+    onlineMerchants,
     currentConversation,
     getConversations, 
     getMessages, 
     sendMessage, 
-    markAsRead,
+    markAsRead, 
     startConversation,
     isStartingConversation
   } = useMessaging(token)
@@ -53,11 +53,11 @@ export default function MessagesPage() {
   useEffect(() => {
     if (currentConversation?.id && currentMessages.length > 0) {
       const lastMessage = currentMessages[currentMessages.length - 1]
-      if (lastMessage.sender_id !== user?.id && !lastMessage.is_read) {
+      if (!isSentByMe(lastMessage) && !lastMessage.is_read) {
         markAsRead(currentConversation.id, lastMessage.id)
       }
     }
-  }, [currentConversation?.id, currentMessages, markAsRead, user?.id])
+  }, [currentConversation?.id, currentMessages, markAsRead])
 
   // Handle URL parameter for conversation
   useEffect(() => {
@@ -104,6 +104,44 @@ export default function MessagesPage() {
       setTimeout(() => setError(null), 3000);
     }
   }
+
+  const isSentByMe = (message: Message) => message.sender_id === user.id;
+
+  const renderMessage = (message: Message) => {
+    const sentByMe = isSentByMe(message);
+
+    return (
+      <div
+        key={`${message.id}-${message.conversation_id}`}
+        className={`flex ${sentByMe ? "justify-end" : "justify-start"} mb-4`}
+      >
+        <div 
+          className={`
+            max-w-[70%] rounded-lg px-4 py-2
+            ${sentByMe 
+              ? "bg-[#f58220] text-white rounded-tr-none" 
+              : "bg-blue-500 text-white rounded-tl-none"
+            }
+          `}
+        >
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          <div className="flex items-center justify-end gap-1 mt-1 text-xs">
+            <span className="opacity-70">
+              {new Date(message.created_at).toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </span>
+            {sentByMe && (
+              <span className="text-black">
+                {message.is_read ? "✓✓" : "✓"}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
@@ -252,39 +290,7 @@ export default function MessagesPage() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {currentMessages.map((message) => {
-                const isSentByMe = message.sender_id === user?.id;
-                return (
-                  <div
-                    key={`${message.id}-${message.conversation_id}`}
-                    className={`flex ${isSentByMe ? "justify-end" : "justify-start"}`}
-                  >
-                    {/* Message bubble */}
-                    <div
-                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                        isSentByMe
-                          ? "bg-[#f58220] text-white rounded-tr-none"
-                          : "bg-blue-500 text-white rounded-tl-none"
-                      }`}
-                    >
-                      <p>{message.content}</p>
-                      <div className="text-xs mt-1 flex justify-end items-center gap-1">
-                        <span className="opacity-70">
-                          {new Date(message.created_at).toLocaleTimeString([], { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                        </span>
-                        {isSentByMe && (
-                          <span className="text-black ml-1">
-                            {message.is_read ? "✓✓" : "✓"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {currentMessages.map(renderMessage)}
               <div ref={messagesEndRef} />
             </div>
 
