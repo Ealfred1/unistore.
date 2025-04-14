@@ -24,6 +24,7 @@ import {
   Sparkles,
   Plus,
   X,
+  Store,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -47,14 +48,16 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useProducts } from "@/providers/product-provider"
+import { useToast } from "@/components/ui/use-toast"
 
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth()
+  const { user, logout, upgradeToMerchant } = useAuth()
   const { products, categories, isLoading, fetchProducts } = useProducts()
   const pathname = usePathname()
   const router = useRouter()
   const isMobile = useMediaQuery("(max-width: 1024px)")
+  const { toast } = useToast()
 
   const [expanded, setExpanded] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -64,6 +67,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     description: "",
     category: "",
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [merchantName, setMerchantName] = useState("")
 
   // Set expanded state based on screen size
   useEffect(() => {
@@ -83,65 +89,91 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setShowRequestModal(false)
   }
 
+  // Handle merchant upgrade
+  const handleUpgradeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    
+    try {
+      await upgradeToMerchant(merchantName)
+      toast({
+        title: "Success!",
+        description: "Your account has been upgraded to merchant status.",
+      })
+      setShowUpgradeModal(false)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to upgrade account. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   // Navigation items - using the correct items from the snippet
   const navItems = [
     {
       name: "Dashboard",
       href: "/dashboard",
       icon: <Home className="h-5 w-5" />,
-      color: "text-[#f58220]",
-      bgColor: "bg-[#f58220]/10",
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
     },
     {
-      name: "Profile",
-      href: "/dashboard/profile",
-      icon: <User className="h-5 w-5" />,
-      color: "text-[#0a2472]",
-      bgColor: "bg-[#0a2472]/10",
-    },
-    {
-      name: "My Products",
-      href: "/dashboard/my-products",
-      icon: <Package className="h-5 w-5" />,
-      color: "text-emerald-500",
-      bgColor: "bg-emerald-500/10",
-    },
-    {
-      name: "Browse Products",
+      name: "Products",
       href: "/dashboard/products",
       icon: <ShoppingBag className="h-5 w-5" />,
-      color: "text-amber-500",
-      bgColor: "bg-amber-500/10",
+      color: "text-purple-600",
+      bgColor: "bg-purple-100",
+      badge: "New",
     },
+    // Only show My Products for merchants
+    ...(user?.user_type === "MERCHANT" ? [
+      {
+        name: "My Products",
+        href: "/dashboard/my-products",
+        icon: <Store className="h-5 w-5" />,
+        color: "text-green-600",
+        bgColor: "bg-green-100",
+      }
+    ] : []),
     {
-      name: "Favorites",
-      href: "/dashboard/favorites",
+      name: "Saved",
+      href: "/dashboard/saved",
       icon: <Heart className="h-5 w-5" />,
-      color: "text-pink-500",
-      bgColor: "bg-pink-500/10",
+      color: "text-red-600",
+      bgColor: "bg-red-100",
     },
     {
       name: "Messages",
       href: "/dashboard/messages",
       icon: <MessageCircle className="h-5 w-5" />,
-      color: "text-indigo-500",
-      bgColor: "bg-indigo-500/10",
-      badge: 3,
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
+      badge: "3",
     },
     {
       name: "Notifications",
       href: "/dashboard/notifications",
       icon: <Bell className="h-5 w-5" />,
-      color: "text-red-500",
-      bgColor: "bg-red-500/10",
-      badge: 5,
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-100",
+    },
+    {
+      name: "Profile",
+      href: "/dashboard/profile",
+      icon: <User className="h-5 w-5" />,
+      color: "text-pink-600",
+      bgColor: "bg-pink-100",
     },
     {
       name: "Settings",
       href: "/dashboard/settings",
       icon: <Settings className="h-5 w-5" />,
-      color: "text-gray-500",
-      bgColor: "bg-gray-500/10",
+      color: "text-gray-600",
+      bgColor: "bg-gray-100",
     },
   ]
 
@@ -382,15 +414,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {expanded || isMobile ? (
               <div className="p-3 rounded-xl bg-[#f58220]/10 border border-[#f58220]/20">
                 <div className="flex items-center">
-                  <div className="mr-3 p-2 rounded-lg bg-[#f58220]/20">
-                    <Sparkles className="h-5 w-5 text-[#f58220]" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Upgrade to Merchant</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Sell your products</p>
-                  </div>
+                  {user?.user_type === "PERSONAL" && (
+                    <div className="mr-3 p-2 rounded-lg bg-[#f58220]/20">
+                      <Sparkles className="h-5 w-5 text-[#f58220]" />
+                    </div>
+                  )}
+                  {user?.user_type === "PERSONAL" && (
+                    <div>
+                      <p className="text-sm font-medium">Upgrade to Merchant</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Sell your products</p>
+                    </div>
+                  )}
                 </div>
-                <Button className="w-full mt-3 bg-[#f58220] hover:bg-[#f58220]/90">Upgrade Now</Button>
+                {user?.user_type === "PERSONAL" ? (
+                  <Button 
+                    className="w-full mt-3 bg-[#f58220] hover:bg-[#f58220]/90"
+                    onClick={() => setShowUpgradeModal(true)}
+                  >
+                    Upgrade Now
+                  </Button>
+                ) : (
+                  <Button 
+                    className="w-full mt-3 bg-[#f58220] hover:bg-[#f58220]/90"
+                    onClick={() => router.push('/dashboard/my-products')}
+                  >
+                    View My Products
+                  </Button>
+                )}
               </div>
             ) : (
               <button
@@ -467,6 +517,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <DialogFooter className="pt-4">
               <Button type="submit" className="bg-[#f58220] hover:bg-[#f58220]/90">
                 Submit Request
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Merchant upgrade modal */}
+      <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upgrade to Merchant</DialogTitle>
+            <DialogDescription>
+              Become a merchant to start selling your products on UniStore.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpgradeSubmit}>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <label htmlFor="merchantName" className="text-sm font-medium">
+                  Merchant Name
+                </label>
+                <Input
+                  id="merchantName"
+                  value={merchantName}
+                  onChange={(e) => setMerchantName(e.target.value)}
+                  placeholder="e.g. John's Electronics"
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button 
+                type="submit" 
+                className="bg-[#f58220] hover:bg-[#f58220]/90"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Upgrading..." : "Upgrade Now"}
               </Button>
             </DialogFooter>
           </form>
