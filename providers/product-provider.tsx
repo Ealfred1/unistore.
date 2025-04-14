@@ -85,6 +85,8 @@ interface ProductContextType {
   createProduct: (productData: any) => Promise<Product>
   updateProduct: (id: number, productData: any) => Promise<Product>
   deleteProduct: (id: number) => Promise<void>
+  deleteProductImage: (imageId: number) => Promise<boolean>
+  setPrimaryImage: (imageId: number) => Promise<any>
 }
 
 // Create product context
@@ -184,6 +186,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
 
       const response = await axios.get(`/products/products/my_products/?${queryParams.toString()}`)
       return {
+        
         count: response.data.count,
         next: response.data.next,
         previous: response.data.previous,
@@ -267,7 +270,38 @@ export function ProductProvider({ children }: ProductProviderProps) {
   // Update product
   const updateProduct = async (id: number, productData: any) => {
     try {
-      const response = await axios.patch(`/products/products/${id}/`, productData)
+      // Create FormData object for multipart/form-data request
+      const formData = new FormData()
+      
+      // Append all product fields to FormData
+      Object.entries(productData).forEach(([key, value]) => {
+        // Skip images array and delete_images, we'll handle them separately
+        if (key !== 'images' && key !== 'delete_images') {
+          if (value !== undefined && value !== null) {
+            formData.append(key, String(value))
+          }
+        }
+      })
+      
+      // Append images if they exist
+      if (productData.images && Array.isArray(productData.images)) {
+        productData.images.forEach((image: File) => {
+          formData.append('images', image)
+        })
+      }
+      
+      // Append image IDs to delete
+      if (productData.delete_images && Array.isArray(productData.delete_images)) {
+        productData.delete_images.forEach((imageId: number) => {
+          formData.append('delete_images', String(imageId))
+        })
+      }
+      
+      const response = await axios.put(`/products/products/${id}/`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
       return response.data
     } catch (error) {
       console.error(`Error updating product ${id}:`, error)
@@ -281,6 +315,28 @@ export function ProductProvider({ children }: ProductProviderProps) {
       await axios.delete(`/products/products/${id}/`)
     } catch (error) {
       console.error(`Error deleting product ${id}:`, error)
+      throw error
+    }
+  }
+
+  // Delete product image
+  const deleteProductImage = async (imageId: number) => {
+    try {
+      await axios.delete(`/products/product-images/${imageId}/`)
+      return true
+    } catch (error) {
+      console.error(`Error deleting product image ${imageId}:`, error)
+      throw error
+    }
+  }
+
+  // Set primary image
+  const setPrimaryImage = async (imageId: number) => {
+    try {
+      const response = await axios.post(`/products/product-images/${imageId}/set_primary/`)
+      return response.data
+    } catch (error) {
+      console.error(`Error setting primary image ${imageId}:`, error)
       throw error
     }
   }
@@ -316,6 +372,8 @@ export function ProductProvider({ children }: ProductProviderProps) {
         createProduct,
         updateProduct,
         deleteProduct,
+        deleteProductImage,
+        setPrimaryImage,
       }}
     >
       {children}

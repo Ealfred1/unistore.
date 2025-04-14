@@ -188,6 +188,15 @@ export default function ProductDetailPage() {
       }
     }
 
+    // For Appwrite URLs, add project ID query param if missing
+    if (imageUrl.includes("appwrite.io")) {
+      const projectId = "67f47c4200273e45c433"
+      if (!imageUrl.includes("project=")) {
+        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+      }
+      return imageUrl
+    }
+
     return imageUrl
   }
 
@@ -328,7 +337,19 @@ export default function ProductDetailPage() {
               <h1 className="text-xl md:text-2xl font-bold mb-2">{product.name}</h1>
 
               <div className="flex items-baseline mb-4">
-                <span className="text-2xl md:text-3xl font-bold">₦{formatPrice(product.price_range)}</span>
+                <span className="text-2xl md:text-3xl font-bold">
+                  {product.price ? (
+                    `₦${formatPrice(product.price)}`
+                  ) : product.price_range ? (
+                    `₦${formatPrice(product.price_range)}`
+                  ) : product.fixed_price ? (
+                    `₦${formatPrice(product.fixed_price)}`
+                  ) : product.custom_range ? (
+                    product.custom_range
+                  ) : (
+                    "Contact for price"
+                  )}
+                </span>
                 {product.price_negotiable && <span className="ml-2 text-sm text-gray-500">(Negotiable)</span>}
               </div>
 
@@ -380,7 +401,7 @@ export default function ProductDetailPage() {
                     />
                   </div>
                   <div>
-                    <h3 className="font-medium">{product.merchant_info.first_name} {product.merchant_info.last_name}{product.merchant_info.last_name}{product.merchant_info.last_name}{product.merchant_info.last_name}{product.merchant_info.last_name}{product.merchant_info.last_name}{product.merchant_info.last_name}{product.merchant_info.last_name}</h3>
+                    <h3 className="font-medium">{product.merchant_info.first_name} {product.merchant_info.last_name}</h3>
                     <p className="text-sm text-gray-500">
                       Member since {new Date(product.merchant_info.date_joined).getFullYear()}
                     </p>

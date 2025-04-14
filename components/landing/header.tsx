@@ -50,14 +50,14 @@ export function Header() {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.5 }}
+              transition={{ duration: 0.3, delay: 0.5 }}                         
             >
-              <Link href="/auth/login">
+              <Link href="/auth/login"> 
                 <Button variant="outline" className="bg-transparent">
                   Log In
                 </Button>
               </Link>
-            </motion.div>
+            </motion.div> 
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
