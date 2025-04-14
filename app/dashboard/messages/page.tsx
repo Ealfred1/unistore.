@@ -19,6 +19,7 @@ export default function MessagesPage() {
     conversations, 
     currentMessages, 
     onlineMerchants = [],
+    currentConversation,
     getConversations, 
     getMessages, 
     sendMessage, 
@@ -27,7 +28,6 @@ export default function MessagesPage() {
     isStartingConversation
   } = useMessaging(token)
 
-  const [currentConversation, setCurrentConversation] = useState<any>(null)
   const [newMessage, setNewMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -67,10 +67,10 @@ export default function MessagesPage() {
     if (conversationId) {
       const conversation = conversations.find(conv => conv.id === conversationId);
       if (conversation) {
-        setCurrentConversation(conversation);
+        startConversation(conversation.other_user.id);
       }
     }
-  }, [conversations]);
+  }, [conversations, startConversation]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,29 +86,20 @@ export default function MessagesPage() {
 
   // Filter conversations based on search query
   const filteredConversations = conversations.filter(conv => 
-    conv.other_user.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.other_user.last_name.toLowerCase().includes(searchQuery.toLowerCase())
+    conv.other_user && (
+      conv.other_user.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      conv.other_user.last_name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
   )
 
   // Handle merchant click
   const handleMerchantClick = async (merchantId: string) => {
     try {
       setError(null);
-      const existingConv = conversations.find(
-        conv => conv.other_user.id === merchantId
-      );
-      
-      if (existingConv) {
-        setCurrentConversation(existingConv);
-        return;
-      }
-
-      const conversation = await startConversation(merchantId);
-      if (conversation) {
-        // Refresh conversations list
-        getConversations();
-      }
+      await startConversation(merchantId);
+      // The conversation will be set in the hook
     } catch (err) {
+      console.error('Failed to start conversation:', err);
       setError('Failed to start conversation');
       setTimeout(() => setError(null), 3000);
     }
@@ -178,7 +169,7 @@ export default function MessagesPage() {
             {filteredConversations.map((conv) => (
               <div
                 key={conv.id}
-                onClick={() => setCurrentConversation(conv)}
+                onClick={() => startConversation(conv.other_user.id)}
                 className={`p-4 hover:bg-gray-50 cursor-pointer ${
                   currentConversation?.id === conv.id ? "bg-gray-50" : ""
                 }`}
@@ -261,31 +252,39 @@ export default function MessagesPage() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {currentMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.sender_id === user?.id ? "justify-end" : "justify-start"}`}
-                >
+              {currentMessages.map((message) => {
+                const isSentByMe = message.sender_id === user?.id;
+                return (
                   <div
-                    className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                      message.sender_id === user?.id
-                        ? "bg-[#f58220] text-white rounded-br-none"
-                        : "bg-gray-100 rounded-bl-none"
-                    }`}
+                    key={`${message.id}-${message.conversation_id}`}
+                    className={`flex ${isSentByMe ? "justify-end" : "justify-start"}`}
                   >
-                    <p>{message.content}</p>
-                    <div className="text-xs mt-1 flex justify-end opacity-70">
-                      {new Date(message.created_at).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                      {message.sender_id === user?.id && (
-                        <span className="ml-1">{message.is_read ? "✓✓" : "✓"}</span>
-                      )}
+                    {/* Message bubble */}
+                    <div
+                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                        isSentByMe
+                          ? "bg-[#f58220] text-white rounded-tr-none"
+                          : "bg-blue-500 text-white rounded-tl-none"
+                      }`}
+                    >
+                      <p>{message.content}</p>
+                      <div className="text-xs mt-1 flex justify-end items-center gap-1">
+                        <span className="opacity-70">
+                          {new Date(message.created_at).toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </span>
+                        {isSentByMe && (
+                          <span className="text-black ml-1">
+                            {message.is_read ? "✓✓" : "✓"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
 

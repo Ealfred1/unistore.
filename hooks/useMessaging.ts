@@ -8,6 +8,7 @@ interface Message {
   sender_id: string;
   created_at: string;
   is_read: boolean;
+  conversation_id: string;
   attachments?: Array<{
     id: string;
     file_name: string;
@@ -38,14 +39,15 @@ interface Conversation {
     id: string;
     first_name: string;
     last_name: string;
+    profile_image: string;
     is_merchant: boolean;
     is_online: boolean;
-    profile_image: string;
+    merchant_verified?: boolean;
   };
   last_message: Message | null;
   unread_count: number;
   created_at: string;
-  last_activity: string;
+  last_message_at: string;
 }
 
 export function useMessaging(token: string) {
@@ -54,6 +56,8 @@ export function useMessaging(token: string) {
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
   const [onlineMerchants, setOnlineMerchants] = useState<Merchant[]>([]);
   const [isStartingConversation, setIsStartingConversation] = useState(false);
+  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
+  const [user, setUser] = useState<{id: string} | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -100,19 +104,35 @@ export function useMessaging(token: string) {
       });
 
       wsRef.current.addMessageHandler('new_message', (data) => {
-        setCurrentMessages(prev => [...prev, data.message]);
+        setCurrentMessages(prev => {
+          const messageExists = prev.some(msg => msg.id === data.message.id);
+          if (!messageExists) {
+            return [...prev].concat(data.message).sort((a, b) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          }
+          return prev;
+        });
+        
         setConversations(prev => prev.map(conv => 
           conv.id === data.message.conversation_id 
-            ? { ...conv, last_message: data.message }
+            ? { ...conv, last_message: data.message, last_message_at: data.message.created_at }
             : conv
         ));
       });
 
       wsRef.current.addMessageHandler('read_receipt', (data) => {
+        const { conversation_id, last_read_id, user_id } = data;
+        
         setCurrentMessages(prev => 
-          prev.map(msg => 
-            msg.id <= data.last_read_id ? { ...msg, is_read: true } : msg
-          )
+          prev.map(msg => ({
+            ...msg,
+            is_read: msg.sender_id === user?.id && // Only update messages sent by current user
+                     msg.conversation_id === conversation_id &&
+                     msg.id <= last_read_id
+              ? true 
+              : msg.is_read
+          }))
         );
       });
 
@@ -128,7 +148,7 @@ export function useMessaging(token: string) {
         wsRef.current = null;
       }
     };
-  }, [token]);
+  }, [token, user?.id]);
 
   const getConversations = useCallback(() => {
     wsRef.current?.send('get_conversations', { page: 1 });
@@ -139,10 +159,14 @@ export function useMessaging(token: string) {
   }, []);
 
   const sendMessage = useCallback((conversationId: string, content: string, attachments?: File[]) => {
-    wsRef.current?.send('send_message', {
+    if (!wsRef.current) return;
+    
+    wsRef.current.send('send_message', {
       conversation_id: conversationId,
-      content,
-      attachments
+      message: {
+        content: content,
+        attachments: attachments
+      }
     });
   }, []);
 
@@ -153,7 +177,7 @@ export function useMessaging(token: string) {
     });
   }, []);
 
-  const startConversation = useCallback(async (merchantId: string): Promise<string | undefined> => {
+  const startConversation = useCallback(async (merchantId: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       if (!wsRef.current) {
         reject(new Error('WebSocket not connected'));
@@ -168,31 +192,33 @@ export function useMessaging(token: string) {
       );
       
       if (existingConv) {
+        setCurrentConversation(existingConv);
         setIsStartingConversation(false);
         resolve(existingConv.id);
         return;
       }
 
-      // Add one-time handlers for the response
       const handleSuccess = (data: any) => {
-        setConversations(prev => [data.conversation, ...prev]);
-        setIsStartingConversation(false);
-        resolve(data.conversation.id);
-        wsRef.current?.messageHandlers.delete('conversation_started');
-        wsRef.current?.messageHandlers.delete('conversation_error');
+        if (data.conversation) {
+          setConversations(prev => [data.conversation, ...prev]);
+          setCurrentConversation(data.conversation);
+          setIsStartingConversation(false);
+          resolve(data.conversation.id);
+        }
+        wsRef.current?.removeMessageHandler('conversation_started');
+        wsRef.current?.removeMessageHandler('conversation_error');
       };
 
       const handleError = (data: any) => {
         setIsStartingConversation(false);
         reject(new Error(data.message));
-        wsRef.current?.messageHandlers.delete('conversation_started');
-        wsRef.current?.messageHandlers.delete('conversation_error');
+        wsRef.current?.removeMessageHandler('conversation_started');
+        wsRef.current?.removeMessageHandler('conversation_error');
       };
 
       wsRef.current.addMessageHandler('conversation_started', handleSuccess);
       wsRef.current.addMessageHandler('conversation_error', handleError);
 
-      // Send the request
       wsRef.current.send('start_conversation_with_merchant', { merchant_id: merchantId });
     });
   }, [conversations]);
@@ -201,6 +227,7 @@ export function useMessaging(token: string) {
     conversations,
     currentMessages,
     onlineMerchants,
+    currentConversation,
     getConversations,
     getMessages,
     sendMessage,
