@@ -205,8 +205,8 @@ export function ProductProvider({ children }: ProductProviderProps) {
   const getFavoriteProducts = async () => {
     try {
       const response = await axios.get("/products/favorites/")
-      // Extract product details from favorites
-      return response.data.map((favorite: any) => favorite.product_details)
+      // The response includes results array with product_details
+      return response.data.results.map((favorite: any) => favorite.product_details)
     } catch (error) {
       console.error("Error fetching favorite products:", error)
       throw error
