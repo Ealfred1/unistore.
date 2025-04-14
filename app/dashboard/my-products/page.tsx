@@ -127,6 +127,31 @@ export default function MyProductsPage() {
     setProductToDelete(productId)
     setDeleteConfirmOpen(true)
   }
+
+  const getProperImageUrl = (imageUrl: string | undefined) => {
+    if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
+
+    // Check if the URL contains both Appwrite and Cloudinary
+    if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
+      // Find the position of the nested https:// for cloudinary
+      const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
+      if (cloudinaryStart !== -1) {
+        // Extract everything from the cloudinary URL start
+        return imageUrl.substring(cloudinaryStart).split("/view")[0]
+      }
+    }
+
+    // For Appwrite URLs, add project ID query param if missing
+    if (imageUrl.includes("appwrite.io")) {
+      const projectId = "67f47c4200273e45c433"
+      if (!imageUrl.includes("project=")) {
+        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+      }
+      return imageUrl
+    }
+
+    return imageUrl
+  }
   
   // Confirm delete
   const handleConfirmDelete = async (productId: number) => {
@@ -160,22 +185,24 @@ export default function MyProductsPage() {
     }
   })
   
-  // Handle edit product
-  const handleEditProduct = (product: any) => {
-    // Fetch the complete product data if needed
-    // This ensures we have all the details including images
-    const fetchCompleteProduct = async () => {
-      try {
-        const completeProduct = await getProductById(product.id);
-        setProductToEdit(completeProduct);
-        setEditModalOpen(true);
-      } catch (error) {
-        console.error("Error fetching product details:", error);
-        toast.error("Failed to load product details");
-      }
-    };
-    
-    fetchCompleteProduct();
+  // Handle edit click
+  const handleEditClick = async (product: any) => {
+    try {
+      // Fetch complete product details including images
+      const completeProduct = await getProductById(product.id)
+      setProductToEdit(completeProduct)
+      setEditModalOpen(true)
+    } catch (error) {
+      console.error("Error fetching product details:", error)
+      toast.error("Failed to load product details")
+    }
+  }
+  
+  // Handle edit success
+  const handleEditSuccess = () => {
+    // Refresh the products list
+    fetchMyProducts(currentPage)
+    toast.success("Product updated successfully")
   }
   
   // Format price for display with proper fallbacks
@@ -288,109 +315,48 @@ export default function MyProductsPage() {
       ) : sortedProducts.length > 0 ? (
         <>
           {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className={`grid gap-4 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"}`}>
               {sortedProducts.map((product) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card className="overflow-hidden h-full flex flex-col border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
-                    <div className="relative h-48 bg-gray-100 dark:bg-gray-700">
-                      <Link href={`/products/${product.id}`}>
-                        <div className="w-full h-full">
-                          {product.primary_image ? (
-                            <img
-                              src={product.primary_image}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-600">
-                              <Package className="h-12 w-12 text-gray-400 dark:text-gray-500" />
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                      <Badge 
-                        className={`absolute top-2 left-2 ${
-                          product.status === "ACTIVE" 
-                            ? "bg-green-100 text-green-800 border-green-200" 
-                            : product.status === "PENDING" 
-                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                            : product.status === "SOLD"
-                            ? "bg-blue-100 text-blue-800 border-blue-200"
-                            : product.status === "DRAFT"
-                            ? "bg-purple-100 text-purple-800 border-purple-200"
-                            : "bg-gray-100 text-gray-800 border-gray-200"
-                        }`}
-                      >
-                        {product.status}
-                      </Badge>
-                    </div>
-                    <CardContent className="p-4 flex-1 flex flex-col">
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleToggleVisibility(product.id)}
-                            className="h-8 w-8 mr-1"
-                            title={product.status === "ACTIVE" ? "Deactivate" : "Activate"}
-                          >
-                            {product.status === "ACTIVE" ? (
-                              <Eye className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <EyeOff className="h-4 w-4 text-gray-500" />
-                            )}
-                          </Button>
-                          <Link href={`/dashboard/my-products/edit/${product.id}`}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 mr-1"
-                              title="Edit"
-                            >
-                              <Edit className="h-4 w-4 text-blue-500" />
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            className="h-8 w-8"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </div>
-                      <h3 className="font-medium text-lg mb-1">{product.name}</h3>
-                      <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-                        {product.condition} • {product.university_name}
-                      </p>
-                      <div className="mt-auto flex items-center justify-between">
-                        <span className="font-bold text-lg">
-                          {product.price ? (
-                            `₦${formatPrice(product.price)}`
-                          ) : product.price_range ? (
-                            `₦${formatPrice(product.price_range)}`
-                          ) : product.fixed_price ? (
-                            `₦${formatPrice(product.fixed_price)}`
-                          ) : product.custom_range ? (
-                            product.custom_range
-                          ) : (
-                            "Contact for price"
-                          )}
-                        </span>
-                        <div className="text-sm text-gray-500">
-                          {product.view_count} {product.view_count === 1 ? "view" : "views"}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                <div key={product.id} className="relative group">
+                  <ProductCard 
+                    product={{
+                      ...product,
+                      primary_image: getProperImageUrl(product.primary_image),
+                      price: formatPrice(product.price)
+                    }} 
+                    viewMode={viewMode}
+                  />
+                  <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-white/90 hover:bg-white dark:bg-gray-800/90 dark:hover:bg-gray-800 shadow-sm"
+                      onClick={() => handleEditClick(product)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-white/90 hover:bg-white dark:bg-gray-800/90 dark:hover:bg-gray-800 shadow-sm"
+                      onClick={() => handleToggleVisibility(product.id)}
+                    >
+                      {product.status === "ACTIVE" ? (
+                        <Eye className="h-4 w-4" />
+                      ) : (
+                        <EyeOff className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleDeleteProduct(product.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
@@ -466,6 +432,15 @@ export default function MyProductsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleEditClick(product)}
+                            className="h-8 w-8 mr-1"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4 text-blue-500" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleToggleVisibility(product.id)}
                             className="h-8 w-8 mr-1"
                             title={product.status === "ACTIVE" ? "Deactivate" : "Activate"}
@@ -476,16 +451,6 @@ export default function MyProductsPage() {
                               <EyeOff className="h-4 w-4 text-gray-500" />
                             )}
                           </Button>
-                          <Link href={`/dashboard/my-products/edit/${product.id}`}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 mr-1"
-                              title="Edit"
-                            >
-                              <Edit className="h-4 w-4 text-blue-500" />
-                            </Button>
-                          </Link>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -622,7 +587,7 @@ export default function MyProductsPage() {
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
         product={productToEdit}
-        onSuccess={() => fetchMyProducts(currentPage)}
+        onSuccess={handleEditSuccess}
       />
     </div>
   )

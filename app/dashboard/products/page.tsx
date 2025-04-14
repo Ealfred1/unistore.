@@ -1,430 +1,300 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment } from "react"
 import { motion } from "framer-motion"
-import { useProducts } from "@/providers/product-provider"
+import { Search, Filter, ChevronDown, Grid, List, ChevronLeft, ChevronRight } from "lucide-react"
 import ProductCard from "@/components/products/product-card"
-import { Search, Filter, ChevronDown, Grid, List, ShoppingBag } from "lucide-react"
-import Image from "next/image"
+import { useProducts } from "@/providers/product-provider"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
 
-export default function BrowseProductsPage() {
-  const { products, categories } = useProducts()
+export default function DashboardProductsPage() {
+  const { products, categories, isLoading, fetchProducts } = useProducts()
+  
+  // State for UI
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high" | "popular">("newest")
-  const [showSortDropdown, setShowSortDropdown] = useState(false)
+  const [sortBy, setSortBy] = useState<string>("newest")
   const [searchQuery, setSearchQuery] = useState("")
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000])
+  const [filteredProducts, setFilteredProducts] = useState(products)
 
-  // Simulate loading
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [totalCount, setTotalCount] = useState(0)
+
+  // Fetch products with filters and pagination
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 1000)
+    const getProducts = async () => {
+      const filters: Record<string, any> = {
+        page: currentPage,
+        page_size: pageSize
+      }
 
-    return () => clearTimeout(timer)
-  }, [])
+      if (searchQuery) {
+        filters.search = searchQuery
+      }
 
-  // Filter products based on search query, category, and price range
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      (selectedCategory ? product.category === selectedCategory : true) &&
-      product.price >= priceRange[0] &&
-      product.price <= priceRange[1],
-  )
+      // Handle sorting
+      switch (sortBy) {
+        case "newest":
+          filters.ordering = "-created_at"
+          break
+        case "price_low":
+          filters.ordering = "price"
+          break
+        case "price_high":
+          filters.ordering = "-price"
+          break
+        case "popular":
+          filters.ordering = "-view_count"
+          break
+      }
 
-  // Sort products
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    if (sortBy === "price_low") return a.price - b.price
-    if (sortBy === "price_high") return b.price - a.price
-    if (sortBy === "popular") return b.reviewCount - a.reviewCount
-    // Default: newest
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  })
+      try {
+        const response = await fetchProducts(filters)
+        if (response) {
+          setFilteredProducts(response.results)
+          setTotalCount(response.count)
+          setTotalPages(response.total_pages)
+        }
+      } catch (error) {
+        console.error("Error fetching products:", error)
+      }
+    }
 
-  // Handle price range change
-  const handlePriceRangeChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const value = Number.parseInt(e.target.value)
-    setPriceRange((prev) => {
-      const newRange = [...prev] as [number, number]
-      newRange[index] = value
-      return newRange as [number, number]
-    })
+    getProducts()
+  }, [searchQuery, sortBy, currentPage, pageSize])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  // Add this function to handle image URLs
+  const getProperImageUrl = (imageUrl: string | undefined) => {
+    if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
+
+    // Check if the URL contains both Appwrite and Cloudinary
+    if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
+      // Find the position of the nested https:// for cloudinary
+      const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
+      if (cloudinaryStart !== -1) {
+        // Extract everything from the cloudinary URL start
+        return imageUrl.substring(cloudinaryStart).split("/view")[0]
+      }
+    }
+
+    // For Appwrite URLs, add project ID query param if missing
+    if (imageUrl.includes("appwrite.io")) {
+      const projectId = "67f47c4200273e45c433"
+      if (!imageUrl.includes("project=")) {
+        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+      }
+      return imageUrl
+    }
+
+    return imageUrl
+  }
+
+  // Add price formatting function
+  const formatPrice = (price: any) => {
+    if (!price) return "Contact for price"
+    
+    // If it's a number or numeric string, format it as currency
+    if (!isNaN(parseFloat(price))) {
+      return new Intl.NumberFormat('en-NG', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(parseFloat(price))
+    }
+    
+    // Otherwise return as is (for price ranges or custom prices)
+    return price
   }
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Browse Products</h1>
-        <p className="text-gray-500">Discover products from fellow students</p>
+        <h1 className="text-2xl font-bold">My Products</h1>
+        <p className="text-gray-500">Manage your product listings</p>
       </div>
 
-      {/* Main content */}
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Filters sidebar */}
-        <div className="lg:w-64 flex-shrink-0">
-          <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden sticky top-4">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="font-semibold">Filters</h2>
-            </div>
-
-            {/* Categories */}
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="font-medium mb-3">Categories</h3>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input
-                    type="radio"
-                    id="all-categories"
-                    name="category"
-                    checked={selectedCategory === null}
-                    onChange={() => setSelectedCategory(null)}
-                    className="h-4 w-4 text-[#f58220] focus:ring-[#f58220] border-gray-300"
-                  />
-                  <label htmlFor="all-categories" className="ml-2 text-sm text-gray-700">
-                    All Categories
-                  </label>
-                </div>
-                {categories.map((category) => (
-                  <div key={category.id} className="flex items-center">
-                    <input
-                      type="radio"
-                      id={`category-${category.id}`}
-                      name="category"
-                      checked={selectedCategory === category.id}
-                      onChange={() => setSelectedCategory(category.id)}
-                      className="h-4 w-4 text-[#f58220] focus:ring-[#f58220] border-gray-300"
-                    />
-                    <label htmlFor={`category-${category.id}`} className="ml-2 text-sm text-gray-700">
-                      {category.name}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Price Range */}
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="font-medium mb-3">Price Range</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">${priceRange[0]}</span>
-                  <span className="text-sm text-gray-500">${priceRange[1]}</span>
-                </div>
-                <div className="relative">
-                  <input
-                    type="range"
-                    min="0"
-                    max="2000"
-                    value={priceRange[0]}
-                    onChange={(e) => handlePriceRangeChange(e, 0)}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max="2000"
-                    value={priceRange[1]}
-                    onChange={(e) => handlePriceRangeChange(e, 1)}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer absolute top-0"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div>
-                    <label htmlFor="min-price" className="block text-xs text-gray-500 mb-1">
-                      Min
-                    </label>
-                    <input
-                      type="number"
-                      id="min-price"
-                      value={priceRange[0]}
-                      onChange={(e) => handlePriceRangeChange(e, 0)}
-                      className="w-full px-2 py-1 text-sm rounded border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#f58220] focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="max-price" className="block text-xs text-gray-500 mb-1">
-                      Max
-                    </label>
-                    <input
-                      type="number"
-                      id="max-price"
-                      value={priceRange[1]}
-                      onChange={(e) => handlePriceRangeChange(e, 1)}
-                      className="w-full px-2 py-1 text-sm rounded border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#f58220] focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Condition */}
-            <div className="p-4">
-              <h3 className="font-medium mb-3">Condition</h3>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="condition-new"
-                    className="h-4 w-4 text-[#f58220] focus:ring-[#f58220] border-gray-300 rounded"
-                  />
-                  <label htmlFor="condition-new" className="ml-2 text-sm text-gray-700">
-                    New
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="condition-like-new"
-                    className="h-4 w-4 text-[#f58220] focus:ring-[#f58220] border-gray-300 rounded"
-                  />
-                  <label htmlFor="condition-like-new" className="ml-2 text-sm text-gray-700">
-                    Like New
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="condition-good"
-                    className="h-4 w-4 text-[#f58220] focus:ring-[#f58220] border-gray-300 rounded"
-                  />
-                  <label htmlFor="condition-good" className="ml-2 text-sm text-gray-700">
-                    Good
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="condition-fair"
-                    className="h-4 w-4 text-[#f58220] focus:ring-[#f58220] border-gray-300 rounded"
-                  />
-                  <label htmlFor="condition-fair" className="ml-2 text-sm text-gray-700">
-                    Fair
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="condition-poor"
-                    className="h-4 w-4 text-[#f58220] focus:ring-[#f58220] border-gray-300 rounded"
-                  />
-                  <label htmlFor="condition-poor" className="ml-2 text-sm text-gray-700">
-                    Poor
-                  </label>
-                </div>
-              </div>
-            </div>
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
           </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search products..."
+            className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent bg-white dark:bg-gray-800 dark:text-gray-100"
+          />
         </div>
 
-        {/* Products grid */}
-        <div className="flex-1">
-          {/* Search and sort */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-gray-400" />
+        <div className="flex gap-2 items-center">
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[180px] h-12 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest First</SelectItem>
+              <SelectItem value="price_low">Price: Low to High</SelectItem>
+              <SelectItem value="price_high">Price: High to Low</SelectItem>
+              <SelectItem value="popular">Most Popular</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="flex h-12 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+            <Button
+              onClick={() => setViewMode("grid")}
+              variant="ghost"
+              size="icon"
+              className={`h-full rounded-none ${viewMode === "grid" ? "bg-[#f58220] text-white hover:bg-[#f58220]/90" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"}`}
+            >
+              <Grid className="h-5 w-5" />
+            </Button>
+            <Separator orientation="vertical" className="h-full" />
+            <Button
+              onClick={() => setViewMode("list")}
+              variant="ghost"
+              size="icon"
+              className={`h-full rounded-none ${viewMode === "list" ? "bg-[#f58220] text-white hover:bg-[#f58220]/90" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"}`}
+            >
+              <List className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className={`grid gap-4 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 animate-pulse" />
+              <div className="p-4 space-y-3">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/3" />
               </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products..."
-                className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Products Grid */}
+      {!isLoading && (
+        <>
+          <div className={`grid gap-4 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
+            {filteredProducts.map((product) => (
+              <ProductCard 
+                key={product.id} 
+                product={{
+                  ...product,
+                  primary_image: getProperImageUrl(product.primary_image),
+                  price: formatPrice(product.price)
+                }} 
+                viewMode={viewMode} 
               />
-            </div>
-
-            <div className="flex gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setShowSortDropdown(!showSortDropdown)}
-                  className="px-4 py-2 border border-gray-300 rounded-xl flex items-center gap-2 hover:bg-gray-50 transition-colors"
-                >
-                  <Filter className="h-4 w-4" />
-                  <span>Sort</span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
-                </button>
-                {showSortDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-10">
-                    <div className="py-1">
-                      <button
-                        onClick={() => {
-                          setSortBy("newest")
-                          setShowSortDropdown(false)
-                        }}
-                        className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "newest" ? "bg-gray-100 font-medium" : ""}`}
-                      >
-                        Newest First
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSortBy("price_low")
-                          setShowSortDropdown(false)
-                        }}
-                        className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "price_low" ? "bg-gray-100 font-medium" : ""}`}
-                      >
-                        Price: Low to High
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSortBy("price_high")
-                          setShowSortDropdown(false)
-                        }}
-                        className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "price_high" ? "bg-gray-100 font-medium" : ""}`}
-                      >
-                        Price: High to Low
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSortBy("popular")
-                          setShowSortDropdown(false)
-                        }}
-                        className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "popular" ? "bg-gray-100 font-medium" : ""}`}
-                      >
-                        Most Popular
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="flex border border-gray-300 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`px-3 py-2 ${viewMode === "grid" ? "bg-gray-100" : "hover:bg-gray-50"} transition-colors`}
-                >
-                  <Grid className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`px-3 py-2 ${viewMode === "list" ? "bg-gray-100" : "hover:bg-gray-50"} transition-colors`}
-                >
-                  <List className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Results count */}
-          <div className="mb-4">
-            <p className="text-sm text-gray-500">
-              Showing {sortedProducts.length} {sortedProducts.length === 1 ? "result" : "results"}
-            </p>
-          </div>
+          {/* Empty State */}
+          {filteredProducts.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+            >
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                <Search className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+              </div>
+              <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-gray-100">No products found</h3>
+              <p className="text-gray-500 dark:text-gray-400 mb-6">Try adjusting your search criteria</p>
+              <Button onClick={() => setSearchQuery("")} className="bg-[#f58220] hover:bg-[#f58220]/90 text-white">
+                Clear Search
+              </Button>
+            </motion.div>
+          )}
 
-          {/* Loading state */}
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-xl overflow-hidden shadow-md border border-gray-100 animate-pulse"
-                >
-                  <div className="aspect-square bg-gray-200"></div>
-                  <div className="p-4 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-                  </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-8">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Showing page {currentPage} of {totalPages}
                 </div>
-              ))}
-            </div>
-          ) : sortedProducts.length > 0 ? (
-            viewMode === "grid" ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sortedProducts.map((product, index) => (
-                  <motion.div
-                    key={product.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.1 }}
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="h-10 w-10 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
                   >
-                    <ProductCard product={product} />
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {sortedProducts.map((product, index) => (
-                  <motion.div
-                    key={product.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.1 }}
-                    className="bg-white rounded-xl overflow-hidden shadow-md border border-gray-100"
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => page === 1 || page === totalPages || 
+                      (page >= currentPage - 1 && page <= currentPage + 1))
+                    .map((page, index, array) => {
+                      if (index > 0 && array[index - 1] !== page - 1) {
+                        return (
+                          <Fragment key={`ellipsis-${page}`}>
+                            <span className="px-2 text-gray-400 dark:text-gray-500">...</span>
+                            <Button
+                              variant={currentPage === page ? "default" : "outline"}
+                              size="icon"
+                              onClick={() => handlePageChange(page)}
+                              className={`h-10 w-10 border-gray-200 dark:border-gray-700 ${
+                                currentPage === page
+                                  ? "bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+                                  : "bg-white dark:bg-gray-800"
+                              }`}
+                            >
+                              {page}
+                            </Button>
+                          </Fragment>
+                        )
+                      }
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="icon"
+                          onClick={() => handlePageChange(page)}
+                          className={`h-10 w-10 border-gray-200 dark:border-gray-700 ${
+                            currentPage === page
+                              ? "bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+                              : "bg-white dark:bg-gray-800"
+                          }`}
+                        >
+                          {page}
+                        </Button>
+                      )
+                    })}
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-10 w-10 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
                   >
-                    <div className="flex">
-                      <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
-                        <Image
-                          src={product.images[0] || "/placeholder.svg"}
-                          alt={product.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 p-4 flex flex-col">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs uppercase text-gray-500">{product.category}</span>
-                          <div className="flex items-center">
-                            <div className="flex items-center">
-                              <svg
-                                className="h-4 w-4 text-yellow-400 fill-current"
-                                viewBox="0 0 24 24"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                              </svg>
-                              <span className="ml-1 text-sm font-medium">{product.rating}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <h3 className="font-medium text-lg mb-1">{product.name}</h3>
-                        <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-                          {product.description || "No description available"}
-                        </p>
-                        <div className="mt-auto flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-lg">${product.price.toFixed(2)}</span>
-                            {product.discount && (
-                              <span className="text-sm text-gray-500 line-through">
-                                ${product.originalPrice?.toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {product.reviewCount} {product.reviewCount === 1 ? "review" : "reviews"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            )
-          ) : (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                <ShoppingBag className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">No products found</h3>
-              <p className="text-gray-500 mb-6">Try adjusting your search or filter criteria</p>
-              <button
-                onClick={() => {
-                  setSearchQuery("")
-                  setSelectedCategory(null)
-                  setPriceRange([0, 2000])
-                }}
-                className="px-4 py-2 bg-[#f58220] text-white font-medium rounded-lg hover:bg-[#f58220]/90 transition-all"
-              >
-                Reset Filters
-              </button>
             </div>
           )}
-        </div>
-      </div>
+        </>
+      )}
     </div>
   )
 }
