@@ -137,11 +137,11 @@ export default function ProductsPage() {
 
       try {
         const response = await fetchProducts(filters)
-        if (response && response.pagination) {
-          setTotalPages(response.pagination.total_pages)
-          setCurrentPage(response.pagination.current_page)
-          setPageSize(response.pagination.page_size)
-          setTotalCount(response.pagination.count)
+        if (response) {
+          setTotalPages(response.total_pages)
+          setCurrentPage(response.current_page)
+          setPageSize(response.page_size)
+          setTotalCount(response.count)
         }
       } catch (error) {
         console.error("Error fetching products:", error)
@@ -225,25 +225,53 @@ export default function ProductsPage() {
       }
     }
 
+    // For Appwrite URLs, add project ID query param if missing
+    if (imageUrl.includes("appwrite.io")) {
+      const projectId = "67f47c4200273e45c433"
+      if (!imageUrl.includes("project=")) {
+        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+      }
+      return imageUrl
+    }
+
     return imageUrl
   }
 
+  // Add this function for price formatting
   const formatPrice = (price: string | number | null) => {
     if (price === null || price === undefined) return "N/A"
     
     // If price is already a string with proper formatting, return as-is
-    if (typeof price === "string" && price.includes(",")) {
-      return `₦${price}`
+    if (typeof price === "string") {
+      // Handle "k" suffix (e.g. "13k" -> "13,000")
+      if (price.toLowerCase().endsWith('k')) {
+        const numValue = parseFloat(price.toLowerCase().replace('k', '')) * 1000
+        return numValue.toLocaleString("en-US")
+      }
+
+      // If already formatted with commas, return as-is
+      if (price.includes(",")) {
+        return price
+      }
+
+      // Try parsing as number
+      const numValue = parseFloat(price)
+      if (!isNaN(numValue)) {
+        return numValue.toLocaleString("en-US", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2
+        })
+      }
+
+      // If parsing fails, return original string
+      return price
     }
     
-    // Convert to number if string without formatting
-    const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
-    
-    // Format with commas and preserve decimals if present
-    return `₦${numPrice.toLocaleString("en-US", {
+    // Handle numeric input
+    return price.toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
-    })}`
+    })
   }
 
   return (
@@ -717,12 +745,20 @@ export default function ProductsPage() {
                         </p>
                         <div className="mt-auto flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-lg text-gray-900 dark:text-gray-100">
-                              {formatPrice(product.price || product.price_range)}
+                            <span className="font-bold text-lg">
+                              {product.price ? (
+                                `₦${formatPrice(product.price)}`
+                              ) : product.price_range ? (
+                                `₦${formatPrice(product.price_range)}`
+                              ) : product.fixed_price ? (
+                                `₦${formatPrice(product.fixed_price)}`
+                              ) : product.custom_range ? (
+                                product.custom_range
+                              ) : (
+                                "Contact for price"
+                              )}
                             </span>
-                            {product.price_negotiable && (
-                              <span className="text-xs text-gray-500 dark:text-gray-400">(Negotiable)</span>
-                            )}
+                            {product.price_negotiable && <span className="text-xs text-gray-500">(Negotiable)</span>}
                           </div>
                           <Button
                             variant="ghost"

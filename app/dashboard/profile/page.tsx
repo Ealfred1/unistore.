@@ -41,10 +41,21 @@ export default function ProfilePage() {
 
     // Check if the URL contains both Appwrite and Cloudinary
     if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
+      // Find the position of the nested https:// for cloudinary
       const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
       if (cloudinaryStart !== -1) {
+        // Extract everything from the cloudinary URL start
         return imageUrl.substring(cloudinaryStart).split("/view")[0]
       }
+    }
+
+    // For Appwrite URLs, add project ID query param if missing
+    if (imageUrl.includes("appwrite.io")) {
+      const projectId = "67f47c4200273e45c433"
+      if (!imageUrl.includes("project=")) {
+        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+      }
+      return imageUrl
     }
 
     return imageUrl
