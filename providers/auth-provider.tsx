@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import axios from "@/lib/axios"
 import { useRouter } from "next/navigation"
+import Cookies from 'js-cookie'
 
 // Define user type
 interface User {
@@ -99,9 +100,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { authentication, user_id, user_type } = response.data
       const { access_token, refresh_token } = authentication
 
-      // Store tokens
+      // Store tokens in localStorage
       localStorage.setItem("access_token", access_token)
       localStorage.setItem("refresh_token", refresh_token)
+      
+      // Also store in cookies for middleware access
+      Cookies.set("access_token", access_token, { expires: 7 })
       
       // Store basic user info temporarily
       const tempUser = {
@@ -109,13 +113,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         user_type: user_type
       }
       localStorage.setItem("user", JSON.stringify(tempUser))
+      Cookies.set("user", JSON.stringify(tempUser), { expires: 7 })
 
       // Fetch complete user profile
       const userResponse = await axios.get("/users/profile/")
       setUser(userResponse.data)
       
-      // Update user data in localStorage with complete profile
+      // Update user data in localStorage and cookies with complete profile
       localStorage.setItem("user", JSON.stringify(userResponse.data))
+      Cookies.set("user", JSON.stringify(userResponse.data), { expires: 7 })
       
       return Promise.resolve()
     } catch (error) {
@@ -158,8 +164,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       // Handle the response based on the actual structure
       if (response.data.authentication?.access_token) {
-        localStorage.setItem("access_token", response.data.authentication.access_token)
-        localStorage.setItem("refresh_token", response.data.authentication.refresh_token)
+        const accessToken = response.data.authentication.access_token
+        const refreshToken = response.data.authentication.refresh_token
+        
+        localStorage.setItem("access_token", accessToken)
+        localStorage.setItem("refresh_token", refreshToken)
+        Cookies.set("access_token", accessToken, { expires: 7 })
         
         // Store basic user info temporarily
         if (response.data.user_id) {
@@ -168,12 +178,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
             user_type: response.data.user_type || "PERSONAL"
           }
           localStorage.setItem("user", JSON.stringify(tempUser))
+          Cookies.set("user", JSON.stringify(tempUser), { expires: 7 })
         }
         
         // Fetch complete user profile
         const userResponse = await axios.get("/users/profile/")
         setUser(userResponse.data)
         localStorage.setItem("user", JSON.stringify(userResponse.data))
+        Cookies.set("user", JSON.stringify(userResponse.data), { expires: 7 })
       }
       
       return true
@@ -200,15 +212,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Upgrade to merchant function
   const upgradeToMerchant = async (merchantName: string) => {
     try {
-      const response = await axios.patch("/users/profile/", {
-        user_type: "MERCHANT",
+      const response = await axios.post("/users/profile/upgrade-to-merchant/", {
         merchant_name: merchantName,
-      })
-      setUser(response.data)
-      localStorage.setItem("user", JSON.stringify(response.data))
+      });
+      
+      const updatedUser = {
+        ...user,
+        user_type: "MERCHANT",
+        merchant_name: merchantName
+      };
+      
+      // Update user data with merchant information
+      setUser(updatedUser);
+      
+      // Update user data in localStorage and cookies
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      Cookies.set("user", JSON.stringify(updatedUser), { expires: 7 });
+      
+      return Promise.resolve(response.data);
     } catch (error) {
-      console.error("Upgrade to merchant error:", error)
-      return Promise.reject(error)
+      console.error("Upgrade to merchant error:", error);
+      return Promise.reject(error);
     }
   }
 
@@ -242,6 +266,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem("access_token")
     localStorage.removeItem("refresh_token")
     localStorage.removeItem("user")
+    
+    // Also clear cookies
+    Cookies.remove("access_token")
+    Cookies.remove("user")
+    
     setUser(null)
     router.push("/auth/login")
   }

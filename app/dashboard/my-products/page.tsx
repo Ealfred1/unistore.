@@ -3,100 +3,169 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import Image from "next/image"
+import ProductCard from "@/components/products/product-card"
 import { useProducts } from "@/providers/product-provider"
-import { Plus, Search, Filter, ChevronDown, Grid, List, Edit, Trash2, Eye, EyeOff, Package } from "lucide-react"
+import { useAuth } from "@/providers/auth-provider"
+import { 
+  Package, 
+  Plus, 
+  Search, 
+  Filter, 
+  Grid3X3, 
+  List, 
+  ArrowUpDown,
+  Eye,
+  EyeOff,
+  Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Separator } from "@/components/ui/separator"
 
 export default function MyProductsPage() {
-  const { products } = useProducts()
-  const [myProducts, setMyProducts] = useState<any[]>([])
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high" | "popular">("newest")
-  const [showSortDropdown, setShowSortDropdown] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
+  const { user } = useAuth()
+  const { getUserProducts, updateProduct, deleteProduct, toggleFavorite } = useProducts()
+  
+  const [products, setProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive" | "sold">("all")
-
-  // Simulate loading and get user's products
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // In a real app, you would filter products by the current user's ID
-      // For now, we'll just use the first few products as mock data
-      const userProducts = products.slice(0, 5).map((product, index) => ({
-        ...product,
-        status: index === 0 ? "inactive" : index === 1 ? "sold" : "active",
-      }))
-      setMyProducts(userProducts)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [sortOption, setSortOption] = useState("newest")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<number | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  
+  // Fetch products
+  const fetchMyProducts = async (page = 1) => {
+    setIsLoading(true)
+    try {
+      const filters: Record<string, any> = { page }
+      
+      if (statusFilter && statusFilter !== "all") {
+        filters.status = statusFilter
+      }
+      
+      if (searchQuery) {
+        filters.search = searchQuery
+      }
+      
+      const response = await getUserProducts(filters)
+      setProducts(response.results)
+      setTotalPages(response.total_pages)
+      setCurrentPage(response.current_page)
+      setTotalCount(response.count)
+    } catch (error) {
+      console.error("Error fetching products:", error)
+      toast.error("Failed to load products")
+    } finally {
       setIsLoading(false)
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [products])
-
-  // Filter products based on search query and active filter
-  const filteredProducts = myProducts.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      (activeFilter === "all" || product.status === activeFilter),
-  )
-
-  // Sort products
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    if (sortBy === "price_low") return a.price - b.price
-    if (sortBy === "price_high") return b.price - a.price
-    if (sortBy === "popular") return b.reviewCount - a.reviewCount
-    // Default: newest
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  })
-
-  // Handle product deletion
-  const handleDeleteProduct = (productId: string) => {
-    if (confirm("Are you sure you want to delete this product?")) {
-      setMyProducts((prev) => prev.filter((product) => product.id !== productId))
     }
   }
-
-  // Handle product visibility toggle
-  const handleToggleVisibility = (productId: string) => {
-    setMyProducts((prev) =>
-      prev.map((product) =>
-        product.id === productId
-          ? { ...product, status: product.status === "active" ? "inactive" : "active" }
-          : product,
-      ),
-    )
+  
+  // Initial fetch
+  useEffect(() => {
+    fetchMyProducts()
+  }, [])
+  
+  // Fetch when filters change
+  useEffect(() => {
+    fetchMyProducts(currentPage)
+  }, [statusFilter, searchQuery, currentPage])
+  
+  // Handle toggle visibility
+  const handleToggleVisibility = async (productId: number) => {
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+    
+    const newStatus = product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
+    
+    try {
+      await updateProduct(productId, { status: newStatus })
+      toast.success(`Product ${newStatus === "ACTIVE" ? "activated" : "deactivated"}`)
+      
+      // Update local state
+      setProducts(products.map(p => 
+        p.id === productId ? { ...p, status: newStatus } : p
+      ))
+    } catch (error) {
+      console.error("Error updating product status:", error)
+      toast.error("Failed to update product status")
+    }
   }
-
-  // Get status badge color
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "inactive":
-        return "bg-gray-100 text-gray-800 border-gray-200"
-      case "sold":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+  
+  // Handle delete product
+  const handleDeleteProduct = (productId: number) => {
+    setProductToDelete(productId)
+    setDeleteConfirmOpen(true)
+  }
+  
+  // Confirm delete
+  const handleConfirmDelete = async (productId: number) => {
+    try {
+      await deleteProduct(productId)
+      toast.success("Product deleted successfully")
+      
+      // Update local state
+      setProducts(products.filter(p => p.id !== productId))
+    } catch (error) {
+      console.error("Error deleting product:", error)
+      toast.error("Failed to delete product")
+    }
+  }
+  
+  // Get sorted products
+  const sortedProducts = [...products].sort((a, b) => {
+    switch (sortOption) {
+      case "newest":
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case "oldest":
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case "price-high":
+        return parseFloat(b.price) - parseFloat(a.price)
+      case "price-low":
+        return parseFloat(a.price) - parseFloat(b.price)
+      case "views":
+        return b.view_count - a.view_count
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return 0
     }
-  }
-
+  })
+  
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="container mx-auto py-8 px-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#0a2472]">My Products</h1>
-          <p className="text-gray-500">
-            {myProducts.length} {myProducts.length === 1 ? "product" : "products"} listed
+          <h1 className="text-2xl font-bold mb-1">My Products</h1>
+          <p className="text-gray-500 dark:text-gray-400">
+            Manage your product listings
           </p>
         </div>
-
         <Link href="/dashboard/my-products/new">
           <Button className="bg-[#f58220] hover:bg-[#f58220]/90">
             <Plus className="h-5 w-5 mr-2" />
@@ -104,293 +173,350 @@ export default function MyProductsPage() {
           </Button>
         </Link>
       </div>
-
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex overflow-x-auto pb-2 md:pb-0 space-x-2">
-          <Button
-            variant={activeFilter === "all" ? "default" : "outline"}
-            onClick={() => setActiveFilter("all")}
-            className={
-              activeFilter === "all"
-                ? "bg-[#f58220] hover:bg-[#f58220]/90"
-                : "border border-gray-200 dark:border-gray-700"
-            }
-          >
-            All Products
-          </Button>
-          <Button
-            variant={activeFilter === "active" ? "default" : "outline"}
-            onClick={() => setActiveFilter("active")}
-            className={
-              activeFilter === "active"
-                ? "bg-[#f58220] hover:bg-[#f58220]/90"
-                : "border border-gray-200 dark:border-gray-700"
-            }
-          >
-            Active
-          </Button>
-          <Button
-            variant={activeFilter === "inactive" ? "default" : "outline"}
-            onClick={() => setActiveFilter("inactive")}
-            className={
-              activeFilter === "inactive"
-                ? "bg-[#f58220] hover:bg-[#f58220]/90"
-                : "border border-gray-200 dark:border-gray-700"
-            }
-          >
-            Inactive
-          </Button>
-          <Button
-            variant={activeFilter === "sold" ? "default" : "outline"}
-            onClick={() => setActiveFilter("sold")}
-            className={
-              activeFilter === "sold"
-                ? "bg-[#f58220] hover:bg-[#f58220]/90"
-                : "border border-gray-200 dark:border-gray-700"
-            }
-          >
-            Sold
-          </Button>
-        </div>
-
-        <div className="flex flex-1 flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
-            </div>
+      
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-6 border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
             <Input
-              type="text"
+              placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products..."
-              className="pl-10 pr-4 py-2"
+              className="pl-10 border-gray-200 dark:border-gray-700"
             />
           </div>
-
           <div className="flex gap-2">
-            <DropdownMenu open={showSortDropdown} onOpenChange={setShowSortDropdown}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border border-gray-200 dark:border-gray-700">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Sort
-                  <ChevronDown
-                    className={`h-4 w-4 ml-2 transition-transform ${showSortDropdown ? "rotate-180" : ""}`}
-                  />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="border border-gray-200 dark:border-gray-700">
-                <DropdownMenuItem
-                  onClick={() => setSortBy("newest")}
-                  className={sortBy === "newest" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
-                >
-                  Newest First
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("price_low")}
-                  className={sortBy === "price_low" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
-                >
-                  Price: Low to High
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("price_high")}
-                  className={sortBy === "price_high" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
-                >
-                  Price: High to Low
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("popular")}
-                  className={sortBy === "popular" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}
-                >
-                  Most Popular
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="flex border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px] border-gray-200 dark:border-gray-700">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="INACTIVE">Inactive</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="SOLD">Sold</SelectItem>
+                <SelectItem value="DRAFT">Draft</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortOption} onValueChange={setSortOption}>
+              <SelectTrigger className="w-[180px] border-gray-200 dark:border-gray-700">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest First</SelectItem>
+                <SelectItem value="oldest">Oldest First</SelectItem>
+                <SelectItem value="price-high">Price: High to Low</SelectItem>
+                <SelectItem value="price-low">Price: Low to High</SelectItem>
+                <SelectItem value="views">Most Views</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <div className="flex h-10 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
               <Button
-                variant="ghost"
-                size="icon"
                 onClick={() => setViewMode("grid")}
-                className={viewMode === "grid" ? "bg-gray-100 dark:bg-gray-800" : ""}
-              >
-                <Grid className="h-4 w-4" />
-              </Button>
-              <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setViewMode("list")}
-                className={viewMode === "list" ? "bg-gray-100 dark:bg-gray-800" : ""}
+                className={`h-full rounded-none ${viewMode === "grid" ? "bg-[#f58220] text-white hover:bg-[#f58220]/90" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"}`}
               >
-                <List className="h-4 w-4" />
+                <Grid3X3 className="h-5 w-5" />
+              </Button>
+              <Separator orientation="vertical" className="h-full" />
+              <Button
+                onClick={() => setViewMode("list")}
+                variant="ghost"
+                size="icon"
+                className={`h-full rounded-none ${viewMode === "list" ? "bg-[#f58220] text-white hover:bg-[#f58220]/90" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"}`}
+              >
+                <List className="h-5 w-5" />
               </Button>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Loading state */}
+      
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div
-              key={index}
-              className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
-            >
-              <div className="aspect-square bg-gray-200 dark:bg-gray-700"></div>
-              <div className="p-4 space-y-3">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, index) => (
+            <Card key={index} className="border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="h-48 bg-gray-100 dark:bg-gray-700 animate-pulse" />
+              <CardContent className="p-4">
+                <div className="h-4 w-2/3 bg-gray-100 dark:bg-gray-700 animate-pulse mb-2" />
+                <div className="h-4 w-1/2 bg-gray-100 dark:bg-gray-700 animate-pulse mb-4" />
+                <div className="h-4 w-1/3 bg-gray-100 dark:bg-gray-700 animate-pulse" />
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : sortedProducts.length > 0 ? (
-        viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {sortedProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-                className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-[#f58220]/50 transition-all group"
-              >
-                <div className="relative">
-                  <div className="aspect-square relative">
-                    <Image
-                      src={product.images[0] || "/placeholder.svg"}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="absolute top-2 left-2">
-                    <Badge variant="outline" className={`${getStatusBadgeColor(product.status)}`}>
-                      {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
-                    </Badge>
-                  </div>
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="flex space-x-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleToggleVisibility(product.id)}
-                        className="h-8 w-8 bg-white/90 backdrop-blur-sm border border-gray-200"
-                      >
-                        {product.status === "active" ? (
-                          <EyeOff className="h-4 w-4 text-gray-700" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-gray-700" />
-                        )}
-                      </Button>
-                      <Link
-                        href={`/dashboard/my-products/edit/${product.id}`}
-                        className="h-8 w-8 flex items-center justify-center rounded-md bg-white/90 backdrop-blur-sm border border-gray-200 hover:bg-white transition-colors"
-                      >
-                        <Edit className="h-4 w-4 text-gray-700" />
+        <>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {sortedProducts.map((product) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Card className="overflow-hidden h-full flex flex-col border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+                    <div className="relative h-48 bg-gray-100 dark:bg-gray-700">
+                      <Link href={`/products/${product.id}`}>
+                        <div className="w-full h-full">
+                          {product.primary_image ? (
+                            <img
+                              src={product.primary_image}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-600">
+                              <Package className="h-12 w-12 text-gray-400 dark:text-gray-500" />
+                            </div>
+                          )}
+                        </div>
                       </Link>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="h-8 w-8 bg-white/90 backdrop-blur-sm border border-gray-200"
+                      <Badge 
+                        className={`absolute top-2 left-2 ${
+                          product.status === "ACTIVE" 
+                            ? "bg-green-100 text-green-800 border-green-200" 
+                            : product.status === "PENDING" 
+                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            : product.status === "SOLD"
+                            ? "bg-blue-100 text-blue-800 border-blue-200"
+                            : product.status === "DRAFT"
+                            ? "bg-purple-100 text-purple-800 border-purple-200"
+                            : "bg-gray-100 text-gray-800 border-gray-200"
+                        }`}
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-medium text-lg mb-1 truncate">{product.name}</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-lg">${product.price.toFixed(2)}</span>
-                    <div className="text-sm text-gray-500">
-                      {product.reviewCount} {product.reviewCount === 1 ? "view" : "views"}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {sortedProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-                className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-[#f58220]/50 transition-all"
-              >
-                <div className="flex">
-                  <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
-                    <Image
-                      src={product.images[0] || "/placeholder.svg"}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                    />
-                    <div className="absolute top-2 left-2">
-                      <Badge variant="outline" className={`${getStatusBadgeColor(product.status)}`}>
-                        {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
+                        {product.status}
                       </Badge>
                     </div>
-                  </div>
-                  <div className="flex-1 p-4 flex flex-col">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs uppercase text-gray-500">{product.category}</span>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleToggleVisibility(product.id)}
-                          className="h-8 w-8 border border-gray-200 dark:border-gray-700"
-                        >
-                          {product.status === "active" ? (
-                            <EyeOff className="h-4 w-4 text-gray-700" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-gray-700" />
-                          )}
-                        </Button>
-                        <Link
-                          href={`/dashboard/my-products/edit/${product.id}`}
-                          className="h-8 w-8 flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          <Edit className="h-4 w-4 text-gray-700" />
-                        </Link>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleDeleteProduct(product.id)}
-                          className="h-8 w-8 border border-gray-200 dark:border-gray-700"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                    <CardContent className="p-4 flex-1 flex flex-col">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleVisibility(product.id)}
+                            className="h-8 w-8 mr-1"
+                            title={product.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                          >
+                            {product.status === "ACTIVE" ? (
+                              <Eye className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <EyeOff className="h-4 w-4 text-gray-500" />
+                            )}
+                          </Button>
+                          <Link href={`/dashboard/my-products/edit/${product.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 mr-1"
+                              title="Edit"
+                            >
+                              <Edit className="h-4 w-4 text-blue-500" />
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="h-8 w-8"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    <h3 className="font-medium text-lg mb-1">{product.name}</h3>
-                    <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-                      {product.condition} • {product.university}
-                    </p>
-                    <div className="mt-auto flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg">${product.price.toFixed(2)}</span>
-                        {product.discount && (
-                          <span className="text-sm text-gray-500 line-through">
-                            ${product.originalPrice?.toFixed(2)}
-                          </span>
+                      <h3 className="font-medium text-lg mb-1">{product.name}</h3>
+                      <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+                        {product.condition} • {product.university_name}
+                      </p>
+                      <div className="mt-auto flex items-center justify-between">
+                        <span className="font-bold text-lg">₦{parseFloat(product.price).toLocaleString()}</span>
+                        <div className="text-sm text-gray-500">
+                          {product.view_count} {product.view_count === 1 ? "view" : "views"}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {sortedProducts.map((product) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="flex flex-col md:flex-row gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 hover:shadow-md transition-shadow">
+                    <div className="relative w-full md:w-48 h-48 bg-gray-100 dark:bg-gray-700 rounded-md overflow-hidden">
+                      <Link href={`/products/${product.id}`}>
+                        {product.primary_image ? (
+                          <img
+                            src={product.primary_image}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-600">
+                            <Package className="h-12 w-12 text-gray-400 dark:text-gray-500" />
+                          </div>
                         )}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {product.reviewCount} {product.reviewCount === 1 ? "view" : "views"}
+                      </Link>
+                      <Badge 
+                        className={`absolute top-2 left-2 ${
+                          product.status === "ACTIVE" 
+                            ? "bg-green-100 text-green-800 border-green-200" 
+                            : product.status === "PENDING" 
+                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            : product.status === "SOLD"
+                            ? "bg-blue-100 text-blue-800 border-blue-200"
+                            : product.status === "DRAFT"
+                            ? "bg-purple-100 text-purple-800 border-purple-200"
+                            : "bg-gray-100 text-gray-800 border-gray-200"
+                        }`}
+                      >
+                        {product.status}
+                      </Badge>
+                    </div>
+                    <div className="flex-1 flex flex-col">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium text-lg mb-1">{product.name}</h3>
+                          <p className="text-gray-600 text-sm mb-2">
+                            {product.condition} • {product.university_name}
+                          </p>
+                          <p className="text-sm text-gray-500 mb-2 line-clamp-2">
+                            {product.description || "No description provided"}
+                          </p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-bold text-lg">₦{parseFloat(product.price).toLocaleString()}</span>
+                            <span className="text-sm text-gray-500">
+                              • {product.view_count} {product.view_count === 1 ? "view" : "views"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleVisibility(product.id)}
+                            className="h-8 w-8 mr-1"
+                            title={product.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                          >
+                            {product.status === "ACTIVE" ? (
+                              <Eye className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <EyeOff className="h-4 w-4 text-gray-500" />
+                            )}
+                          </Button>
+                          <Link href={`/dashboard/my-products/edit/${product.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 mr-1"
+                              title="Edit"
+                            >
+                              <Edit className="h-4 w-4 text-blue-500" />
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="h-8 w-8"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )
+                </motion.div>
+              ))}
+            </div>
+          )}
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-8">
+              <div className="text-sm text-gray-500">
+                Showing {(currentPage - 1) * products.length + 1}-
+                {Math.min(currentPage * products.length, totalCount)} of {totalCount} products
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-10 w-10 border-gray-200 dark:border-gray-700"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    return page === 1 || page === totalPages || 
+                           (page >= currentPage - 1 && page <= currentPage + 1);
+                  })
+                  .map((page, index, array) => {
+                    if (index > 0 && array[index - 1] !== page - 1) {
+                      return (
+                        <div key={`ellipsis-${page}`} className="flex items-center">
+                          <span className="px-2 text-gray-400">...</span>
+                          <Button
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="icon"
+                            onClick={() => setCurrentPage(page)}
+                            className={`h-10 w-10 border-gray-200 dark:border-gray-700 ${
+                              currentPage === page
+                                ? "bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+                                : ""
+                            }`}
+                          >
+                            {page}
+                          </Button>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="icon"
+                        onClick={() => setCurrentPage(page)}
+                        className={`h-10 w-10 border-gray-200 dark:border-gray-700 ${
+                          currentPage === page
+                            ? "bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+                            : ""
+                        }`}
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="h-10 w-10 border-gray-200 dark:border-gray-700"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <Card className="text-center py-16 border border-gray-200 dark:border-gray-700">
           <CardContent>
@@ -408,6 +534,27 @@ export default function MyProductsPage() {
           </CardContent>
         </Card>
       )}
+      
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your product.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => productToDelete && handleConfirmDelete(productToDelete)}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

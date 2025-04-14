@@ -59,16 +59,27 @@ interface Product {
   is_favorited: boolean
 }
 
+// Define pagination response type
+interface PaginatedResponse<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  current_page: number
+  total_pages: number
+  page_size: number
+  results: T[]
+}
+
 // Define product context type
 interface ProductContextType {
   products: Product[]
   categories: Category[]
   isLoading: boolean
-  fetchProducts: (filters?: Record<string, any>) => Promise<void>
-  fetchCategories: () => Promise<void>
+  fetchProducts: (filters?: Record<string, any>) => Promise<PaginatedResponse<Product>>
+  fetchCategories: () => Promise<Category[]>
   getProductById: (id: number) => Promise<Product | undefined>
   getProductsByCategory: (categoryId: number) => Promise<Product[]>
-  getUserProducts: () => Promise<Product[]>
+  getUserProducts: (filters?: Record<string, any>) => Promise<PaginatedResponse<Product>>
   getFavoriteProducts: () => Promise<Product[]>
   toggleFavorite: (productId: number) => Promise<void>
   createProduct: (productData: any) => Promise<Product>
@@ -108,15 +119,13 @@ export function ProductProvider({ children }: ProductProviderProps) {
       
       // Return the complete response data including pagination info
       return {
-        results: response.data.results,
-        pagination: {
-          count: response.data.count,
-          next: response.data.next,
-          previous: response.data.previous,
-          current_page: response.data.current_page,
-          total_pages: response.data.total_pages,
-          page_size: response.data.page_size
-        }
+        count: response.data.count,
+        next: response.data.next,
+        previous: response.data.previous,
+        current_page: response.data.current_page,
+        total_pages: response.data.total_pages,
+        page_size: response.data.page_size,
+        results: response.data.results
       }
     } catch (error) {
       console.error("Error fetching products:", error)
@@ -160,12 +169,29 @@ export function ProductProvider({ children }: ProductProviderProps) {
     }
   }
 
-  // Get user's products
-  const getUserProducts = async () => {
+  // Get user's products with optional filters
+  const getUserProducts = async (filters?: Record<string, any>) => {
     try {
-      // Assuming there's an endpoint for user's products or we can filter by current user
-      const response = await axios.get("/products/products/?my_products=true")
-      return response.data.results
+      const queryParams = new URLSearchParams()
+
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") {
+            queryParams.append(key, String(value))
+          }
+        })
+      }
+
+      const response = await axios.get(`/products/products/my_products/?${queryParams.toString()}`)
+      return {
+        count: response.data.count,
+        next: response.data.next,
+        previous: response.data.previous,
+        current_page: response.data.current_page,
+        total_pages: response.data.total_pages,
+        page_size: response.data.page_size,
+        results: response.data.results
+      }
     } catch (error) {
       console.error("Error fetching user products:", error)
       throw error
@@ -203,10 +229,34 @@ export function ProductProvider({ children }: ProductProviderProps) {
     }
   }
 
-  // Create product
+  // Create product with images
   const createProduct = async (productData: any) => {
     try {
-      const response = await axios.post("/products/products/", productData)
+      // Create FormData object for multipart/form-data request
+      const formData = new FormData()
+      
+      // Append all product fields to FormData
+      Object.entries(productData).forEach(([key, value]) => {
+        // Skip images array, we'll handle it separately
+        if (key !== 'images') {
+          if (value !== undefined && value !== null) {
+            formData.append(key, String(value))
+          }
+        }
+      })
+      
+      // Append images if they exist
+      if (productData.images && Array.isArray(productData.images)) {
+        productData.images.forEach((image: File) => {
+          formData.append('images', image)
+        })
+      }
+      
+      const response = await axios.post("/products/products/", formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
       return response.data
     } catch (error) {
       console.error("Error creating product:", error)
