@@ -6,9 +6,16 @@ interface LogoProps {
   linkClassName?: string
   showText?: boolean
   size?: "sm" | "md" | "lg"
+  universityAbbreviation?: string | null
 }
 
-export function Logo({ className, linkClassName, showText = true, size = "md" }: LogoProps) {
+export function Logo({ 
+  className, 
+  linkClassName, 
+  showText = true, 
+  size = "md", 
+  universityAbbreviation = null 
+}: LogoProps) {
   const sizeClasses = {
     sm: "text-lg",
     md: "text-xl",
@@ -21,7 +28,9 @@ export function Logo({ className, linkClassName, showText = true, size = "md" }:
         <div className="relative flex items-center">
           {showText && (
             <div className={cn("flex items-center font-bold", sizeClasses[size])}>
-              <span className="text-[#f58220]">Uni</span>
+              <span className="text-[#f58220]">
+                {universityAbbreviation ? universityAbbreviation : "Uni"}
+              </span>
               <span className="text-[#0a2472]">store</span>
             </div>
           )}
