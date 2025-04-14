@@ -44,10 +44,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
+import EditProductModal from "@/components/products/edit-product-modal"
 
 export default function MyProductsPage() {
   const { user } = useAuth()
-  const { getUserProducts, updateProduct, deleteProduct, toggleFavorite } = useProducts()
+  const { getUserProducts, updateProduct, deleteProduct, toggleFavorite, getProductById } = useProducts()
   
   const [products, setProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -60,6 +61,8 @@ export default function MyProductsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [productToEdit, setProductToEdit] = useState<any>(null)
   
   // Fetch products
   const fetchMyProducts = async (page = 1) => {
@@ -156,6 +159,40 @@ export default function MyProductsPage() {
         return 0
     }
   })
+  
+  // Handle edit product
+  const handleEditProduct = (product: any) => {
+    // Fetch the complete product data if needed
+    // This ensures we have all the details including images
+    const fetchCompleteProduct = async () => {
+      try {
+        const completeProduct = await getProductById(product.id);
+        setProductToEdit(completeProduct);
+        setEditModalOpen(true);
+      } catch (error) {
+        console.error("Error fetching product details:", error);
+        toast.error("Failed to load product details");
+      }
+    };
+    
+    fetchCompleteProduct();
+  }
+  
+  // Format price for display with proper fallbacks
+  const formatPrice = (price: any) => {
+    if (!price) return "Contact for price";
+    
+    // If it's a number or numeric string, format it as currency
+    if (!isNaN(parseFloat(price))) {
+      return new Intl.NumberFormat('en-NG', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(parseFloat(price));
+    }
+    
+    // Otherwise return as is (for price ranges or custom prices)
+    return price;
+  };
   
   return (
     <div className="container mx-auto py-8 px-4">
@@ -334,7 +371,19 @@ export default function MyProductsPage() {
                         {product.condition} • {product.university_name}
                       </p>
                       <div className="mt-auto flex items-center justify-between">
-                        <span className="font-bold text-lg">₦{parseFloat(product.price).toLocaleString()}</span>
+                        <span className="font-bold text-lg">
+                          {product.price ? (
+                            `₦${formatPrice(product.price)}`
+                          ) : product.price_range ? (
+                            `₦${formatPrice(product.price_range)}`
+                          ) : product.fixed_price ? (
+                            `₦${formatPrice(product.fixed_price)}`
+                          ) : product.custom_range ? (
+                            product.custom_range
+                          ) : (
+                            "Contact for price"
+                          )}
+                        </span>
                         <div className="text-sm text-gray-500">
                           {product.view_count} {product.view_count === 1 ? "view" : "views"}
                         </div>
@@ -395,7 +444,19 @@ export default function MyProductsPage() {
                             {product.description || "No description provided"}
                           </p>
                           <div className="flex items-center gap-2 mb-2">
-                            <span className="font-bold text-lg">₦{parseFloat(product.price).toLocaleString()}</span>
+                            <span className="font-bold text-lg">
+                              {product.price ? (
+                                `₦${formatPrice(product.price)}`
+                              ) : product.price_range ? (
+                                `₦${formatPrice(product.price_range)}`
+                              ) : product.fixed_price ? (
+                                `₦${formatPrice(product.fixed_price)}`
+                              ) : product.custom_range ? (
+                                product.custom_range
+                              ) : (
+                                "Contact for price"
+                              )}
+                            </span>
                             <span className="text-sm text-gray-500">
                               • {product.view_count} {product.view_count === 1 ? "view" : "views"}
                             </span>
@@ -555,6 +616,14 @@ export default function MyProductsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Edit Product Modal */}
+      <EditProductModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        product={productToEdit}
+        onSuccess={() => fetchMyProducts(currentPage)}
+      />
     </div>
   )
 }

@@ -69,6 +69,15 @@ export default function DashboardPage() {
       }
     }
 
+    // For Appwrite URLs, add project ID query param if missing
+    if (imageUrl.includes("appwrite.io")) {
+      const projectId = "67f47c4200273e45c433"
+      if (!imageUrl.includes("project=")) {
+        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+      }
+      return imageUrl
+    }
+
     return imageUrl
   }
 
