@@ -1,6 +1,7 @@
 // hooks/useMessaging.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { WebSocketManager } from '@/utils/websocket';
+import { useAuth } from '@/providers/auth-provider';
 
 interface Message {
   id: string;
@@ -51,27 +52,43 @@ interface Conversation {
 }
 
 export function useMessaging(token: string) {
+  const { user } = useAuth();
   const wsRef = useRef<WebSocketManager | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
   const [onlineMerchants, setOnlineMerchants] = useState<Merchant[]>([]);
   const [isStartingConversation, setIsStartingConversation] = useState(false);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUserId(payload.user_id);
-      } catch (e) {
-        console.error('Failed to decode token:', e);
+  const markAsRead = useCallback((conversationId: string, messageId: string) => {
+    wsRef.current?.send('mark_read', {
+      conversation_id: conversationId,
+      last_read_id: messageId
+    });
+  }, []);
+
+  const getConversations = useCallback(() => {
+    wsRef.current?.send('get_conversations', { page: 1 });
+  }, []);
+
+  const getMessages = useCallback((conversationId: string) => {
+    wsRef.current?.send('get_messages', { conversation_id: conversationId, page: 1 });
+  }, []);
+
+  const sendMessage = useCallback((conversationId: string, content: string, attachments?: File[]) => {
+    if (!wsRef.current) return;
+    
+    wsRef.current.send('send_message', {
+      conversation_id: conversationId,
+      message: {
+        content: content,
+        attachments: attachments
       }
-    }
-  }, [token]);
+    });
+  }, []);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !user) return;
 
     if (!wsRef.current) {
       wsRef.current = new WebSocketManager(token);
@@ -116,9 +133,11 @@ export function useMessaging(token: string) {
 
       wsRef.current.addMessageHandler('new_message', (data) => {
         const newMessage = data.message;
+        console.log('New message received:', newMessage, 'Current user:', user?.id);
+        
         setCurrentMessages(prev => {
           // Check if message already exists
-          if (prev.some(msg => msg.id === newMessage.id)) {
+          if (prev.some(msg => String(msg.id) === String(newMessage.id))) {
             return prev;
           }
           // Add new message and sort by creation time
@@ -127,9 +146,17 @@ export function useMessaging(token: string) {
           );
         });
         
+        // Update conversations list with new message
         setConversations(prev => prev.map(conv => 
-          conv.id === data.message.conversation_id 
-            ? { ...conv, last_message: data.message, last_message_at: data.message.created_at }
+          String(conv.id) === String(newMessage.conversation_id)
+            ? { 
+                ...conv, 
+                last_message: newMessage, 
+                last_message_at: newMessage.created_at,
+                unread_count: String(newMessage.sender_id) !== String(user?.id)
+                  ? conv.unread_count + 1 
+                  : conv.unread_count
+              }
             : conv
         ));
       });
@@ -137,14 +164,14 @@ export function useMessaging(token: string) {
       wsRef.current.addMessageHandler('read_receipt', (data) => {
         const { conversation_id, last_read_id, user_id: readByUserId } = data;
         
-        // Only update if the receipt is from the other user
-        if (readByUserId !== userId) {
+        // Convert IDs to strings for comparison
+        if (user && String(readByUserId) !== String(user.id)) {
           setCurrentMessages(prev => 
             prev.map(msg => ({
               ...msg,
-              is_read: msg.sender_id === userId && // Only update messages sent by current user
-                       msg.conversation_id === conversation_id &&
-                       msg.id <= last_read_id
+              is_read: String(msg.sender_id) === String(user.id) && 
+                       String(msg.conversation_id) === String(conversation_id) &&
+                       String(msg.id) <= String(last_read_id)
                 ? true 
                 : msg.is_read
             }))
@@ -164,34 +191,16 @@ export function useMessaging(token: string) {
         wsRef.current = null;
       }
     };
-  }, [token, userId]);
+  }, [token, user]);
 
-  const getConversations = useCallback(() => {
-    wsRef.current?.send('get_conversations', { page: 1 });
-  }, []);
-
-  const getMessages = useCallback((conversationId: string) => {
-    wsRef.current?.send('get_messages', { conversation_id: conversationId, page: 1 });
-  }, []);
-
-  const sendMessage = useCallback((conversationId: string, content: string, attachments?: File[]) => {
-    if (!wsRef.current) return;
-    
-    wsRef.current.send('send_message', {
-      conversation_id: conversationId,
-      message: {
-        content: content,
-        attachments: attachments
+  useEffect(() => {
+    if (currentConversation?.id && currentMessages.length > 0) {
+      const lastMessage = currentMessages[currentMessages.length - 1];
+      if (user && lastMessage.sender_id !== user.id && !lastMessage.is_read) {
+        markAsRead(currentConversation.id, lastMessage.id);
       }
-    });
-  }, []);
-
-  const markAsRead = useCallback((conversationId: string, messageId: string) => {
-    wsRef.current?.send('mark_read', {
-      conversation_id: conversationId,
-      last_read_id: messageId
-    });
-  }, []);
+    }
+  }, [currentConversation?.id, currentMessages, markAsRead, user]);
 
   const startConversation = useCallback(async (merchantId: string): Promise<string> => {
     return new Promise((resolve, reject) => {

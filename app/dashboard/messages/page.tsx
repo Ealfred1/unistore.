@@ -1,15 +1,35 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useAuth } from "@/providers/auth-provider"
 import { useMessaging } from "@/hooks/useMessaging"
 import Image from "next/image"
 import { Send, Phone, Video, MoreVertical, MessageCircle } from "lucide-react"
 
+interface Message {
+  id: string
+  content: string
+  sender_id: string
+  created_at: string
+  is_read: boolean
+  conversation_id: string
+  attachments?: Array<{
+    id: string
+    file_name: string
+    file_url: string
+  }>
+}
+
 export default function MessagesPage() {
   const { user } = useAuth()
   const [token, setToken] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (user) {
+      console.log('Current user ID:', user.id);
+    }
+  }, [user]);
 
   useEffect(() => {
     setToken(localStorage.getItem("access_token") || "")
@@ -105,36 +125,61 @@ export default function MessagesPage() {
     }
   }
 
-  const isSentByMe = (message: Message) => message.sender_id === user.id;
+  const isSentByMe = useCallback((message: Message) => {
+    if (!user) return false;
+    const isFromMe = String(message.sender_id) === String(user.id);
+    console.log('Message comparison:', {
+      messageSenderId: String(message.sender_id),
+      userId: String(user.id),
+      isFromMe
+    });
+    return isFromMe;
+  }, [user]);
 
   const renderMessage = (message: Message) => {
-    const sentByMe = isSentByMe(message);
-
+    const fromMe = isSentByMe(message);
+    
     return (
       <div
         key={`${message.id}-${message.conversation_id}`}
-        className={`flex ${sentByMe ? "justify-end" : "justify-start"} mb-4`}
+        className={`flex ${fromMe ? "justify-end" : "justify-start"} mb-4`}
       >
         <div 
           className={`
-            max-w-[70%] rounded-lg px-4 py-2
-            ${sentByMe 
-              ? "bg-[#f58220] text-white rounded-tr-none" 
-              : "bg-blue-500 text-white rounded-tl-none"
+            relative max-w-[70%] px-4 py-2 rounded-lg
+            ${fromMe 
+              ? "bg-[#f58220] text-white rounded-tr-none ml-auto" 
+              : "bg-blue-500 text-white rounded-tl-none mr-auto"
             }
           `}
         >
           <p className="whitespace-pre-wrap break-words">{message.content}</p>
-          <div className="flex items-center justify-end gap-1 mt-1 text-xs">
-            <span className="opacity-70">
+          
+          {/* Time and read receipt */}
+          <div 
+            className={`
+              flex items-center justify-end gap-1 mt-1 text-xs
+              ${fromMe ? "text-white/70" : "text-white/70"}
+            `}
+          >
+            <span>
               {new Date(message.created_at).toLocaleTimeString([], { 
                 hour: '2-digit', 
                 minute: '2-digit' 
               })}
             </span>
-            {sentByMe && (
-              <span className="text-black">
-                {message.is_read ? "✓✓" : "✓"}
+            {fromMe && (
+              <span className="flex items-center ml-1">
+                {message.is_read ? (
+                  <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                    <path fill="currentColor" d="M18.59 7L9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" opacity="0.5"/>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                  </svg>
+                )}
               </span>
             )}
           </div>
@@ -161,7 +206,7 @@ export default function MessagesPage() {
               {onlineMerchants.length === 0 ? (
                 <p className="text-gray-500 text-sm">No merchants online</p>
               ) : (
-                onlineMerchants.map((merchant) => (
+                onlineMerchants.map((merchant) => ( 
                   <div
                     key={merchant.id}
                     onClick={() => handleMerchantClick(merchant.id)}

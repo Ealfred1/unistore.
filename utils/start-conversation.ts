@@ -23,4 +23,4 @@ export const useStartConversation = () => {
   };
 
   return { startChatWithMerchant, isLoading, error };
-};
+}; 
