@@ -1,5 +1,6 @@
 // utils/websocket.ts
 export class WebSocketManager {
+  private static instance: WebSocketManager | null = null;
   private socket: WebSocket | null = null;
   private messageHandlers: Map<string, ((data: any) => void)[]> = new Map();
   private reconnectAttempts = 0;
@@ -7,8 +8,24 @@ export class WebSocketManager {
   private messageQueue: Array<{action: string, data: any}> = [];
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
+  private token: string | null = null;
 
-  constructor(private token: string) {}
+  private constructor() {}
+
+  static getInstance(): WebSocketManager {
+    if (!WebSocketManager.instance) {
+      WebSocketManager.instance = new WebSocketManager();
+    }
+    return WebSocketManager.instance;
+  }
+
+  updateToken(token: string) {
+    if (this.token !== token) {
+      this.token = token;
+      this.disconnect();
+      this.connect();
+    }
+  }
 
   connect() {
     if (this.socket?.readyState === WebSocket.OPEN || this.isConnecting) {
@@ -97,7 +114,7 @@ export class WebSocketManager {
       this.socket.send(JSON.stringify({ action, ...data }));
     } catch (error) {
       console.error('Error sending message:', error);
-      this.messageQueue.push({ action, data });
+      this.messageQueue.push({ action, data });  
     }
   }
 

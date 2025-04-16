@@ -36,7 +36,7 @@ export default function MessagesPage() {
   }, [])
 
   const { 
-    conversations, 
+    conversations = [],
     currentMessages, 
     onlineMerchants,
     currentConversation,
@@ -92,6 +92,11 @@ export default function MessagesPage() {
     }
   }, [conversations, startConversation]);
 
+  // Add debug logging
+  useEffect(() => {
+    console.log('Current conversations:', conversations);
+  }, [conversations]);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() || !currentConversation?.id) return
@@ -104,13 +109,14 @@ export default function MessagesPage() {
     }
   }
 
-  // Filter conversations based on search query
-  const filteredConversations = conversations.filter(conv => 
-    conv.other_user && (
-      conv.other_user.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.other_user.last_name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  )
+  // Ensure conversations is an array before filtering
+  const filteredConversations = Array.isArray(conversations) 
+    ? conversations.filter(conv => {
+        const searchLower = searchQuery.toLowerCase()
+        const fullName = `${conv.other_user.first_name} ${conv.other_user.last_name}`.toLowerCase()
+        return fullName.includes(searchLower)
+      })
+    : [];
 
   // Handle merchant click
   const handleMerchantClick = async (merchantId: string) => {
@@ -259,45 +265,51 @@ export default function MessagesPage() {
             />
           </div>
           <div className="flex-1 overflow-y-auto">
-            {filteredConversations.map((conv) => (
-              <div
-                key={conv.id}
-                onClick={() => startConversation(conv.other_user.id)}
-                className={`p-4 hover:bg-gray-50 cursor-pointer ${
-                  currentConversation?.id === conv.id ? "bg-gray-50" : ""
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-full overflow-hidden">
-                      <Image
-                        src={conv.other_user.profile_image || "/placeholder.png"}
-                        alt={`${conv.other_user.first_name} ${conv.other_user.last_name}`}
-                        width={48}
-                        height={48}
-                        className="object-cover"
-                      />
+            {Array.isArray(conversations) && conversations.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                No conversations yet
+              </div>
+            ) : (
+              filteredConversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  onClick={() => startConversation(conv.other_user.id)}
+                  className={`p-4 hover:bg-gray-50 cursor-pointer ${
+                    currentConversation?.id === conv.id ? "bg-gray-50" : ""
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-full overflow-hidden">
+                        <Image
+                          src={conv.other_user.profile_image || "/placeholder.png"}
+                          alt={`${conv.other_user.first_name} ${conv.other_user.last_name}`}
+                          width={48}
+                          height={48}
+                          className="object-cover"
+                        />
+                      </div>
+                      {conv.other_user.is_online && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                      )}
                     </div>
-                    {conv.other_user.is_online && (
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium truncate">
+                        {conv.other_user.first_name} {conv.other_user.last_name}
+                      </h4>
+                      <p className="text-sm text-gray-500 truncate">
+                        {conv.last_message?.content || "No messages yet"}
+                      </p>
+                    </div>
+                    {conv.unread_count > 0 && (
+                      <div className="bg-[#f58220] text-white text-xs rounded-full px-2 py-1">
+                        {conv.unread_count}
+                      </div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium truncate">
-                      {conv.other_user.first_name} {conv.other_user.last_name}
-                    </h4>
-                    <p className="text-sm text-gray-500 truncate">
-                      {conv.last_message?.content || "No messages yet"}
-                    </p>
-                  </div>
-                  {conv.unread_count > 0 && (
-                    <div className="bg-[#f58220] text-white text-xs rounded-full px-2 py-1">
-                      {conv.unread_count}
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
