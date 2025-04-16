@@ -243,13 +243,13 @@ export default function DashboardPage() {
               Discover amazing products from fellow students at {user?.university_name}. Browse the latest listings or
               create your own.
             </p>
-          </div>
+          </div> 
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Link href="/dashboard/my-products/new">
               <Button className="bg-[#f58220] hover:bg-[#f58220]/90 text-white border-none w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
-                List a Product
+                Upload Product
               </Button>
             </Link>
             <Link href="/dashboard/products">

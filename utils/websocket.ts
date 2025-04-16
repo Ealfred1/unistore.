@@ -41,7 +41,6 @@ export class WebSocketManager {
         : `wss://${'unistore-v2.onrender.com'}/ws/messaging/?token=${this.token}`;
 
       this.socket = new WebSocket(wsUrl);
-
       this.socket.onopen = () => {
         console.log('WebSocket connected');
         this.isConnecting = false;
