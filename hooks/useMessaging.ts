@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { WebSocketManager } from '@/utils/websocket';
 import { useAuth } from '@/providers/auth-provider';
+import { usePathname } from '@/hooks/usePathname';
 
 interface Message {
   id: string;
@@ -53,6 +54,7 @@ interface Conversation {
 
 export function useMessaging(token: string) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const wsRef = useRef<WebSocketManager | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
@@ -128,20 +130,22 @@ export function useMessaging(token: string) {
       });
 
       wsRef.current.addMessageHandler('messages_list', (data) => {
-        setCurrentMessages(data.data.messages);
+        // Messages come with is_read status from the server
+        const messages = data.data.messages.map((msg: Message) => ({
+          ...msg,
+          is_read: Boolean(msg.is_read) // Ensure boolean value
+        }));
+        setCurrentMessages(messages);
       });
 
       wsRef.current.addMessageHandler('new_message', (data) => {
         const newMessage = data.message;
-        console.log('New message received:', newMessage, 'Current user:', user?.id);
         
         setCurrentMessages(prev => {
-          // Check if message already exists
           if (prev.some(msg => String(msg.id) === String(newMessage.id))) {
             return prev;
           }
-          // Add new message and sort by creation time
-          return [...prev, newMessage].sort((a, b) => 
+          return [...prev, { ...newMessage, is_read: false }].sort((a, b) => 
             new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
         });
@@ -163,20 +167,24 @@ export function useMessaging(token: string) {
 
       wsRef.current.addMessageHandler('read_receipt', (data) => {
         const { conversation_id, last_read_id, user_id: readByUserId } = data;
+        console.log('Read receipt received:', {
+          readByUserId,
+          currentUserId: user?.id,
+          conversation_id,
+          last_read_id
+        });
         
-        // Convert IDs to strings for comparison
-        if (user && String(readByUserId) !== String(user.id)) {
-          setCurrentMessages(prev => 
-            prev.map(msg => ({
-              ...msg,
-              is_read: String(msg.sender_id) === String(user.id) && 
-                       String(msg.conversation_id) === String(conversation_id) &&
-                       String(msg.id) <= String(last_read_id)
-                ? true 
-                : msg.is_read
-            }))
-          );
-        }
+        // Update read status for messages sent by current user
+        setCurrentMessages(prev => 
+          prev.map(msg => ({
+            ...msg,
+            is_read: String(msg.conversation_id) === String(conversation_id) &&
+                     String(msg.sender_id) === String(user?.id) && // Only for messages sent by current user
+                     String(msg.id) <= String(last_read_id)
+              ? true 
+              : msg.is_read
+          }))
+        );
       });
 
       wsRef.current.connect();
@@ -194,13 +202,33 @@ export function useMessaging(token: string) {
   }, [token, user]);
 
   useEffect(() => {
-    if (currentConversation?.id && currentMessages.length > 0) {
+    if (
+      pathname.startsWith('/dashboard/messages') && // Only on messages page
+      currentConversation?.id && 
+      currentMessages.length > 0
+    ) {
       const lastMessage = currentMessages[currentMessages.length - 1];
-      if (user && lastMessage.sender_id !== user.id && !lastMessage.is_read) {
-        markAsRead(currentConversation.id, lastMessage.id);
+      if (
+        user && 
+        lastMessage.sender_id !== user.id && 
+        !lastMessage.is_read
+      ) {
+        // Only mark as read if we're actually viewing this conversation
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeConversationId = urlParams.get('conversation');
+        
+        if (activeConversationId === currentConversation.id) {
+          markAsRead(currentConversation.id, lastMessage.id);
+        }
       }
     }
-  }, [currentConversation?.id, currentMessages, markAsRead, user]);
+  }, [
+    pathname,
+    currentConversation?.id, 
+    currentMessages, 
+    markAsRead, 
+    user
+  ]);
 
   const startConversation = useCallback(async (merchantId: string): Promise<string> => {
     return new Promise((resolve, reject) => {

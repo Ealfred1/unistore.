@@ -50,6 +50,7 @@ import { Input } from "@/components/ui/input"
 import { useProducts } from "@/providers/product-provider"
 import { useToast } from "@/components/ui/use-toast"
 import { useUniversities } from "@/providers/university-provider"
+import { useMessagingContext } from "@/providers/messaging-provider"
 
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -60,6 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const isMobile = useMediaQuery("(max-width: 1024px)")
   const { toast } = useToast()
+  const { unreadCount } = useMessagingContext()
 
   const [expanded, setExpanded] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -184,7 +186,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       icon: <MessageCircle className="h-5 w-5" />,
       color: "text-yellow-600",
       bgColor: "bg-yellow-100",
-      badge: "3",
+      badge: unreadCount > 0 ? String(unreadCount) : undefined,
     },
     {
       name: "Notifications",

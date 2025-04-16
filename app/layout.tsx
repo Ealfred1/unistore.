@@ -7,6 +7,7 @@ import { AuthProvider } from "@/providers/auth-provider"
 import { ProductProvider } from "@/providers/product-provider"
 import { UniversityProvider } from "@/providers/university-provider"
 import { Toaster } from 'sonner'
+import { MessagingProvider } from '@/providers/messaging-provider'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -25,9 +26,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
           <AuthProvider>
-            <UniversityProvider>
+`          <MessagingProvider>
+`            <UniversityProvider>
               <ProductProvider>{children}</ProductProvider>
             </UniversityProvider>
+          </MessagingProvider>
           </AuthProvider>
           <Toaster position="bottom-right" richColors />
       </body>
@@ -35,5 +38,3 @@ export default function RootLayout({
   )
 }
 
-
-import './globals.css'
