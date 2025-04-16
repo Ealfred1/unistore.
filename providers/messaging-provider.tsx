@@ -13,6 +13,7 @@ interface Message {
   created_at: string
   is_read: boolean
   conversation_id: string
+  sender_name?: string
 }
 
 interface MessagingContextType {
@@ -49,23 +50,46 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       // Handle new messages
       wsRef.current.addMessageHandler('new_message', (data) => {
         const newMessage = data.message;
+        console.log(newMessage)
         
-        // Only show toast if not on messages page
-        if (!pathname.startsWith('/dashboard/messages')) {
-          toast(`New message from ${newMessage.sender_name}`, {
-            description: newMessage.content,
-            action: {
-              label: "View",
-              onClick: () => {
-                window.location.href = `/dashboard/messages?conversation=${newMessage.conversation_id}`;
+        // Only show toast if:
+        // 1. Not on messages page
+        // 2. Message is not from current user
+        if (
+          !pathname.startsWith('/dashboard/messages') && 
+          String(newMessage.sender_id) !== String(user.id)
+        ) {
+          const senderName = newMessage.sender_name || 'Unknown';
+          const initial = senderName[0].toUpperCase();
+          const colors = ['bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500'];
+          const randomColor = colors[Math.floor(Math.random() * colors.length)];
+          
+          toast(
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-full ${randomColor} flex items-center justify-center text-white text-sm font-medium`}>
+                {initial}
+              </div>
+              <div>
+                <p className="font-medium">{senderName}</p>
+                <p className="text-sm text-gray-600">{newMessage.content}</p>
+              </div>
+            </div>,
+            {
+              action: {
+                label: "View",
+                onClick: () => {
+                  window.location.href = `/dashboard/messages?conversation=${newMessage.conversation_id}`;
+                }
               }
             }
-          });
+          );
         }
 
-        // Update unread count
-        setUnreadCount(prev => prev + 1);
-        setLastMessage(newMessage);
+        // Only update unread count if message is not from current user
+        if (String(newMessage.sender_id) !== String(user.id)) {
+          setUnreadCount(prev => prev + 1);
+          setLastMessage(newMessage);
+        }
       });
 
       wsRef.current.connect()
