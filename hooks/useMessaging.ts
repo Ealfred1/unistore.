@@ -251,12 +251,26 @@ export function useMessaging(token: string) {
         return;
       }
 
+      // Setup handlers before sending the request
       const handleSuccess = (data: any) => {
         if (data.conversation) {
-          setConversations(prev => [data.conversation, ...prev]);
-          setCurrentConversation(data.conversation);
+          const newConversation = data.conversation;
+          setConversations(prev => [newConversation, ...prev]);
+          setCurrentConversation(newConversation);
           setIsStartingConversation(false);
-          resolve(data.conversation.id);
+          
+          // Send initial message if provided
+          if (wsRef.current && newConversation.id && window.initialMessage) {
+            wsRef.current.send('send_message', {
+              conversation_id: newConversation.id,
+              message: {
+                content: window.initialMessage
+              }
+            });
+            delete window.initialMessage; // Clear the initial message
+          }
+          
+          resolve(newConversation.id);
         }
         wsRef.current?.removeMessageHandler('conversation_started');
         wsRef.current?.removeMessageHandler('conversation_error');
@@ -264,7 +278,8 @@ export function useMessaging(token: string) {
 
       const handleError = (data: any) => {
         setIsStartingConversation(false);
-        reject(new Error(data.message));
+        const errorMessage = data.message || 'Could not start conversation';
+        reject(new Error(errorMessage));
         wsRef.current?.removeMessageHandler('conversation_started');
         wsRef.current?.removeMessageHandler('conversation_error');
       };
@@ -272,6 +287,7 @@ export function useMessaging(token: string) {
       wsRef.current.addMessageHandler('conversation_started', handleSuccess);
       wsRef.current.addMessageHandler('conversation_error', handleError);
 
+      // Send the request to start conversation
       wsRef.current.send('start_conversation_with_merchant', { merchant_id: merchantId });
     });
   }, [conversations]);

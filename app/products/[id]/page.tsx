@@ -17,6 +17,7 @@ import {
   Copy,
   Shield,
   AlertTriangle,
+  Loader2,
 } from "lucide-react"
 import Navbar from "@/components/navbar"
 import { useProducts } from "@/providers/product-provider"
@@ -33,17 +34,18 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { Header } from "@/components/landing/header"
+import { useStartConversation } from '@/utils/start-conversation'
 
 export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { getProductById, toggleFavorite } = useProducts()
   const { user, isAuthenticated } = useAuth()
+  const { startChatWithMerchant, isLoading, error } = useStartConversation()
 
   const [product, setProduct] = useState<any>(null)
   const [similarProducts, setSimilarProducts] = useState<any[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
   const [showContactModal, setShowContactModal] = useState(false)
   const [message, setMessage] = useState("")
   const [contactCopied, setContactCopied] = useState(false)
@@ -71,8 +73,6 @@ export default function ProductDetailPage() {
         }
       } catch (error) {
         console.error("Error fetching product:", error)
-      } finally {
-        setIsLoading(false)
       }
     }
 
@@ -103,7 +103,7 @@ export default function ProductDetailPage() {
   }
 
   // Handle contact merchant
-  const handleContactMerchant = (e: React.FormEvent) => {
+  const handleContactMerchant = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!message.trim()) {
@@ -115,14 +115,26 @@ export default function ProductDetailPage() {
       return
     }
 
-    // In a real app, you would call an API to send the message
-    toast({
-      title: "Message Sent",
-      description: "Your message has been sent to the seller",
-    })
-
-    setShowContactModal(false)
-    setMessage("")
+    try {
+      if (product?.merchant_info?.id) {
+        // Store the message temporarily
+        window.initialMessage = message.trim()
+        
+        // Start conversation and get the conversation ID
+        await startChatWithMerchant(product.merchant_info.id)
+        
+        // Close modal and reset form
+        setShowContactModal(false)
+        setMessage("")
+      }
+    } catch (error) {
+      console.error('Failed to start conversation:', error)
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   // Copy contact number
@@ -591,6 +603,7 @@ export default function ProductDetailPage() {
                 placeholder="Hi, I'm interested in your product. Is it still available?"
                 className="w-full"
                 required
+                disabled={isLoading}
               />
             </div>
             <div className="flex items-center text-sm text-gray-500 mb-4">
@@ -598,8 +611,19 @@ export default function ProductDetailPage() {
               <p>Your contact details will be shared with the seller.</p>
             </div>
             <DialogFooter>
-              <Button type="submit" className="w-full bg-[#f58220] hover:bg-[#f58220]/90 text-white">
-                Send Message
+              <Button 
+                type="submit" 
+                className="w-full bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Message'
+                )}
               </Button>
             </DialogFooter>
           </form>

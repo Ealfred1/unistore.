@@ -1,7 +1,7 @@
 // utils/websocket.ts
 export class WebSocketManager {
   private socket: WebSocket | null = null;
-  private messageHandlers: Map<string, (data: any) => void> = new Map();
+  private messageHandlers: Map<string, ((data: any) => void)[]> = new Map();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private messageQueue: Array<{action: string, data: any}> = [];
@@ -47,9 +47,9 @@ export class WebSocketManager {
         try {
           const data = JSON.parse(event.data);
           console.log('WebSocket received message:', data); // Log every message received
-          const handler = this.messageHandlers.get(data.type);
-          if (handler) {
-            handler(data);
+          const handlers = this.messageHandlers.get(data.type);
+          if (handlers) {
+            handlers.forEach(handler => handler(data));
           }
         } catch (error) {
           console.error('Error processing message:', error);
@@ -102,7 +102,29 @@ export class WebSocketManager {
   }
 
   addMessageHandler(type: string, handler: (data: any) => void) {
-    this.messageHandlers.set(type, handler);
+    if (!this.messageHandlers.has(type)) {
+      this.messageHandlers.set(type, []);
+    }
+    this.messageHandlers.get(type)?.push(handler);
+  }
+
+  removeMessageHandler(type: string, handler?: (data: any) => void) {
+    if (!handler) {
+      // If no specific handler provided, remove all handlers for this type
+      this.messageHandlers.delete(type);
+    } else {
+      // Remove specific handler
+      const handlers = this.messageHandlers.get(type);
+      if (handlers) {
+        const index = handlers.indexOf(handler);
+        if (index > -1) {
+          handlers.splice(index, 1);
+        }
+        if (handlers.length === 0) {
+          this.messageHandlers.delete(type);
+        }
+      }
+    }
   }
 
   disconnect() {
