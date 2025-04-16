@@ -128,11 +128,6 @@ export default function MessagesPage() {
   const isSentByMe = useCallback((message: Message) => {
     if (!user) return false;
     const isFromMe = String(message.sender_id) === String(user.id);
-    console.log('Message comparison:', {
-      messageSenderId: String(message.sender_id),
-      userId: String(user.id),
-      isFromMe
-    });
     return isFromMe;
   }, [user]);
 
@@ -168,16 +163,31 @@ export default function MessagesPage() {
                 minute: '2-digit' 
               })}
             </span>
+            
+            {/* Only show read receipts for messages sent by current user */}
             {fromMe && (
               <span className="flex items-center ml-1">
                 {message.is_read ? (
+                  // Double tick for read messages
                   <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                    <path fill="currentColor" d="M18.59 7L9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" opacity="0.5"/>
+                    <path 
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      d="M 2 12 L 6 16 L 14 8 M 6 12 L 10 16 L 18 8"
+                    />
                   </svg>
                 ) : (
+                  // Single tick for sent but unread messages
                   <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                    <path 
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      d="M 4 12 L 8 16 L 16 8"
+                    />
                   </svg>
                 )}
               </span>
