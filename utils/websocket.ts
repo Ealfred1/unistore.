@@ -38,7 +38,7 @@ export class WebSocketManager {
     try {
       const wsUrl = process.env.NEXT_PUBLIC_WS_URL 
         ? `${process.env.NEXT_PUBLIC_WS_URL}/ws/messaging/?token=${this.token}`
-        : `wss://${'ws://unistore-v2.onrender.com'}/ws/messaging/?token=${this.token}`;
+        : `wss://${'unistore-v2.onrender.com'}/ws/messaging/?token=${this.token}`;
 
       this.socket = new WebSocket(wsUrl);
 
