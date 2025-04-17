@@ -36,10 +36,34 @@ export default function SignupPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }))
+    
+    if (name === "phone") {
+      // Don't allow changing +234
+      if (!value.startsWith("+234")) {
+        return
+      }
+      
+      // Remove any non-digit characters after +234
+      const digits = value.slice(4).replace(/\D/g, "")
+      
+      // Ensure first digit after +234 isn't 0
+      if (digits.length > 0 && digits[0] === "0") {
+        return
+      }
+      
+      // Limit to 10 digits after +234
+      const truncated = digits.slice(0, 10)
+      
+      setFormData(prev => ({
+        ...prev,
+        phone: `+234${truncated}`
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      }))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

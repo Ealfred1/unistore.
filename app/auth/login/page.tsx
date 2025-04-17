@@ -20,6 +20,28 @@ export default function LoginPage() {
   const { login, isAuthenticated } = useAuth()
   const router = useRouter()
 
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+
+    // Don't allow changing +234
+    if (!value.startsWith("+234")) {
+      return
+    }
+    
+    // Remove any non-digit characters after +234
+    const digits = value.slice(4).replace(/\D/g, "")
+    
+    // Ensure first digit after +234 isn't 0
+    if (digits.length > 0 && digits[0] === "0") {
+      return
+    }
+    
+    // Limit to 10 digits after +234
+    const truncated = digits.slice(0, 10)
+    
+    setPhoneNumber(`+234${truncated}`)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -109,7 +131,7 @@ export default function LoginPage() {
                   id="phone"
                   type="tel"
                   value={phone_number}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={handlePhoneNumberChange}
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
                   placeholder="+234 XXX XXX XXXX"
                   required

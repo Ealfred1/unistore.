@@ -16,9 +16,27 @@ import { toast } from "sonner"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
-  const [phoneNumber, setPhoneNumber] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("+234")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+
+    if (!value.startsWith("+234")) {
+      return
+    }
+    
+    const digits = value.slice(4).replace(/\D/g, "")
+    
+    if (digits.length > 0 && digits[0] === "0") {
+      return
+    }
+    
+    const truncated = digits.slice(0, 10)
+    
+    setPhoneNumber(`+234${truncated}`)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,7 +112,7 @@ export default function ForgotPasswordPage() {
                     type="tel"
                     placeholder="Enter your phone number"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={handlePhoneNumberChange}
                     className="pl-10"
                   />
                 </div>
