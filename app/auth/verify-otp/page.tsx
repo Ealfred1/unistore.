@@ -150,25 +150,25 @@ export default function VerifyOTPPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       {/* Left side - OTP verification form */}
-      <div className="w-full md:w-1/2 flex items-center justify-center p-8 md:p-16">
+      <div className="w-full md:w-1/2 flex items-center justify-center p-4 md:p-16">
         <div className="w-full max-w-md">
-          <div className="mb-8">
-            <Logo className="text-2xl" />
+          <div className="mb-6 md:mb-8">
+            <Logo className="text-xl md:text-2xl" />
           </div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="bg-white rounded-2xl shadow-sm p-8"
+            className="bg-white rounded-xl md:rounded-2xl shadow-sm p-4 md:p-8"
           >
-            <Link href="/auth/signup" className="inline-flex items-center text-gray-500 hover:text-gray-700 mb-6">
+            <Link href="/auth/signup" className="inline-flex items-center text-gray-500 hover:text-gray-700 mb-4 md:mb-6">
               <ArrowLeft className="h-4 w-4 mr-1" />
               <span>Back</span>
             </Link>
 
-            <h1 className="text-2xl font-bold mb-2">Verify Your Phone</h1>
-            <p className="text-gray-600 mb-6">
+            <h1 className="text-xl md:text-2xl font-bold mb-2">Verify Your Phone</h1>
+            <p className="text-gray-600 mb-4 md:mb-6 text-sm md:text-base">
               We've sent a 6-digit verification code to your phone. Enter the code below to verify your account.
             </p>
 
@@ -176,19 +176,19 @@ export default function VerifyOTPPage() {
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center py-8"
+                className="flex flex-col items-center justify-center py-6 md:py-8"
               >
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                  <CheckCircle className="h-10 w-10 text-green-500" />
+                <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                  <CheckCircle className="h-8 w-8 md:h-10 md:w-10 text-green-500" />
                 </div>
-                <h2 className="text-xl font-semibold mb-2">Verification Successful!</h2>
-                <p className="text-gray-500 text-center mb-4">
+                <h2 className="text-lg md:text-xl font-semibold mb-2">Verification Successful!</h2>
+                <p className="text-gray-500 text-center text-sm md:text-base mb-4">
                   Your phone number has been verified successfully. Redirecting...
                 </p>
               </motion.div>
             ) : (
               <form onSubmit={handleSubmit}>
-                <div className="flex justify-center space-x-3 mb-6">
+                <div className="flex justify-center space-x-2 md:space-x-3 mb-4 md:mb-6">
                   {otp.map((digit, index) => (
                     <input
                       key={index}
@@ -201,23 +201,23 @@ export default function VerifyOTPPage() {
                       onChange={(e) => handleChange(index, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(index, e)}
                       onPaste={handlePaste}
-                      className="w-12 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
+                      className="w-10 h-12 md:w-12 md:h-14 text-center text-lg md:text-xl font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
                     />
                   ))}
                 </div>
 
-                {error && <div className="text-red-500 text-sm text-center mb-4">{error}</div>}
+                {error && <div className="text-red-500 text-xs md:text-sm text-center mb-4">{error}</div>}
 
                 <motion.button
                   type="submit"
                   disabled={isVerifying || otp.some((digit) => !digit)}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full py-3 px-4 bg-[#f58220] text-white font-medium rounded-xl hover:bg-[#f58220]/90 transition-all flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 md:py-3 px-4 bg-[#f58220] text-white text-sm md:text-base font-medium rounded-lg md:rounded-xl hover:bg-[#f58220]/90 transition-all flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isVerifying ? (
                     <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+                      <div className="animate-spin rounded-full h-4 w-4 md:h-5 md:w-5 border-b-2 border-white mr-2" />
                       Verifying...
                     </div>
                   ) : (
@@ -225,8 +225,8 @@ export default function VerifyOTPPage() {
                   )}
                 </motion.button>
 
-                <div className="mt-6 text-center">
-                  <p className="text-gray-600 text-sm">
+                <div className="mt-4 md:mt-6 text-center">
+                  <p className="text-gray-600 text-xs md:text-sm">
                     Didn't receive the code?{" "}
                     {resendCountdown > 0 ? (
                       <span className="text-gray-500">Resend in {resendCountdown}s</span>
