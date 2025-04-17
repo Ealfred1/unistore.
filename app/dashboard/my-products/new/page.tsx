@@ -128,7 +128,7 @@ export default function NewProductPage() {
       toast.error("Maximum 5 images allowed")
       return
     }
-
+  
     // Check if adding these would exceed 5 images
     const remainingSlots = 5 - productImages.length
     const filesToAdd = Array.from(files).slice(0, remainingSlots)
@@ -204,7 +204,7 @@ export default function NewProductPage() {
   }
 
   return (
-    <div className="container max-w-5xl py-8">
+    <div className="lg:container max-w-5xl py-8">
       <div className="flex items-center mb-6">
         <Button
           variant="ghost"

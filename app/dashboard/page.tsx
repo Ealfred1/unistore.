@@ -32,7 +32,13 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 
 export default function DashboardPage() {
-  const { products, categories, isLoading, fetchProducts } = useProducts()
+  const { 
+    products, 
+    categories, 
+    isLoading, 
+    fetchProducts,
+    getProductsByCategory 
+  } = useProducts();
   const { user } = useAuth()
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [showFilters, setShowFilters] = useState(false)
@@ -54,6 +60,15 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredProducts, setFilteredProducts] = useState(products)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
+
+  // Update categoryProducts state to handle full response
+  const [categoryProducts, setCategoryProducts] = useState<Record<string, {
+    results: any[],
+    count: number,
+    current_page: number,
+    total_pages: number
+  }>>({});
+  const [isLoadingCategory, setIsLoadingCategory] = useState<Record<string, boolean>>({});
 
   // Image handling function - same as in products page
   const getProperImageUrl = (imageUrl: string | undefined) => {
@@ -87,6 +102,68 @@ export default function DashboardPage() {
     const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
     return `₦${numPrice.toLocaleString()}`
   }
+
+  // Function to fetch products for a specific category
+  const fetchCategoryProducts = async (categoryId: string) => {
+    setIsLoadingCategory(prev => ({ ...prev, [categoryId]: true }));
+    try {
+      const filters = {
+        category: categoryId,
+        ...(searchQuery && { search: searchQuery }),
+        ...(selectedCondition && { condition: selectedCondition }),
+        ...(selectedUniversity && { university: selectedUniversity }),
+        ...(priceRange[0] > 0 && { price_min: priceRange[0] }),
+        ...(priceRange[1] < 2000 && { price_max: priceRange[1] }),
+        ...(sortBy && { ordering: getSortOrder(sortBy) })
+      };
+
+      // Use the getProductsByCategory function from useProducts
+      const response = await fetchProducts(filters);
+      
+      setCategoryProducts(prev => ({ 
+        ...prev, 
+        [categoryId]: response 
+      }));
+    } catch (error) {
+      console.error(`Error fetching products for category ${categoryId}:`, error);
+    } finally {
+      setIsLoadingCategory(prev => ({ ...prev, [categoryId]: false }));
+    }
+  };
+
+  // Helper function for sort order
+  const getSortOrder = (sort: string) => {
+    switch (sort) {
+      case "newest": return "-created_at";
+      case "price_low": return "price";
+      case "price_high": return "-price";
+      case "popular": return "-view_count";
+      default: return "-created_at";
+    }
+  };
+
+  // Update tab change handler
+  useEffect(() => {
+    const handleTabChange = async () => {
+      if (activeTab === "all") {
+        // Fetch all products with current filters
+        const filters = {
+          ...(searchQuery && { search: searchQuery }),
+          ...(selectedCondition && { condition: selectedCondition }),
+          ...(selectedUniversity && { university: selectedUniversity }),
+          ...(priceRange[0] > 0 && { price_min: priceRange[0] }),
+          ...(priceRange[1] < 2000 && { price_max: priceRange[1] }),
+          ...(sortBy && { ordering: getSortOrder(sortBy) })
+        };
+        await fetchProducts(filters);
+      } else if (!categoryProducts[activeTab]) {
+        // Fetch category-specific products
+        await fetchCategoryProducts(activeTab);
+      }
+    };
+
+    handleTabChange();
+  }, [activeTab, searchQuery, selectedCondition, selectedUniversity, priceRange, sortBy]);
 
   // Fetch products with filters
   useEffect(() => {
@@ -482,7 +559,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Product Categories Tabs */}
-      <Tabs defaultValue="all" className="space-y-6" onValueChange={setActiveTab}>
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
           <TabsTrigger
             value="all"
@@ -565,17 +642,17 @@ export default function DashboardPage() {
               {/* Products grid */}
               {viewMode === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {getPaginatedProducts().map((product, index) => (
+                  {getPaginatedProducts().map((product) => (
                     <motion.div
                       key={product.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                      transition={{ duration: 0.3 }}
                     >
                       <ProductCard 
                         product={{
                           ...product,
-                          primary_image: getProperImageUrl(product.primary_image),
+                          primary_image: getProperImageUrl(product.primary_image)
                         }} 
                       />
                     </motion.div>
@@ -730,28 +807,41 @@ export default function DashboardPage() {
               <p className="text-gray-600 dark:text-gray-400">
                 Showing{" "}
                 <span className="font-medium">
-                  {filteredProducts.filter((p) => p.category_id === category.id).length}
+                  {(categoryProducts[category.id.toString()]?.results || []).length}
                 </span>{" "}
                 products
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {filteredProducts
-                .filter((p) => p.category_id === category.id)
-                .map((product) => (
+            {isLoadingCategory[category.id.toString()] ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="bg-gray-200 dark:bg-gray-700 h-48 rounded-lg mb-3" />
+                    <div className="bg-gray-200 dark:bg-gray-700 h-4 w-3/4 rounded mb-2" />
+                    <div className="bg-gray-200 dark:bg-gray-700 h-4 w-1/2 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : (categoryProducts[category.id.toString()]?.results || []).length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {(categoryProducts[category.id.toString()]?.results || []).map((product) => (
                   <motion.div
                     key={product.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
                   >
-                    <ProductCard product={product} />
+                    <ProductCard 
+                      product={{
+                        ...product,
+                        primary_image: getProperImageUrl(product.primary_image)
+                      }} 
+                    />
                   </motion.div>
                 ))}
-            </div>
-
-            {filteredProducts.filter((p) => p.category_id === category.id).length === 0 && (
+              </div>
+            ) : (
               <div className="text-center py-16">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                   <Search className="h-8 w-8 text-gray-400" />
