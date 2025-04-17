@@ -201,8 +201,37 @@ export default function FavoritesPage() {
         </div>
       </div>
 
-      {/* Products Grid/List */}
-      {!isLoading && sortedProducts.length > 0 ? (
+      {/* Loading State */}
+      {isLoading ? (
+        <div className={`grid gap-4 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"}`}>
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+              <div className={viewMode === "grid" ? "space-y-3" : "flex h-32"}>
+                {/* Image skeleton */}
+                <div className={`bg-gray-200 dark:bg-gray-700 animate-pulse ${
+                  viewMode === "grid" ? "aspect-square w-full" : "w-32 h-32"
+                }`} />
+                
+                {/* Content skeleton */}
+                <div className="p-4 flex-1">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  </div>
+                  <div className="w-3/4 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3" />
+                  <div className="w-1/2 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  {viewMode === "list" && (
+                    <div className="flex items-center justify-between mt-4">
+                      <div className="w-24 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : sortedProducts.length > 0 ? (
         <div className={`grid gap-4 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"}`}>
           {sortedProducts.map((product) => (
             <div key={product.id} className="relative group">

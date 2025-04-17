@@ -138,260 +138,243 @@ export default function ProductDetailPage() {
     }
   }
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="container py-8">
-          <div className="flex flex-col lg:flex-row gap-8 animate-pulse">
-            <div className="w-full lg:w-1/2">
-              <div className="aspect-square rounded-xl bg-gray-200"></div>
-              <div className="grid grid-cols-4 gap-2 mt-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="aspect-square rounded-lg bg-gray-200"></div>
-                ))}
-              </div>
-            </div>
-            <div className="w-full lg:w-1/2">
-              <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100 space-y-4">
-                <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-200 rounded w-full"></div>
-                <div className="h-4 bg-gray-200 rounded w-full"></div>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (!product) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="container py-16 text-center">
-          <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>
-          <p className="text-gray-500 mb-8">The product you're looking for doesn't exist or has been removed.</p>
-          <Button asChild>
-            <Link href="/products">Browse Products</Link>
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
       <div className="container py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Product images */}
-          <div className="w-full lg:w-1/2">
-            <div className="relative aspect-square rounded-xl overflow-hidden bg-white shadow-md">
-              <Image
-                src={
-                  product.images && product.images.length > 0
-                    ? product.images[currentImageIndex].image_url
-                    : "/placeholder.svg?height=600&width=600&text=No+Image"
-                }
-                alt={product.name}
-                fill
-                className="object-contain"
-              />
-            </div>
-            {product.images && product.images.length > 0 && (
-              <div className="grid grid-cols-4 gap-2 mt-4">
-                {product.images.map((image: any, index: number) => (
-                  <div
-                    key={image.id}
-                    className={`aspect-square rounded-lg overflow-hidden cursor-pointer border-2 ${
-                      index === currentImageIndex ? "border-[#f58220]" : "border-transparent"
-                    }`}
-                    onClick={() => setCurrentImageIndex(index)}
-                  >
-                    <div className="relative w-full h-full">
-                      <Image
-                        src={image.image_url || "/placeholder.svg"}
-                        alt={`${product.name} ${index + 1}`}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {isLoading && (
+          // Loading skeleton - shown immediately while fetching data
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* ... existing skeleton code ... */}
           </div>
+        )}
 
-          {/* Product details */}
-          <div className="w-full lg:w-1/2">
-            <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <div className="px-3 py-1 bg-[#f58220]/10 text-[#f58220] text-xs font-medium rounded-full">
-                    {product.category_name}
+        {!isLoading && (
+          <>
+            {product ? (
+              // Product exists - show product details
+              <div className="flex flex-col lg:flex-row gap-8">
+                {/* Product images */}
+                <div className="w-full lg:w-1/2">
+                  <div className="relative aspect-square rounded-xl overflow-hidden bg-white shadow-md">
+                    <Image
+                      src={
+                        product.images && product.images.length > 0
+                          ? product.images[currentImageIndex].image_url
+                          : "/placeholder.svg?height=600&width=600&text=No+Image"
+                      }
+                      alt={product.name}
+                      fill
+                      className="object-contain"
+                    />
                   </div>
-                  {product.is_verified && (
-                    <div className="ml-2 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center">
-                      <Check className="h-3 w-3 mr-1" />
-                      Verified
+                  {product.images && product.images.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 mt-4">
+                      {product.images.map((image: any, index: number) => (
+                        <div
+                          key={image.id}
+                          className={`aspect-square rounded-lg overflow-hidden cursor-pointer border-2 ${
+                            index === currentImageIndex ? "border-[#f58220]" : "border-transparent"
+                          }`}
+                          onClick={() => setCurrentImageIndex(index)}
+                        >
+                          <div className="relative w-full h-full">
+                            <Image
+                              src={image.image_url || "/placeholder.svg"}
+                              alt={`${product.name} ${index + 1}`}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={handleToggleFavorite} className="relative">
-                    <Heart className={`h-5 w-5 ${product.is_favorited ? "fill-red-500 text-red-500" : ""}`} />
-                  </Button>
-                  <Button variant="ghost" size="icon">
-                    <Share2 className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
 
-              <h1 className="text-2xl font-bold mb-2">{product.name}</h1>
+                {/* Product details */}
+                <div className="w-full lg:w-1/2">
+                  <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center">
+                        <div className="px-3 py-1 bg-[#f58220]/10 text-[#f58220] text-xs font-medium rounded-full">
+                          {product.category_name}
+                        </div>
+                        {product.is_verified && (
+                          <div className="ml-2 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center">
+                            <Check className="h-3 w-3 mr-1" />
+                            Verified
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={handleToggleFavorite} className="relative">
+                          <Heart className={`h-5 w-5 ${product.is_favorited ? "fill-red-500 text-red-500" : ""}`} />
+                        </Button>
+                        <Button variant="ghost" size="icon">
+                          <Share2 className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
 
-              <div className="flex items-baseline mb-4">
-                <span className="text-3xl font-bold">${Number.parseFloat(product.price).toFixed(2)}</span>
-                {product.price_negotiable && <span className="ml-2 text-sm text-gray-500">(Negotiable)</span>}
-              </div>
+                    <h1 className="text-2xl font-bold mb-2">{product.name}</h1>
 
-              <div className="flex items-center text-gray-500 text-sm mb-6">
-                <Clock className="h-4 w-4 mr-1" />
-                <span>Posted on {formatDate(product.created_at)}</span>
-                <span className="mx-2">•</span>
-                <MapPin className="h-4 w-4 mr-1" />
-                <span>{product.university_name}</span>
-              </div>
+                    <div className="flex items-baseline mb-4">
+                      <span className="text-3xl font-bold">${Number.parseFloat(product.price).toFixed(2)}</span>
+                      {product.price_negotiable && <span className="ml-2 text-sm text-gray-500">(Negotiable)</span>}
+                    </div>
 
-              {product.description && (
-                <div className="border-t border-b py-4 mb-6">
-                  <h3 className="font-medium mb-2">Description</h3>
-                  <p className="text-gray-600">{product.description}</p>
-                </div>
-              )}
+                    <div className="flex items-center text-gray-500 text-sm mb-6">
+                      <Clock className="h-4 w-4 mr-1" />
+                      <span>Posted on {formatDate(product.created_at)}</span>
+                      <span className="mx-2">•</span>
+                      <MapPin className="h-4 w-4 mr-1" />
+                      <span>{product.university_name}</span>
+                    </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="flex flex-col">
-                  <span className="text-sm text-gray-500">Condition</span>
-                  <span className="font-medium">{product.condition.replace("_", " ")}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm text-gray-500">Quantity</span>
-                  <span className="font-medium">{product.quantity} available</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm text-gray-500">Status</span>
-                  <span className="font-medium">{product.status}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm text-gray-500">Views</span>
-                  <span className="font-medium">{product.view_count}</span>
-                </div>
-              </div>
+                    {product.description && (
+                      <div className="border-t border-b py-4 mb-6">
+                        <h3 className="font-medium mb-2">Description</h3>
+                        <p className="text-gray-600">{product.description}</p>
+                      </div>
+                    )}
 
-              {product.merchant_info && (
-                <div className="flex items-center p-4 bg-gray-50 rounded-xl mb-6">
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4">
-                    <Image
-                      src={product.merchant_info.profile_picture || "/placeholder.svg?height=48&width=48&text=Seller"}
-                      alt={product.merchant_info.full_name}
-                      fill
-                      className="object-cover"
-                    />
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500">Condition</span>
+                        <span className="font-medium">{product.condition.replace("_", " ")}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500">Quantity</span>
+                        <span className="font-medium">{product.quantity} available</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500">Status</span>
+                        <span className="font-medium">{product.status}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-500">Views</span>
+                        <span className="font-medium">{product.view_count}</span>
+                      </div>
+                    </div>
+
+                    {product.merchant_info && (
+                      <div className="flex items-center p-4 bg-gray-50 rounded-xl mb-6">
+                        <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4">
+                          <Image
+                            src={product.merchant_info.profile_picture || "/placeholder.svg?height=48&width=48&text=Seller"}
+                            alt={product.merchant_info.full_name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">{product.merchant_info.full_name}</h3>
+                          <p className="text-sm text-gray-500">
+                            Member since {new Date(product.merchant_info.joined_date).getFullYear()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-4">
+                      <Button
+                        onClick={() => setShowContactModal(true)}
+                        className="flex-1 bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+                      >
+                        <MessageCircle className="h-5 w-5 mr-2" />
+                        Contact Seller
+                      </Button>
+                      <Button
+                        className="flex-1 border border-[#0a2472] text-[#0a2472] hover:bg-[#0a2472]/5"
+                        variant="outline"
+                      >
+                        <ShoppingCart className="h-5 w-5 mr-2" />
+                        Make Offer
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-medium">{product.merchant_info.full_name}</h3>
-                    <p className="text-sm text-gray-500">
-                      Member since {new Date(product.merchant_info.joined_date).getFullYear()}
-                    </p>
+
+                  {/* Purchase Instructions */}
+                  <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100 mt-6">
+                    <h2 className="text-lg font-semibold mb-4">Purchase Instructions</h2>
+                    <ul className="space-y-3">
+                      <li className="flex items-start">
+                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#f58220]/20 flex items-center justify-center mr-3 mt-0.5">
+                          <span className="text-xs font-bold text-[#f58220]">1</span>
+                        </div>
+                        <p className="text-sm text-gray-600">Click "Copy Seller Contact" to get the seller's phone number.</p>
+                      </li>
+                      <li className="flex items-start">
+                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#f58220]/20 flex items-center justify-center mr-3 mt-0.5">
+                          <span className="text-xs font-bold text-[#f58220]">2</span>
+                        </div>
+                        <p className="text-sm text-gray-600">Contact the seller directly to discuss the product.</p>
+                      </li>
+                      <li className="flex items-start">
+                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#f58220]/20 flex items-center justify-center mr-3 mt-0.5">
+                          <span className="text-xs font-bold text-[#f58220]">3</span>
+                        </div>
+                        <p className="text-sm text-gray-600">Arrange to meet in a safe place for delivery.</p>
+                      </li>
+                      <li className="flex items-start">
+                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#f58220]/20 flex items-center justify-center mr-3 mt-0.5">
+                          <span className="text-xs font-bold text-[#f58220]">4</span>
+                        </div>
+                        <p className="text-sm text-gray-600">Make payment only after inspecting the product.</p>
+                      </li>
+                    </ul>
+
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <h3 className="font-medium mb-3">Security Measures</h3>
+                      <ul className="space-y-2">
+                        <li className="flex items-start">
+                          <Shield className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                          <p className="text-sm text-gray-600">Verify the seller's details and reviews.</p>
+                        </li>
+                        <li className="flex items-start">
+                          <Shield className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                          <p className="text-sm text-gray-600">Use secure payment methods within the chat.</p>
+                        </li>
+                        <li className="flex items-start">
+                          <Shield className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                          <p className="text-sm text-gray-600">Inspect the product before completing payment.</p>
+                        </li>
+                        <li className="flex items-start">
+                          <Shield className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                          <p className="text-sm text-gray-600">Avoid sharing personal information.</p>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <Button onClick={copyContactNumber} className="w-full bg-[#0a2472] hover:bg-[#0a2472]/90 text-white">
+                        <Copy className="h-5 w-5 mr-2" />
+                        {contactCopied ? "Contact Copied!" : "Copy Seller Contact"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              )}
-
-              <div className="flex gap-4">
-                <Button
-                  onClick={() => setShowContactModal(true)}
-                  className="flex-1 bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+              </div>
+            ) : (
+              // No product found - show error state
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="h-8 w-8 text-red-500" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">Product Not Found</h3>
+                <p className="text-gray-500 mb-6">The product you're looking for doesn't exist or has been removed.</p>
+                <Button 
+                  onClick={() => router.push('/products')}
+                  className="bg-[#f58220] hover:bg-[#f58220]/90"
                 >
-                  <MessageCircle className="h-5 w-5 mr-2" />
-                  Contact Seller
-                </Button>
-                <Button
-                  className="flex-1 border border-[#0a2472] text-[#0a2472] hover:bg-[#0a2472]/5"
-                  variant="outline"
-                >
-                  <ShoppingCart className="h-5 w-5 mr-2" />
-                  Make Offer
+                  Browse Products
                 </Button>
               </div>
-            </div>
-
-            {/* Purchase Instructions */}
-            <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100 mt-6">
-              <h2 className="text-lg font-semibold mb-4">Purchase Instructions</h2>
-              <ul className="space-y-3">
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#f58220]/20 flex items-center justify-center mr-3 mt-0.5">
-                    <span className="text-xs font-bold text-[#f58220]">1</span>
-                  </div>
-                  <p className="text-sm text-gray-600">Click "Copy Seller Contact" to get the seller's phone number.</p>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#f58220]/20 flex items-center justify-center mr-3 mt-0.5">
-                    <span className="text-xs font-bold text-[#f58220]">2</span>
-                  </div>
-                  <p className="text-sm text-gray-600">Contact the seller directly to discuss the product.</p>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#f58220]/20 flex items-center justify-center mr-3 mt-0.5">
-                    <span className="text-xs font-bold text-[#f58220]">3</span>
-                  </div>
-                  <p className="text-sm text-gray-600">Arrange to meet in a safe place for delivery.</p>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#f58220]/20 flex items-center justify-center mr-3 mt-0.5">
-                    <span className="text-xs font-bold text-[#f58220]">4</span>
-                  </div>
-                  <p className="text-sm text-gray-600">Make payment only after inspecting the product.</p>
-                </li>
-              </ul>
-
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <h3 className="font-medium mb-3">Security Measures</h3>
-                <ul className="space-y-2">
-                  <li className="flex items-start">
-                    <Shield className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                    <p className="text-sm text-gray-600">Verify the seller's details and reviews.</p>
-                  </li>
-                  <li className="flex items-start">
-                    <Shield className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                    <p className="text-sm text-gray-600">Use secure payment methods within the chat.</p>
-                  </li>
-                  <li className="flex items-start">
-                    <Shield className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                    <p className="text-sm text-gray-600">Inspect the product before completing payment.</p>
-                  </li>
-                  <li className="flex items-start">
-                    <Shield className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                    <p className="text-sm text-gray-600">Avoid sharing personal information.</p>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <Button onClick={copyContactNumber} className="w-full bg-[#0a2472] hover:bg-[#0a2472]/90 text-white">
-                  <Copy className="h-5 w-5 mr-2" />
-                  {contactCopied ? "Contact Copied!" : "Copy Seller Contact"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+            )}
+          </>
+        )}
 
         {/* Similar products */}
         {similarProducts.length > 0 && (

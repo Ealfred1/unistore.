@@ -78,7 +78,7 @@ interface ProductContextType {
   fetchProducts: (filters?: Record<string, any>) => Promise<PaginatedResponse<Product>>
   fetchCategories: () => Promise<Category[]>
   getProductById: (id: number) => Promise<Product | undefined>
-  getProductsByCategory: (categoryId: number) => Promise<Product[]>
+  getProductsByCategory: (categoryId: number, filters?: Record<string, any>) => Promise<PaginatedResponse<Product>>
   getUserProducts: (filters?: Record<string, any>) => Promise<PaginatedResponse<Product>>
   getFavoriteProducts: () => Promise<Product[]>
   toggleFavorite: (productId: number) => Promise<void>
@@ -161,13 +161,32 @@ export function ProductProvider({ children }: ProductProviderProps) {
   }
 
   // Get products by category
-  const getProductsByCategory = async (categoryId: number) => {
+  const getProductsByCategory = async (categoryId: number, filters?: Record<string, any>) => {
     try {
-      const response = await axios.get(`/products/products/?category=${categoryId}`)
-      return response.data.results
+      const queryParams = new URLSearchParams();
+      queryParams.append('category', String(categoryId));
+
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+
+      const response = await axios.get(`/products/products/?${queryParams.toString()}`);
+      return {
+        count: response.data.count,
+        next: response.data.next,
+        previous: response.data.previous,
+        current_page: response.data.current_page,
+        total_pages: response.data.total_pages,
+        page_size: response.data.page_size,
+        results: response.data.results
+      };
     } catch (error) {
-      console.error(`Error fetching products for category ${categoryId}:`, error)
-      throw error
+      console.error(`Error fetching products for category ${categoryId}:`, error);
+      throw error;
     }
   }
 

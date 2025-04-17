@@ -17,7 +17,7 @@ export default function CategoryDetailPage() {
   const router = useRouter()
   const categoryId = Number(params.id)
   
-  const { categories } = useProducts()
+  const { categories, getProductsByCategory } = useProducts()
   const [category, setCategory] = useState<any>(null)
   const [products, setProducts] = useState<any[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
@@ -77,23 +77,20 @@ export default function CategoryDetailPage() {
                       sortBy === "name-asc" ? "name" : 
                       sortBy === "name-desc" ? "-name" : "-created_at";
       
-      const response = await axios.get("/products/products/", {
-        params: {
-          category: categoryId,
-          page: page,
-          page_size: pageSize,
-          ordering: ordering,
-          search: searchQuery || undefined
-        }
+      const response = await getProductsByCategory(categoryId, {
+        page,
+        page_size: pageSize,
+        ordering,
+        search: searchQuery || undefined
       });
       
-      const data = response.data;
-      setProducts(data.results);
-      setTotalPages(data.total_pages);
-      setCurrentPage(data.current_page);
-      setTotalCount(data.count);
-      setNextPageUrl(data.next);
-      setPrevPageUrl(data.previous);
+      setProducts(response.results);
+      setTotalPages(response.total_pages);
+      setCurrentPage(response.current_page);
+      setTotalCount(response.count);
+      setNextPageUrl(response.next);
+      setPrevPageUrl(response.previous);
+      console.log(response.previous, response.next, response.count)
     } catch (error) {
       console.error("Error fetching category products:", error);
     } finally {
@@ -105,6 +102,8 @@ export default function CategoryDetailPage() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     fetchCategoryProducts(page);
+    // Scroll to top smoothly
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Handle next page
@@ -121,22 +120,20 @@ export default function CategoryDetailPage() {
     }
   };
 
-  // Find category and fetch products on initial load
+  // Initial fetch and category setup
   useEffect(() => {
     const foundCategory = categories.find((c) => c.id === categoryId);
     if (foundCategory) {
       setCategory(foundCategory);
     }
-    
     fetchCategoryProducts(1);
-  }, [categoryId, categories, pageSize, sortBy]);
+  }, [categoryId, categories, sortBy, pageSize]);
 
-  // Refetch when search query changes
+  // Handle search with debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchCategoryProducts(1);
     }, 500);
-    
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -256,30 +253,38 @@ export default function CategoryDetailPage() {
                   className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 transition-all hover:border-[#f58220]/50"
                 >
                   {/* List view product card */}
-                  <div className="flex">
-                    <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
+                  <div className="flex flex-col sm:flex-row">
+                    {/* Image container - full width on mobile, fixed width on desktop */}
+                    <div className="w-full sm:w-48 h-48 sm:h-48 relative flex-shrink-0">
                       <img
                         src={getProperImageUrl(product.primary_image)}
                         alt={product.name}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div className="flex-1 p-4 flex flex-col">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="bg-gray-100/50 dark:bg-gray-800/50 text-xs border border-gray-200 dark:border-gray-700 rounded-full px-2 py-0.5">
+
+                    {/* Content container */}
+                    <div className="flex-1 p-4">
+                      {/* Top row with category and university */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                        <div className="bg-gray-100/50 dark:bg-gray-800/50 text-xs border border-gray-200 dark:border-gray-700 rounded-full px-2 py-0.5 w-fit">
                           {product.category_name}
                         </div>
-                        <div className="flex items-center">
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                            {product.university_name}
-                          </span>
-                        </div>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {product.university_name}
+                        </span>
                       </div>
-                      <h3 className="font-medium text-lg mb-1">{product.name}</h3>
-                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 line-clamp-2">
+
+                      {/* Product name */}
+                      <h3 className="font-medium text-lg mb-2">{product.name}</h3>
+
+                      {/* Product details */}
+                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
                         {product.condition.replace("_", " ")} • {product.merchant_name || "Unknown seller"}
                       </p>
-                      <div className="mt-auto flex items-center justify-between">
+
+                      {/* Bottom row with price and action button */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-auto">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-lg">{formatPrice(product.price)}</span>
                           {product.price_negotiable && (
@@ -289,7 +294,7 @@ export default function CategoryDetailPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-[#f58220] hover:text-[#f58220]/90 hover:bg-[#f58220]/10"
+                          className="text-[#f58220] hover:text-[#f58220]/90 hover:bg-[#f58220]/10 w-full sm:w-auto"
                         >
                           View Details
                         </Button>
