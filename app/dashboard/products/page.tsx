@@ -8,9 +8,11 @@ import { useProducts } from "@/providers/product-provider"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
 
 export default function DashboardProductsPage() {
-  const { products, categories, isLoading, fetchProducts } = useProducts()
+  const { products, categories, isLoading, fetchProducts, toggleFavorite } = useProducts()
   
   // State for UI
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -113,6 +115,23 @@ export default function DashboardProductsPage() {
     return price
   }
 
+  // Add handler for favorite toggle
+  const handleFavoriteToggle = async (productId: number) => {
+    try {
+      await toggleFavorite(productId);
+      // Optionally refresh the products list
+      const filters = {
+        page: currentPage,
+        page_size: pageSize,
+        ...(searchQuery && { search: searchQuery }),
+        ...(sortBy && { ordering: getSortOrder(sortBy) })
+      };
+      await fetchProducts(filters);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -189,17 +208,86 @@ export default function DashboardProductsPage() {
       {/* Products Grid */}
       {!isLoading && (
         <>
-          <div className={`grid gap-4 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
+          <div className={viewMode === "grid" 
+            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" 
+            : "space-y-3"
+          }>
             {filteredProducts.map((product) => (
-              <ProductCard 
-                key={product.id} 
-                product={{
-                  ...product,
-                  primary_image: getProperImageUrl(product.primary_image),
-                  price: formatPrice(product.price)
-                }} 
-                viewMode={viewMode} 
-              />
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`bg-white dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all ${
+                  viewMode === "list" ? "w-full" : ""
+                }`}
+              >
+                {viewMode === "grid" ? (
+                  <ProductCard 
+                    product={product} 
+                    onFavoriteToggle={handleFavoriteToggle}
+                  />
+                ) : (
+                  <Link 
+                    href={`/dashboard/products/${product.id}`} 
+                    className="flex h-32"
+                  >
+                    {/* Image Container */}
+                    <div className={viewMode === "list" ? "w-32 h-32 relative flex-shrink-0" : "aspect-square relative"}>
+                      <img
+                        src={getProperImageUrl(product.primary_image) || "/placeholder.svg"}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {product.is_featured && (
+                        <div className="absolute top-2 left-2 bg-[#f58220] text-white text-xs px-2 py-1 rounded">
+                          Featured
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content Container */}
+                    <div className={`flex-1 p-4 ${viewMode === "list" ? "flex flex-col justify-between" : ""}`}>
+                      <div>
+                        {/* Category and University */}
+                        <div className="flex items-center justify-between mb-1">
+                          <Badge variant="outline" className="text-xs">
+                            {product.category_name}
+                          </Badge>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {product.university_name}
+                          </span>
+                        </div>
+
+                        {/* Title and Status */}
+                        <h3 className="font-medium text-base mb-1 line-clamp-1">
+                          {product.name}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                          {product.condition} • {product.status}
+                        </p>
+                      </div>
+
+                      {/* Price and Actions */}
+                      <div className="flex items-center justify-between mt-auto">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-base">
+                            {formatPrice(product.price)}
+                          </span>
+                          {product.price_negotiable && 
+                            <span className="text-xs text-gray-500">(Negotiable)</span>
+                          }
+                        </div>
+                        <Badge 
+                          variant={product.is_available ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {product.is_available ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </Link>
+                )}
+              </motion.div>
             ))}
           </div>
 

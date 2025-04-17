@@ -37,7 +37,8 @@ export default function DashboardPage() {
     categories, 
     isLoading, 
     fetchProducts,
-    getProductsByCategory 
+    getProductsByCategory,
+    toggleFavorite 
   } = useProducts();
   const { user } = useAuth()
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -303,6 +304,21 @@ export default function DashboardPage() {
       textColor: "text-blue-500",
     },
   ]
+
+  // Add handler for favorite toggle
+  const handleFavoriteToggle = async (productId: number) => {
+    try {
+      await toggleFavorite(productId);
+      // Refresh products after toggling favorite
+      if (activeTab === "all") {
+        await fetchProducts();
+      } else {
+        await fetchCategoryProducts(activeTab);
+      }
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -654,6 +670,7 @@ export default function DashboardPage() {
                           ...product,
                           primary_image: getProperImageUrl(product.primary_image)
                         }} 
+                        onFavoriteToggle={handleFavoriteToggle}
                       />
                     </motion.div>
                   ))}
@@ -837,6 +854,7 @@ export default function DashboardPage() {
                         ...product,
                         primary_image: getProperImageUrl(product.primary_image)
                       }} 
+                      onFavoriteToggle={handleFavoriteToggle}
                     />
                   </motion.div>
                 ))}

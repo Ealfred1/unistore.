@@ -315,20 +315,17 @@ export default function CategoryDetailPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={handlePrevPage}
-                disabled={!prevPageUrl}
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
                 className="h-10 w-10 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
 
               {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((page) => {
-                  // Show first page, last page, current page, and pages around current page
-                  return page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)
-                })
+                .filter(page => page === 1 || page === totalPages || 
+                  (page >= currentPage - 1 && page <= currentPage + 1))
                 .map((page, index, array) => {
-                  // Add ellipsis
                   if (index > 0 && array[index - 1] !== page - 1) {
                     return (
                       <Fragment key={`ellipsis-${page}`}>
@@ -348,7 +345,6 @@ export default function CategoryDetailPage() {
                       </Fragment>
                     )
                   }
-
                   return (
                     <Button
                       key={page}
@@ -369,8 +365,8 @@ export default function CategoryDetailPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={handleNextPage}
-                disabled={!nextPageUrl}
+                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
                 className="h-10 w-10 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
               >
                 <ChevronRight className="h-4 w-4" />
