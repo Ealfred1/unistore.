@@ -46,8 +46,8 @@ export default function ProductCard({ product, onFavoriteToggle }: ProductCardPr
   const displayPrice = price_range || price ? formatPrice(price_range || price) : "Price on request";
 
   return (
-    <div className="bg-white rounded-xl overflow-hidden border border-gray-200 group hover:shadow-md transition-all">
-      <div className="relative">
+    <div className="bg-white h-[280px] lg:h-auto rounded-xl overflow-hidden border border-gray-200 group hover:shadow-md transition-all">
+      <div className="relative h-full">
         <Button
           variant="ghost"
           size="icon"
@@ -60,8 +60,8 @@ export default function ProductCard({ product, onFavoriteToggle }: ProductCardPr
         >
           <Heart className={`w-5 h-5 ${is_favorited ? "fill-red-500 text-red-500" : "text-gray-400"}`} />
         </Button>
-        <Link href={`/products/${id}`}>
-          <div className="relative aspect-square overflow-hidden bg-gray-100">
+        <Link href={`/products/${id}`} className="h-full flex flex-col">
+          <div className="relative h-[200px] lg:aspect-square overflow-hidden bg-gray-100">
             <Image
               src={primary_image || "/placeholder.svg?height=400&width=300&text=No+Image"}
               alt={name}
@@ -69,14 +69,14 @@ export default function ProductCard({ product, onFavoriteToggle }: ProductCardPr
               className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
           </div>
-          <div className="p-4">
+          <div className="p-3 lg:p-4 flex-1">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs uppercase text-gray-500">{category_name}</span>
               <div className="text-xs px-2 py-0.5 bg-gray-100 rounded-full">{condition.replace("_", " ")}</div>
             </div>
-            <h3 className="font-medium text-base mb-1 truncate">{name}</h3>
+            <h3 className="font-medium text-sm lg:text-base mb-1 truncate">{name}</h3>
             <div className="flex items-center gap-2">
-              <span className="font-bold">{displayPrice}</span>
+              <span className="font-bold text-sm lg:text-base">{displayPrice}</span>
               {price_negotiable && <span className="text-xs text-gray-500">(Negotiable)</span>}
             </div>
           </div>

@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input"
 import ProductCard from "@/components/products/product-card"
 import { Skeleton } from "@/components/ui/skeleton"
 import axios from "@/lib/axios"
+import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
 
 export default function CategoryDetailPage() {
   const params = useParams()
@@ -59,11 +61,30 @@ export default function CategoryDetailPage() {
     return imageUrl
   }
 
-  // Format price for display
-  const formatPrice = (price: string | number | null) => {
-    if (price === null || price === undefined) return "N/A"
-    const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
-    return `₦${numPrice.toLocaleString()}`
+  // Get display price string - exact copy from products page
+  const getDisplayPrice = (product: any) => {
+    // Case 1: Regular price (e.g., "20000.00")
+    if (product.price) {
+      return product.price
+    }
+    
+    // Case 2: Price range with emoji or text
+    if (product.price_range) {
+      return product.price_range
+    }
+    
+    // Case 3: Fixed price
+    if (product.fixed_price) {
+      return product.fixed_price
+    }
+    
+    // Case 4: Custom range
+    if (product.custom_range) {
+      return product.custom_range
+    }
+
+    // Fallback
+    return "Contact for price"
   }
 
   // Fetch products for this category
@@ -209,22 +230,43 @@ export default function CategoryDetailPage() {
       </div>
 
       {isLoadingProducts ? (
-        <div className={`grid grid-cols-1 ${viewMode === "grid" ? "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : ""} gap-6`}>
-          {Array.from({ length: 8 }).map((_, index) => (
-            <Skeleton key={index} className={`${viewMode === "grid" ? "h-80" : "h-32"} rounded-xl`} />
-          ))}
+        <div className={viewMode === "grid" 
+          ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+          : "space-y-4"
+        }>
+          {Array.from({ length: 8 }).map((_, index) =>
+            viewMode === "grid" ? (
+              <div
+                key={index}
+                className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
+              >
+                <div className="aspect-square bg-gray-200 dark:bg-gray-800"></div>
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2"></div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-800 rounded w-1/3"></div>
+                </div>
+              </div>
+            ) : (
+              <div
+                key={index}
+                className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
+              >
+                <div className="flex">
+                  <div className="w-32 h-32 sm:w-48 sm:h-48 bg-gray-200 dark:bg-gray-800"></div>
+                  <div className="flex-1 p-4 space-y-3">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2"></div>
+                    <div className="h-6 bg-gray-200 dark:bg-gray-800 rounded w-1/3"></div>
+                  </div>
+                </div>
+              </div>
+            )
+          )}
         </div>
       ) : (
         <>
-          {products.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                <Search className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">No products found</h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">Try adjusting your search criteria</p>
-            </div>
-          ) : viewMode === "grid" ? (
+          {viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {products.map((product) => (
                 <motion.div
@@ -237,6 +279,7 @@ export default function CategoryDetailPage() {
                     product={{
                       ...product,
                       primary_image: getProperImageUrl(product.primary_image),
+                      price: getDisplayPrice(product)
                     }} 
                   />
                 </motion.div>
@@ -244,49 +287,45 @@ export default function CategoryDetailPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {products.map((product) => (
+              {products.map((product, index) => (
                 <motion.div
                   key={product.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
                   className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 transition-all hover:border-[#f58220]/50"
                 >
-                  {/* List view product card */}
-                  <div className="flex flex-col sm:flex-row">
-                    {/* Image container - full width on mobile, fixed width on desktop */}
-                    <div className="w-full sm:w-48 h-48 sm:h-48 relative flex-shrink-0">
+                  <Link href={`/products/${product.id}`} className="flex">
+                    <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
                       <img
                         src={getProperImageUrl(product.primary_image)}
                         alt={product.name}
                         className="w-full h-full object-cover"
                       />
                     </div>
-
-                    {/* Content container */}
-                    <div className="flex-1 p-4">
-                      {/* Top row with category and university */}
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                        <div className="bg-gray-100/50 dark:bg-gray-800/50 text-xs border border-gray-200 dark:border-gray-700 rounded-full px-2 py-0.5 w-fit">
+                    <div className="flex-1 p-4 flex flex-col">
+                      <div className="flex items-center justify-between mb-1">
+                        <Badge
+                          variant="outline"
+                          className="bg-gray-100/50 dark:bg-gray-800/50 text-xs border-gray-200 truncate dark:border-gray-700"
+                        >
                           {product.category_name}
+                        </Badge>
+                        <div className="flex items-center">
+                          <span className="text-xs hidden lg:text-sm font-medium text-gray-600 dark:text-gray-400">
+                            {product.university_name}
+                          </span>
                         </div>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {product.university_name}
-                        </span>
                       </div>
-
-                      {/* Product name */}
-                      <h3 className="font-medium text-lg mb-2">{product.name}</h3>
-
-                      {/* Product details */}
-                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
-                        {product.condition.replace("_", " ")} • {product.merchant_name || "Unknown seller"}
+                      <h3 className="font-medium text-lg mb-1">{product.name}</h3>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 line-clamp-2">
+                        {product.condition.replace("_", " ")} • {product.merchant_name}
                       </p>
-
-                      {/* Bottom row with price and action button */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-auto">
+                      <div className="mt-auto flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-lg">{formatPrice(product.price)}</span>
+                          <span className="font-bold text-base">
+                            {getDisplayPrice(product)}
+                          </span>
                           {product.price_negotiable && (
                             <span className="text-xs text-gray-500 dark:text-gray-400">(Negotiable)</span>
                           )}
@@ -294,13 +333,13 @@ export default function CategoryDetailPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-[#f58220] hover:text-[#f58220]/90 hover:bg-[#f58220]/10 w-full sm:w-auto"
+                          className="text-[#f58220] hover:text-[#f58220]/90 hover:bg-[#f58220]/10"
                         >
                           View Details
                         </Button>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 </motion.div>
               ))}
             </div>

@@ -200,6 +200,11 @@ export default function ProductDetailPage() {
       }
     }
 
+    // Handle Cloudinary-only URLs
+    if (imageUrl.includes("cloudinary.com")) {
+      return imageUrl
+    }
+
     // For Appwrite URLs, add project ID query param if missing
     if (imageUrl.includes("appwrite.io")) {
       const projectId = "67f47c4200273e45c433"
@@ -266,12 +271,26 @@ export default function ProductDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <div className="container px-4 py-8 md:py-16 text-center">
-          <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>
-          <p className="text-gray-500 mb-8">The product you're looking for doesn't exist or has been removed.</p>
-          <Button asChild>
-            <Link href="/products">Browse Products</Link>
-          </Button>
+        <div className="container px-4 py-4 md:py-8">
+          <div className="flex flex-col lg:flex-row gap-4 md:gap-8 animate-pulse">
+            <div className="w-full lg:w-1/2">
+              <div className="aspect-square rounded-xl bg-gray-200"></div>
+              <div className="grid grid-cols-4 gap-2 mt-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="aspect-square rounded-lg bg-gray-200"></div>
+                ))}
+              </div>
+            </div>
+            <div className="w-full lg:w-1/2">
+              <div className="bg-white rounded-xl p-4 md:p-6 border border-gray-200 space-y-4">
+                <div className="h-8 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-200 rounded w-full"></div>
+                <div className="h-4 bg-gray-200 rounded w-full"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )

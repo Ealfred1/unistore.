@@ -97,11 +97,30 @@ export default function DashboardPage() {
     return imageUrl
   }
 
-  // Format price for display - same as in products page
-  const formatPrice = (price: string | number | null) => {
-    if (price === null || price === undefined) return "N/A"
-    const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
-    return `₦${numPrice.toLocaleString()}`
+  // Get display price string - updated to match products page exactly
+  const getDisplayPrice = (product: any) => {
+    // Case 1: Regular price (e.g., "20000.00")
+    if (product.price) {
+      return product.price
+    }
+    
+    // Case 2: Price range with emoji or text (e.g., "🏷️3500" or "Mini pack ranges from #1300-#1900")
+    if (product.price_range) {
+      return product.price_range
+    }
+    
+    // Case 3: Fixed price
+    if (product.fixed_price) {
+      return product.fixed_price
+    }
+    
+    // Case 4: Custom range
+    if (product.custom_range) {
+      return product.custom_range
+    }
+
+    // Fallback
+    return "Contact for price"
   }
 
   // Function to fetch products for a specific category
@@ -668,7 +687,8 @@ export default function DashboardPage() {
                       <ProductCard 
                         product={{
                           ...product,
-                          primary_image: getProperImageUrl(product.primary_image)
+                          primary_image: getProperImageUrl(product.primary_image),
+                          price: getDisplayPrice(product)
                         }} 
                         onFavoriteToggle={handleFavoriteToggle}
                       />
@@ -697,12 +717,12 @@ export default function DashboardPage() {
                           <div className="flex items-center justify-between mb-1">
                             <Badge
                               variant="outline"
-                              className="bg-gray-100/50 dark:bg-gray-800/50 text-xs border-gray-200 dark:border-gray-700"
+                              className="bg-gray-100/50 dark:bg-gray-800/50 text-xs border-gray-200 truncate dark:border-gray-700"
                             >
                               {product.category_name}
                             </Badge>
                             <div className="flex items-center">
-                              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                              <span className="text-xs hidden lg:text-sm font-medium text-gray-600 dark:text-gray-400">
                                 {product.university_name}
                               </span>
                             </div>
@@ -713,7 +733,9 @@ export default function DashboardPage() {
                           </p>
                           <div className="mt-auto flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-lg">{formatPrice(product.price || product.price_range)}</span>
+                              <span className="font-bold text-base">
+                                {getDisplayPrice(product)}
+                              </span>
                               {product.price_negotiable && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">(Negotiable)</span>
                               )}
@@ -852,7 +874,8 @@ export default function DashboardPage() {
                     <ProductCard 
                       product={{
                         ...product,
-                        primary_image: getProperImageUrl(product.primary_image)
+                        primary_image: getProperImageUrl(product.primary_image),
+                        price: getDisplayPrice(product)
                       }} 
                       onFavoriteToggle={handleFavoriteToggle}
                     />

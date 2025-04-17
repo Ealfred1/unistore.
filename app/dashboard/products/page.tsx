@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
+import { toast } from "@/components/ui/use-toast"
 
 export default function DashboardProductsPage() {
   const { products, categories, isLoading, fetchProducts, toggleFavorite } = useProducts()
@@ -26,32 +27,30 @@ export default function DashboardProductsPage() {
   const [pageSize, setPageSize] = useState(20)
   const [totalCount, setTotalCount] = useState(0)
 
+  // Helper function to get sort order
+  const getSortOrder = (sort: string) => {
+    switch (sort) {
+      case "newest":
+        return "-created_at"
+      case "price_low":
+        return "price"
+      case "price_high":
+        return "-price"
+      case "popular":
+        return "-view_count"
+      default:
+        return "-created_at"
+    }
+  }
+
   // Fetch products with filters and pagination
   useEffect(() => {
     const getProducts = async () => {
       const filters: Record<string, any> = {
         page: currentPage,
-        page_size: pageSize
-      }
-
-      if (searchQuery) {
-        filters.search = searchQuery
-      }
-
-      // Handle sorting
-      switch (sortBy) {
-        case "newest":
-          filters.ordering = "-created_at"
-          break
-        case "price_low":
-          filters.ordering = "price"
-          break
-        case "price_high":
-          filters.ordering = "-price"
-          break
-        case "popular":
-          filters.ordering = "-view_count"
-          break
+        page_size: pageSize,
+        ...(searchQuery && { search: searchQuery }),
+        ...(sortBy && { ordering: getSortOrder(sortBy) })
       }
 
       try {
@@ -99,38 +98,61 @@ export default function DashboardProductsPage() {
     return imageUrl
   }
 
-  // Add price formatting function
-  const formatPrice = (price: any) => {
-    if (!price) return "Contact for price"
-    
-    // If it's a number or numeric string, format it as currency
-    if (!isNaN(parseFloat(price))) {
-      return new Intl.NumberFormat('en-NG', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(parseFloat(price))
+  // Get display price string - updated to handle all cases
+  const getDisplayPrice = (product: any) => {
+    // Case 1: Regular price (e.g., "20000.00")
+    if (product.price) {
+      return product.price
     }
     
-    // Otherwise return as is (for price ranges or custom prices)
-    return price
+    // Case 2: Price range with emoji or text (e.g., "🏷️3500" or "Mini pack ranges from #1300-#1900")
+    if (product.price_range) {
+      return product.price_range
+    }
+    
+    // Case 3: Fixed price
+    if (product.fixed_price) {
+      return product.fixed_price
+    }
+    
+    // Case 4: Custom range
+    if (product.custom_range) {
+      return product.custom_range
+    }
+
+    // Fallback
+    return "Contact for price"
   }
 
-  // Add handler for favorite toggle
+  // Improved favorite toggle handler
   const handleFavoriteToggle = async (productId: number) => {
     try {
-      await toggleFavorite(productId);
-      // Optionally refresh the products list
-      const filters = {
-        page: currentPage,
-        page_size: pageSize,
-        ...(searchQuery && { search: searchQuery }),
-        ...(sortBy && { ordering: getSortOrder(sortBy) })
-      };
-      await fetchProducts(filters);
+      await toggleFavorite(productId)
+      // Update the products list immediately after toggling
+      setFilteredProducts(prevProducts => 
+        prevProducts.map(product => 
+          product.id === productId 
+            ? {...product, is_favorited: !product.is_favorited}
+            : product
+        )
+      )
+      
+      const product = filteredProducts.find(p => p.id === productId)
+      toast({
+        title: product?.is_favorited ? "Removed from favorites" : "Added to favorites",
+        description: product?.is_favorited 
+          ? "This product has been removed from your favorites"
+          : "This product has been added to your favorites",
+      })
     } catch (error) {
-      console.error("Error toggling favorite:", error);
+      console.error("Error toggling favorite:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update favorite status",
+        variant: "destructive",
+      })
     }
-  };
+  }
 
   return (
     <div className="space-y-8">
@@ -223,8 +245,12 @@ export default function DashboardProductsPage() {
               >
                 {viewMode === "grid" ? (
                   <ProductCard 
-                    product={product} 
-                    onFavoriteToggle={handleFavoriteToggle}
+                    product={{
+                      ...product,
+                      primary_image: getProperImageUrl(product.primary_image),
+                      price: getDisplayPrice(product)
+                    }} 
+                    onFavoriteToggle={() => handleFavoriteToggle(product.id)}
                   />
                 ) : (
                   <Link 
@@ -253,16 +279,16 @@ export default function DashboardProductsPage() {
                           <Badge variant="outline" className="text-xs">
                             {product.category_name}
                           </Badge>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs hidden text-gray-500 dark:text-gray-400">
                             {product.university_name}
                           </span>
                         </div>
 
                         {/* Title and Status */}
-                        <h3 className="font-medium text-base mb-1 line-clamp-1">
+                        <h3 className="font-medium text-sm mb-1 line-clamp-1">
                           {product.name}
                         </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
                           {product.condition} • {product.status}
                         </p>
                       </div>
@@ -271,7 +297,7 @@ export default function DashboardProductsPage() {
                       <div className="flex items-center justify-between mt-auto">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-base">
-                            {formatPrice(product.price)}
+                            {getDisplayPrice(product)}
                           </span>
                           {product.price_negotiable && 
                             <span className="text-xs text-gray-500">(Negotiable)</span>

@@ -129,7 +129,7 @@ export function Header() {
                   <Logo size="md" universityAbbreviation={universityAbbreviation} />
                   <SheetTrigger asChild>
                     <Button variant="ghost" size="icon">
-                      <X className="h-5 w-5" />
+                      {/* <X className="h-5 w-5" /> */}
                     </Button>
                   </SheetTrigger>
                 </div>
