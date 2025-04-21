@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { formatPrice } from "@/lib/utils"
 import { UniversityPopup } from "@/components/university-popup"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -268,42 +269,42 @@ export default function ProductsPage() {
     return imageUrl
   }
 
-  // Add this function for price formatting
-  const formatPrice = (price: string | number | null) => {
-    if (price === null || price === undefined) return "N/A"
+  // // Add this function for price formatting
+  // const formatPrice = (price: string | number | null) => {
+  //   if (price === null || price === undefined) return "N/A"
     
-    // If price is already a string with proper formatting, return as-is
-    if (typeof price === "string") {
-      // Handle "k" suffix (e.g. "13k" -> "13,000")
-      if (price.toLowerCase().endsWith('k')) {
-        const numValue = parseFloat(price.toLowerCase().replace('k', '')) * 1000
-        return numValue.toLocaleString("en-US")
-      }
+  //   // If price is already a string with proper formatting, return as-is
+  //   if (typeof price === "string") {
+  //     // Handle "k" suffix (e.g. "13k" -> "13,000")
+  //     if (price.toLowerCase().endsWith('k')) {
+  //       const numValue = parseFloat(price.toLowerCase().replace('k', '')) * 1000
+  //       return numValue.toLocaleString("en-US")
+  //     }
 
-      // If already formatted with commas, return as-is
-      if (price.includes(",")) {
-        return price
-      }
+  //     // If already formatted with commas, return as-is
+  //     if (price.includes(",")) {
+  //       return price
+  //     }
 
-      // Try parsing as number
-      const numValue = parseFloat(price)
-      if (!isNaN(numValue)) {
-        return numValue.toLocaleString("en-US", {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2
-        })
-      }
+  //     // Try parsing as number
+  //     const numValue = parseFloat(price)
+  //     if (!isNaN(numValue)) {
+  //       return numValue.toLocaleString("en-US", {
+  //         minimumFractionDigits: 0,
+  //         maximumFractionDigits: 2
+  //       })
+  //     }
 
-      // If parsing fails, return original string
-      return price
-    }
+  //     // If parsing fails, return original string
+  //     return price
+  //   }
     
-    // Handle numeric input
-    return price.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    })
-  }
+  //   // Handle numeric input
+  //   return price.toLocaleString("en-US", {
+  //     minimumFractionDigits: 0,
+  //     maximumFractionDigits: 2
+  //   })
+  // }
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">

@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { formatPrice } from "@/lib/utils"
 
 interface ProductCardProps {
   product: {
@@ -23,24 +24,6 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, onFavoriteToggle }: ProductCardProps) {
   const { id, name, price, primary_image, price_range, category_name, condition, price_negotiable, is_favorited } = product
-
-  // Format price in Naira
-  const formatPrice = (value: string | null | undefined) => {
-    if (!value) return "Price on request";
-    
-    // Check if it's a price range
-    if (value.includes("-") || value.includes("to")) {
-      return value; // Return the range as is
-    }
-    
-    // Format as Naira
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(Number.parseFloat(value));
-  }
 
   // Display price or price range
   const displayPrice = price_range || price ? formatPrice(price_range || price) : "Price on request";
