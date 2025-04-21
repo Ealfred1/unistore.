@@ -269,43 +269,6 @@ export default function ProductsPage() {
     return imageUrl
   }
 
-  // // Add this function for price formatting
-  // const formatPrice = (price: string | number | null) => {
-  //   if (price === null || price === undefined) return "N/A"
-    
-  //   // If price is already a string with proper formatting, return as-is
-  //   if (typeof price === "string") {
-  //     // Handle "k" suffix (e.g. "13k" -> "13,000")
-  //     if (price.toLowerCase().endsWith('k')) {
-  //       const numValue = parseFloat(price.toLowerCase().replace('k', '')) * 1000
-  //       return numValue.toLocaleString("en-US")
-  //     }
-
-  //     // If already formatted with commas, return as-is
-  //     if (price.includes(",")) {
-  //       return price
-  //     }
-
-  //     // Try parsing as number
-  //     const numValue = parseFloat(price)
-  //     if (!isNaN(numValue)) {
-  //       return numValue.toLocaleString("en-US", {
-  //         minimumFractionDigits: 0,
-  //         maximumFractionDigits: 2
-  //       })
-  //     }
-
-  //     // If parsing fails, return original string
-  //     return price
-  //   }
-    
-  //   // Handle numeric input
-  //   return price.toLocaleString("en-US", {
-  //     minimumFractionDigits: 0,
-  //     maximumFractionDigits: 2
-  //   })
-  // }
-
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
       {/* Header */}
@@ -329,7 +292,7 @@ export default function ProductsPage() {
         )}
       </AnimatePresence>
 
-      <div className="container py-8">
+      <div className="px-3 lg:container py-8">
         {/* Search and filters */}
         <div className="mb-6">
           <div className="flex flex-col md:flex-row gap-4 mb-4">
@@ -663,13 +626,13 @@ export default function ProductsPage() {
         {/* Results count and page size */}
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-2">
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-gray-600 text-xs lg:text-sm dark:text-gray-400">
               Showing <span className="font-medium text-gray-900 dark:text-gray-100">{filteredProducts.length}</span> of{" "}
               <span className="font-medium text-gray-900 dark:text-gray-100">{totalCount}</span> products
             </p>
 
             {totalPages > 1 && (
-              <p className="text-gray-500 dark:text-gray-500">
+              <p className="text-gray-500 text-xs lg:text-sm dark:text-gray-500">
                 • Page {currentPage} of {totalPages}
               </p>
             )}
