@@ -46,6 +46,12 @@ export class WebSocketManager {
         this.isConnecting = false;
         this.reconnectAttempts = 0;
         
+        // Notify connection established
+        const handlers = this.messageHandlers.get('connection_established');
+        if (handlers) {
+          handlers.forEach(handler => handler({ type: 'connection_established' }));
+        }
+        
         // Process any queued messages
         while (this.messageQueue.length > 0) {
           const message = this.messageQueue.shift();
@@ -76,6 +82,12 @@ export class WebSocketManager {
         console.log('WebSocket disconnected');
         this.isConnecting = false;
         this.socket = null;
+        
+        // Notify connection closed
+        const handlers = this.messageHandlers.get('connection_closed');
+        if (handlers) {
+          handlers.forEach(handler => handler({ type: 'connection_closed' }));
+        }
         
         // Clear any existing reconnect timeout
         if (this.reconnectTimeout) {

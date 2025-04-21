@@ -37,8 +37,42 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const wsRef = useRef<WebSocketManager>(WebSocketManager.getInstance())
   const [isConnected, setIsConnected] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [lastMessage, setLastMessage] = useState<Message | null>(null)
-  const pathname = usePathname()
+  const [lastMessage, setLastMessage] = useState<any>(null)
+  const { pathname } = usePathname()
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Get token from localStorage
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    wsRef.current.updateToken(token);
+    
+    // Handle connection status through message handlers
+    const handleConnect = (data: any) => {
+      console.log('WebSocket connected');
+      setIsConnected(true);
+    };
+
+    const handleDisconnect = (data: any) => {
+      console.log('WebSocket disconnected');
+      setIsConnected(false);
+    };
+
+    // Add handlers for connection status
+    wsRef.current.addMessageHandler('connection_established', handleConnect);
+    wsRef.current.addMessageHandler('connection_closed', handleDisconnect);
+
+    // Connect WebSocket
+    wsRef.current.connect();
+
+    return () => {
+      wsRef.current.removeMessageHandler('connection_established', handleConnect);
+      wsRef.current.removeMessageHandler('connection_closed', handleDisconnect);
+      wsRef.current.disconnect();
+    };
+  }, [user]);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token")

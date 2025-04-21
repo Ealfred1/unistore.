@@ -78,13 +78,12 @@ export default function ProductsPage() {
     const university = searchParams.get("university")
     if (university) {
       setSelectedUniversity(university)
-    } else {
-      // Check if university is stored in localStorage
+    } else if (!isAuthenticated) {
+      // Only check localStorage for university if user is not authenticated
       const storedUniversity = localStorage.getItem("unistore_university")
       if (storedUniversity) {
         setSelectedUniversity(storedUniversity)
       } else {
-        // Show university popup if no university is selected  bb
         setShowUniversityPopup(true)
       }
     }
@@ -93,28 +92,7 @@ export default function ProductsPage() {
     if (page) { 
       setCurrentPage(Number.parseInt(page))
     }
-  }, [searchParams])
-
-  // Handle initial university selection
-  useEffect(() => {
-    const storedUniversity = localStorage.getItem("unistore_university")
-    if (!storedUniversity) {
-      setShowUniversityPopup(true)
-    } else {
-      // Fetch products for the stored university
-      const getProducts = async () => {
-        try {
-          const response = await fetchProducts({ university: storedUniversity })
-          setFilteredProducts(response.results)
-          setTotalPages(response.total_pages)
-          setTotalCount(response.count)
-        } catch (error) {
-          console.error("Error fetching products:", error)
-        }
-      }
-      getProducts()
-    }
-  }, [])
+  }, [searchParams, isAuthenticated])
 
   // Update URL and fetch products when filters change
   useEffect(() => {
@@ -131,10 +109,23 @@ export default function ProductsPage() {
 
     const getProducts = async () => {
       try {
-        const response = await fetchProducts({
+        // Prepare filters object
+        const filters: Record<string, any> = {
           page: currentPage,
-          // ... other existing filters ...
-        })
+          search: searchQuery || undefined,
+          category: selectedCategory || undefined,
+          condition: selectedCondition || undefined,
+          min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
+          max_price: priceRange[1] < 2000 ? priceRange[1] : undefined,
+          sort_by: sortBy || undefined,
+        }
+
+        // Only include university filter for non-authenticated users
+        if (!isAuthenticated && selectedUniversity) {
+          filters.university = selectedUniversity
+        }
+
+        const response = await fetchProducts(filters)
         setFilteredProducts(response.results)
         setTotalPages(response.total_pages)
         setTotalCount(response.count)
@@ -146,7 +137,7 @@ export default function ProductsPage() {
     // Debounce the fetch to prevent multiple calls
     const timeoutId = setTimeout(getProducts, 300)
     return () => clearTimeout(timeoutId)
-  }, [currentPage, searchParams, isInitialLoad])
+  }, [currentPage, searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy, isAuthenticated, searchParams, isInitialLoad])
 
   // Update URL when page changes
   const handlePageChange = (page: number) => {
@@ -196,13 +187,18 @@ export default function ProductsPage() {
 
   // Handle university selection
   const handleSelectUniversity = async (universityId: number) => {
-    localStorage.setItem("unistore_university", String(universityId))
+    if (!isAuthenticated) {
+      localStorage.setItem("unistore_university", String(universityId))
+    }
     setShowUniversityPopup(false)
     setSelectedUniversity(String(universityId))
     
     // Fetch products for the selected university
     try {
-      const response = await fetchProducts({ university: universityId })
+      const response = await fetchProducts({ 
+        university: universityId,
+        page: currentPage 
+      })
       setFilteredProducts(response.results)
       setTotalPages(response.total_pages)
       setTotalCount(response.count)
