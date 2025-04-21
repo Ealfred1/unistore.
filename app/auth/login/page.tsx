@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
 import { Eye, EyeOff, ArrowRight, LogIn, Facebook, Twitter } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
@@ -19,6 +19,10 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const { login, isAuthenticated } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // Get the next page from URL params
+  const nextPage = searchParams.get('next') || '/dashboard'
 
   const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -54,8 +58,10 @@ export default function LoginPage() {
 
     try {
       await login({ phone_number, password })
-      toast.success("Login successful! Redirecting to dashboard...")
-      router.push("/dashboard")
+      toast.success("Login successful! Redirecting...")
+      
+      // Redirect to the next page
+      router.push(decodeURIComponent(nextPage))
     } catch (error: any) {
       console.error(error)
       

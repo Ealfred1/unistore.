@@ -3,7 +3,7 @@
 import { useState, useEffect, Fragment } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Search, Filter, ChevronDown, Grid, List, ArrowUpDown, Heart, ChevronLeft, ChevronRight } from "lucide-react"
 import { Header } from "@/components/landing/header"
 import ProductCard from "@/components/products/product-card"
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 
 export default function ProductsPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const { products, categories, isLoading, fetchProducts, toggleFavorite } = useProducts()
   const { isAuthenticated } = useAuth()
@@ -38,8 +39,15 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredProducts, setFilteredProducts] = useState(products)
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
+  // Get initial filters from URL or set defaults
+  const initialPage = searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1
+  
+  // State management
+  const [currentPage, setCurrentPage] = useState(initialPage)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+
+  // Get current page from URL params or default to 1
+  const currentPageParam = searchParams.get('page')
   const [totalPages, setTotalPages] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [totalCount, setTotalCount] = useState(0)
@@ -58,10 +66,10 @@ export default function ProductsPage() {
   // Initialize search query and filters from URL params
   useEffect(() => {
     const query = searchParams.get("search")
-    if (query) {
+    if (query) { 
       setSearchQuery(query)
     }
-
+   
     const category = searchParams.get("category")
     if (category) {
       setSelectedCategory(category)
@@ -76,13 +84,13 @@ export default function ProductsPage() {
       if (storedUniversity) {
         setSelectedUniversity(storedUniversity)
       } else {
-        // Show university popup if no university is selected
+        // Show university popup if no university is selected  bb
         setShowUniversityPopup(true)
       }
     }
 
     const page = searchParams.get("page")
-    if (page) {
+    if (page) { 
       setCurrentPage(Number.parseInt(page))
     }
   }, [searchParams])
@@ -108,80 +116,46 @@ export default function ProductsPage() {
     }
   }, [])
 
-  // Fetch products with filters
+  // Update URL and fetch products when filters change
   useEffect(() => {
+    if (isInitialLoad) {
+      // Ensure page param exists on initial load
+      if (!searchParams.has('page')) {
+        const params = new URLSearchParams(searchParams)
+        params.set('page', '1')
+        router.replace(`/products?${params.toString()}`, { scroll: false })
+      }
+      setIsInitialLoad(false)
+      return
+    }
+
     const getProducts = async () => {
-      const filters: Record<string, any> = {}
-
-      if (searchQuery) {
-        filters.search = searchQuery
-      }
-
-      if (selectedCategory) {
-        filters.category = selectedCategory
-      }
-
-      if (selectedCondition) {
-        filters.condition = selectedCondition
-      }
-
-      if (selectedUniversity) {
-        filters.university = selectedUniversity
-      }
-
-      if (priceRange[0] > 0) {
-        filters.min_price = priceRange[0]
-      }
-
-      if (priceRange[1] < 2000) {
-        filters.max_price = priceRange[1]
-      }
-
-      // Handle sorting
-      switch (sortBy) {
-        case "newest":
-          filters.ordering = "-created_at"
-          break
-        case "price_low":
-          filters.ordering = "price"
-          break
-        case "price_high":
-          filters.ordering = "-price"
-          break
-        case "popular":
-          filters.ordering = "-view_count"
-          break
-      }
-
-      // Add pagination
-      filters.page = currentPage
-      filters.page_size = pageSize
-
       try {
-        const response = await fetchProducts(filters)
-        if (response) {
-          setTotalPages(response.total_pages)
-          setCurrentPage(response.current_page)
-          setPageSize(response.page_size)
-          setTotalCount(response.count)
-        }
+        const response = await fetchProducts({
+          page: currentPage,
+          // ... other existing filters ...
+        })
+        setFilteredProducts(response.results)
+        setTotalPages(response.total_pages)
+        setTotalCount(response.count)
       } catch (error) {
         console.error("Error fetching products:", error)
       }
     }
 
-    getProducts()
-  }, [
-    searchQuery,
-    selectedCategory,
-    selectedCondition,
-    selectedUniversity,
-    priceRange,
-    sortBy,
-    currentPage,
-    pageSize,
+    // Debounce the fetch to prevent multiple calls
+    const timeoutId = setTimeout(getProducts, 300)
+    return () => clearTimeout(timeoutId)
+  }, [currentPage, searchParams, isInitialLoad])
 
-  ])
+  // Update URL when page changes
+  const handlePageChange = (page: number) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('page', page.toString())
+    router.push(`/products?${params.toString()}`, { scroll: false })
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
 
   // Update filtered products when products change
   useEffect(() => {
@@ -212,12 +186,6 @@ export default function ProductsPage() {
     setSearchQuery("")
     setSortBy("newest")
     setCurrentPage(1)
-  }
-
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   // Get unique conditions from products

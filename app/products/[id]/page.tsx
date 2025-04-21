@@ -34,6 +34,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { Header } from "@/components/landing/header"
+import { formatPrice } from "@/lib/utils"
 import { useStartConversation } from '@/utils/start-conversation'
 
 export default function ProductDetailPage() {
@@ -41,14 +42,15 @@ export default function ProductDetailPage() {
   const router = useRouter()
   const { getProductById, toggleFavorite } = useProducts()
   const { user, isAuthenticated } = useAuth()
-  const { startChatWithMerchant, isLoading, error } = useStartConversation()
+  const { startChatWithMerchant, isLoading: isStartingChat } = useStartConversation()
 
   const [product, setProduct] = useState<any>(null)
   const [similarProducts, setSimilarProducts] = useState<any[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showContactModal, setShowContactModal] = useState(false)
-  const [message, setMessage] = useState("")
+  const [message, setMessage] = useState("Hi, I'm interested in your product. Is it still available?")
   const [contactCopied, setContactCopied] = useState(false)
+  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
 
   // Fetch product data
   useEffect(() => {
@@ -103,37 +105,30 @@ export default function ProductDetailPage() {
   }
 
   // Handle contact merchant
-  const handleContactMerchant = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!message.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a message",
-        variant: "destructive",
-      })
+  const handleContactMerchant = async () => {
+    if (!isAuthenticated) {
+      const currentPath = encodeURIComponent(window.location.pathname)
+      router.push(`/auth/login?next=${currentPath}`)
       return
     }
 
+    // If we have a message dialog, show it
+    if (product?.merchant_id && product?.merchant_id !== user?.id) {
+      setIsMessageDialogOpen(true)
+    }
+  }
+
+  // Handle message submit
+  const handleMessageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!product?.merchant_id || !message.trim()) return
+    
     try {
-      if (product?.merchant_info?.id) {
-        // Store the message temporarily
-        window.initialMessage = message.trim()
-        
-        // Start conversation and get the conversation ID
-        await startChatWithMerchant(product.merchant_info.id)
-        
-        // Close modal and reset form
-        setShowContactModal(false)
-        setMessage("")
-      }
+      await startChatWithMerchant(product.merchant_id, message.trim())
+      setIsMessageDialogOpen(false)
     } catch (error) {
-      console.error('Failed to start conversation:', error)
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      })
+      console.error("Error sending message:", error)
     }
   }
 
@@ -217,27 +212,27 @@ export default function ProductDetailPage() {
     return imageUrl
   }
 
-  // Format price for display
-  const formatPrice = (price: string | number | null) => {
-    if (price === null || price === undefined) return "N/A"
+  // // Format price for display
+  // const formatPrice = (price: string | number | null) => {
+  //   if (price === null || price === undefined) return "N/A"
     
-    // If price is already a string with proper formatting, return as-is
-    if (typeof price === "string" && price.includes(",")) {
-      return price
-    }
+  //   // If price is already a string with proper formatting, return as-is
+  //   if (typeof price === "string" && price.includes(",")) {
+  //     return price
+  //   }
     
-    // Convert to number if string without formatting
-    const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
+  //   // Convert to number if string without formatting
+  //   const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
     
-    // Format with commas and preserve decimals if present
-    return numPrice.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    })
-  }
+  //   // Format with commas and preserve decimals if present
+  //   return numPrice.toLocaleString("en-US", {
+  //     minimumFractionDigits: 0,
+  //     maximumFractionDigits: 2
+  //   })
+  // }
 
   // Loading state
-  if (isLoading) {
+  if (isStartingChat) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
@@ -442,11 +437,11 @@ export default function ProductDetailPage() {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
-                  onClick={() => setShowContactModal(true)}
+                  onClick={handleContactMerchant}
                   className="flex-1 bg-[#f58220] hover:bg-[#f58220]/90 text-white"
                 >
-                  <MessageCircle className="h-5 w-5 mr-2" />
-                  Contact Seller
+                  <MessageCircle className="h-4 w-4" />
+                  {isAuthenticated ? "Message Seller" : "Login to Message Seller"}
                 </Button>
                 <Button
                   className="flex-1 border border-[#0a2472] text-[#0a2472] hover:bg-[#0a2472]/5"
@@ -580,36 +575,37 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Contact modal */}
-      <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Contact Seller</DialogTitle>
-            <DialogDescription>Send a message to the seller about this product.</DialogDescription>
+            <DialogTitle>Message Seller</DialogTitle>
+            <DialogDescription>
+              Send a message to the seller about this product.
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="flex items-center mb-4">
-            <div className="relative w-10 h-10 rounded-full overflow-hidden mr-3">
-              <Image
-                src={product.merchant_info?.profile_picture || "/placeholder.svg?height=40&width=40&text=Seller"}
-                alt={product.merchant_info?.full_name || "Seller"}
-                fill
-                className="object-cover"
-              />
+          <form onSubmit={handleMessageSubmit}>
+            <div className="flex items-center mb-4">
+              <div className="relative w-10 h-10 rounded-full overflow-hidden mr-3">
+                <Image
+                  src={product.merchant_info?.profile_picture || "/placeholder.svg?height=40&width=40&text=Seller"}
+                  alt={product.merchant_info?.full_name || "Seller"}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+              <div>
+                <h4 className="font-medium">{product.merchant_info?.full_name || "Seller"}</h4>
+                <p className="text-sm text-gray-500">{product.university_name}</p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-medium">{product.merchant_info?.full_name || "Seller"}</h4>
-              <p className="text-sm text-gray-500">{product.university_name}</p>
+
+            <div className="mb-4">
+              <h4 className="font-medium mb-1">About the product</h4>
+              <p className="text-sm text-gray-600">
+                {product.name} - ₦{formatPrice(product.price)}
+              </p>
             </div>
-          </div>
 
-          <div className="mb-4">
-            <h4 className="font-medium mb-1">About the product</h4>
-            <p className="text-sm text-gray-600">
-              {product.name} - ₦{formatPrice(product.price)}
-            </p>
-          </div>
-
-          <form onSubmit={handleContactMerchant}>
             <div className="mb-4">
               <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
                 Message
@@ -622,7 +618,7 @@ export default function ProductDetailPage() {
                 placeholder="Hi, I'm interested in your product. Is it still available?"
                 className="w-full"
                 required
-                disabled={isLoading}
+                disabled={isStartingChat}
               />
             </div>
             <div className="flex items-center text-sm text-gray-500 mb-4">
@@ -633,9 +629,9 @@ export default function ProductDetailPage() {
               <Button 
                 type="submit" 
                 className="w-full bg-[#f58220] hover:bg-[#f58220]/90 text-white"
-                disabled={isLoading}
+                disabled={isStartingChat}
               >
-                {isLoading ? (
+                {isStartingChat ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Sending...
