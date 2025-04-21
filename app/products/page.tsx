@@ -86,6 +86,27 @@ export default function ProductsPage() {
     }
   }, [searchParams])
 
+  // Handle initial university selection
+  useEffect(() => {
+    const storedUniversity = localStorage.getItem("unistore_university")
+    if (!storedUniversity) {
+      setShowUniversityPopup(true)
+    } else {
+      // Fetch products for the stored university
+      const getProducts = async () => {
+        try {
+          const response = await fetchProducts({ university: storedUniversity })
+          setFilteredProducts(response.results)
+          setTotalPages(response.total_pages)
+          setTotalCount(response.count)
+        } catch (error) {
+          console.error("Error fetching products:", error)
+        }
+      }
+      getProducts()
+    }
+  }, [])
+
   // Fetch products with filters
   useEffect(() => {
     const getProducts = async () => {
@@ -205,10 +226,20 @@ export default function ProductsPage() {
   const universities = Array.from(new Set(products.map((p) => p.university_name))).filter(Boolean)
 
   // Handle university selection
-  const handleSelectUniversity = (universityId: number) => {
-    setSelectedUniversity(universityId.toString())
-    localStorage.setItem("unistore_university", universityId.toString())
+  const handleSelectUniversity = async (universityId: number) => {
+    localStorage.setItem("unistore_university", String(universityId))
     setShowUniversityPopup(false)
+    setSelectedUniversity(String(universityId))
+    
+    // Fetch products for the selected university
+    try {
+      const response = await fetchProducts({ university: universityId })
+      setFilteredProducts(response.results)
+      setTotalPages(response.total_pages)
+      setTotalCount(response.count)
+    } catch (error) {
+      console.error("Error fetching products:", error)
+    }
   }
 
   // Fix image URL function

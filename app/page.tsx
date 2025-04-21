@@ -1,41 +1,66 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { UniversityPopup } from "@/components/university-popup"
 import { Header } from "@/components/landing/header"
 import { Hero } from "@/components/landing/hero"
+import { ProductShowcase } from "@/components/landing/product-showcase"
 import { Features } from "@/components/landing/features"
 import { HowItWorks } from "@/components/landing/how-it-works"
 import { Testimonials } from "@/components/landing/testimonials"
 import { CTA } from "@/components/landing/cta"
 import { Footer } from "@/components/landing/footer"
-export default function LandingPage() {
-  const [showUniversityPopup, setShowUniversityPopup] = useState(false)
+import { useAuth } from "@/providers/auth-provider"
 
-  // Check if it's the first visit
+export default function LandingPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { isAuthenticated } = useAuth()
+  const [showUniversityPopup, setShowUniversityPopup] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
   useEffect(() => {
-    const hasVisited = localStorage.getItem("unistore_visited")
-    if (!hasVisited) {
-      // Show popup after a short delay
-      const timer = setTimeout(() => {
+    const checkRedirection = () => {
+      const showLanding = searchParams.get("show_landing")
+      const hasVisited = localStorage.getItem("unistore_visited")
+      const hasUniversity = localStorage.getItem("unistore_university")
+
+      // If show_landing is explicitly set to "true", always show the landing page
+      if (showLanding === "true") {
+        setIsLoading(false)
+        return
+      }
+
+      // If user is authenticated or has selected a university and has visited before,
+      // redirect to products page unless explicitly showing landing
+      if ((isAuthenticated || hasUniversity) && hasVisited && showLanding !== "true") {
+        router.replace("/products")
+        return
+      }
+
+      // Show university popup for first-time visitors
+      if (!hasVisited && !hasUniversity) {
         setShowUniversityPopup(true)
-      }, 2000)
-      return () => clearTimeout(timer)
+      }
+
+      setIsLoading(false)
     }
-  }, [])
+
+    checkRedirection()
+  }, [isAuthenticated, router, searchParams])
 
   // Handle university selection
   const handleSelectUniversity = (universityId: number) => {
-    // In a real app, you would store the selected university in state/context
-    // and use it to filter products, etc.
-    console.log("Selected university:", universityId)
-
-    // Mark as visited
+    localStorage.setItem("unistore_university", String(universityId))
     localStorage.setItem("unistore_visited", "true")
-
-    // Close popup
     setShowUniversityPopup(false)
+    router.replace("/products")
+  }
+
+  if (isLoading) {
+    return null // Or a loading spinner
   }
 
   return (
@@ -55,8 +80,13 @@ export default function LandingPage() {
 
       <Header />
 
-      <motion.main initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+      <motion.main 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        transition={{ duration: 0.5 }}
+      >
         <Hero />
+        {/* <ProductShowcase /> */}
         <Features />
         <HowItWorks />
         <Testimonials />
@@ -66,4 +96,4 @@ export default function LandingPage() {
       <Footer />
     </div>
   )
-}
+} 
