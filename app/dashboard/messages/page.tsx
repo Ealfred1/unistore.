@@ -77,7 +77,7 @@ export default function MessagesPage() {
     if (currentConversation?.id && currentMessages.length > 0) {
       const lastMessage = currentMessages[currentMessages.length - 1]
       if (!isSentByMe(lastMessage) && !lastMessage.is_read) {
-        markAsRead(currentConversation.id, lastMessage.id)
+        markAsRead(currentConversation.id, lastMessage.id) 
       }
     }
   }, [currentConversation?.id, currentMessages, markAsRead])

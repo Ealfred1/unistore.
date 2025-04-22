@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
@@ -10,14 +10,12 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Home,
   User,
-  Package,
   ShoppingBag,
   Heart,
   MessageCircle,
   Bell,
   Settings,
   LogOut,
-  Search,
   Menu,
   ChevronRight,
   Grid3X3,
@@ -25,9 +23,11 @@ import {
   Plus,
   X,
   Store,
+  PanelLeft,
+  Zap,
+  Brain,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Logo } from "@/components/ui/logo"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -51,7 +51,7 @@ import { useProducts } from "@/providers/product-provider"
 import { useToast } from "@/components/ui/use-toast"
 import { useUniversities } from "@/providers/university-provider"
 import { useMessagingContext } from "@/providers/messaging-provider"
-
+import { cn } from "@/lib/utils"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, upgradeToMerchant } = useAuth()
@@ -63,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { toast } = useToast()
   const { unreadCount } = useMessagingContext()
 
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [requestForm, setRequestForm] = useState({
@@ -75,11 +75,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [merchantName, setMerchantName] = useState("")
   const [universityAbbreviation, setUniversityAbbreviation] = useState<string | null>(null)
+  const [aiButtonHovered, setAiButtonHovered] = useState(false)
 
-  // Set expanded state based on screen size
+  // Add keyboard shortcut for toggling sidebar
   useEffect(() => {
-    setExpanded(!isMobile)
-  }, [isMobile])
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "k" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault()
+        if (isMobile) {
+          setMobileOpen(!mobileOpen)
+        } else {
+          setExpanded(!expanded)
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [expanded, isMobile, mobileOpen])
 
   // Get university abbreviation
   useEffect(() => {
@@ -127,7 +140,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleUpgradeSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    
+
     try {
       await upgradeToMerchant(merchantName)
       toast({
@@ -139,14 +152,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       toast({
         title: "Error",
         description: "Failed to upgrade account. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // Navigation items - using the correct items from the snippet
+  // Handle AI button click
+  const handleAiButtonClick = () => {
+    if (user?.user_type === "MERCHANT") {
+      router.push("/dashboard/merchant-requests")
+    } else {
+      router.push("/dashboard/request-product")
+    }
+  }
+
+  // Navigation items
   const navItems = [
     {
       name: "Dashboard",
@@ -161,18 +183,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       icon: <ShoppingBag className="h-5 w-5" />,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
-      badge: "New",
     },
     // Only show My Products for merchants
-    ...(user?.user_type === "MERCHANT" ? [
-      {
-        name: "My Products",
-        href: "/dashboard/my-products",
-        icon: <Store className="h-5 w-5" />,
-        color: "text-green-600",
-        bgColor: "bg-green-100",
-      }
-    ] : []),
+    ...(user?.user_type === "MERCHANT"
+      ? [
+          {
+            name: "My Products",
+            href: "/dashboard/my-products",
+            icon: <Store className="h-5 w-5" />,
+            color: "text-green-600",
+            bgColor: "bg-green-100",
+          },
+        ]
+      : []),
     {
       name: "Saved",
       href: "/dashboard/favorites",
@@ -186,7 +209,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       icon: <MessageCircle className="h-5 w-5" />,
       color: "text-yellow-600",
       bgColor: "bg-yellow-100",
-      badge: unreadCount > 0 ? String(unreadCount) : undefined,
     },
     {
       name: "Notifications",
@@ -222,12 +244,67 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="ml-3 lg:hidden">
+          <div className="ml-12">
             <Logo size="lg" universityAbbreviation={universityAbbreviation} />
           </div>
         </div>
 
         <div className="flex items-center space-x-3">
+          {/* AI Button with animation */}
+          <motion.button
+            className="relative p-2 rounded-lg bg-gradient-to-r from-indigo-500 via-orange-500 to-indigo-500 text-white overflow-hidden"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onHoverStart={() => setAiButtonHovered(true)}
+            onHoverEnd={() => setAiButtonHovered(false)}
+            onClick={handleAiButtonClick}
+          >
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-orange-600 via-orange-300 to-purple-600"
+              animate={{
+                x: aiButtonHovered ? ["0%", "100%", "0%"] : "0%",
+              }}
+              transition={{
+                duration: 2,
+                repeat: Number.POSITIVE_INFINITY,
+                repeatType: "reverse",
+              }}
+            />
+            <motion.div className="relative flex items-center gap-1">
+              <motion.div
+                animate={{
+                  rotate: aiButtonHovered ? [0, 360] : 0,
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "linear",
+                }}
+              >
+                <Brain className="h-5 w-5" />
+              </motion.div>
+              <motion.span
+                animate={{
+                  opacity: aiButtonHovered ? 1 : 1,
+                }}
+                className="hidden sm:inline-block"
+              >
+                AI Request
+              </motion.span>
+              <motion.div
+                animate={{
+                  y: aiButtonHovered ? [-2, 2, -2] : 0,
+                }}
+                transition={{
+                  duration: 0.5,
+                  repeat: Number.POSITIVE_INFINITY,
+                }}
+              >
+                <Zap className="h-4 w-4" />
+              </motion.div>
+            </motion.div>
+          </motion.button>
+
           <button
             onClick={() => setShowRequestModal(true)}
             className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -249,7 +326,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <div className="p-2">
-                <p className="font-medium">{user?.first_name} {user?.last_name}</p>
+                <p className="font-medium">
+                  {user?.first_name} {user?.last_name}
+                </p>
                 <p className="text-xs text-gray-500">{user?.email}</p>
               </div>
               <DropdownMenuSeparator />
@@ -285,39 +364,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar */}
       <motion.div
-        className={`fixed top-0 left-0 bottom-0 z-40 w-[280px] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm ${
-          isMobile ? "pt-16" : "pt-0"
-        }`}
-        initial={isMobile ? { x: -280 } : { x: expanded ? 0 : -200 }}
-        animate={
-          isMobile
-            ? { x: mobileOpen ? 0 : -280 }
-            : { x: 0, width: expanded ? 280 : 80 }
-        }
+        className="fixed top-0 left-0 bottom-0 z-40 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm"
+        initial={isMobile ? { x: -280 } : { x: 0, width: 60 }}
+        animate={isMobile ? { x: mobileOpen ? 0 : -280, width: 280 } : { x: 0, width: expanded ? 280 : 60 }}
         transition={{ duration: 0.3 }}
       >
         <div className="flex flex-col h-full">
           {/* Sidebar header */}
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center">
-              <Logo size="lg" universityAbbreviation={universityAbbreviation} />
-              {isMobile && (
-                <button 
-                  onClick={() => setMobileOpen(false)}
-                  className="absolute top-4 right-4 p-1 rounded-full bg-gray-100 text-gray-500"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+          <div className={cn("p-4 flex items-center justify-between", isMobile ? "pt-20" : "pt-4")}>
+            {(expanded || isMobile) && (
+              <div className="flex items-center">
+                <Logo size="lg" universityAbbreviation={universityAbbreviation} />
+                {isMobile && (
+                  <button
+                    onClick={() => setMobileOpen(false)}
+                    className="absolute top-20 right-4 p-1 rounded-full bg-gray-100 text-gray-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
             {!isMobile && (
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                className={cn(
+                  "p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700",
+                  expanded ? "" : "mx-auto",
+                )}
               >
-                <ChevronRight
-                  className={`h-5 w-5 transition-transform ${expanded ? "rotate-180" : ""}`}
-                />
+                <PanelLeft className={`h-5 w-5 transition-transform ${expanded ? "" : "rotate-180"}`} />
               </button>
             )}
           </div>
@@ -325,13 +401,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* User profile */}
           <div className="px-4 py-2">
             <div className={`flex items-center ${expanded || isMobile ? "space-x-3" : "justify-center"}`}>
-              <Avatar className="h-10 w-10">
+              <Avatar className="h-10 w-10 shrink-0">
                 <AvatarImage src={user?.profile_picture || ""} alt={user?.first_name || "User"} />
                 <AvatarFallback>{getUserInitials()}</AvatarFallback>
               </Avatar>
               {(expanded || isMobile) && (
                 <div className="overflow-hidden">
-                  <p className="font-medium truncate">{user?.first_name} {user?.last_name}</p>
+                  <p className="font-medium truncate">
+                    {user?.first_name} {user?.last_name}
+                  </p>
                   <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                 </div>
               )}
@@ -340,7 +418,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Navigation */}
           <div className="flex-1 overflow-y-auto py-4 px-3 no-scrollbar">
-            <nav className="space-y-1">
+            <nav className="space-y-4">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
@@ -371,37 +449,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </motion.span>
                     )}
                   </AnimatePresence>
-
-                  {/* Badge */}
-                  {item.badge && (
-                    <AnimatePresence>
-                      {expanded || isMobile ? (  
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{ duration: 0.2 }}
-                          className="ml-auto"
-                        >
-                          <Badge variant="secondary" className="bg-red-500 text-white hover:bg-red-600">
-                            {item.badge}
-                          </Badge>
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{ duration: 0.2 }}
-                          className="absolute -top-1 -right-1"
-                        >
-                          <Badge variant="secondary" className="bg-red-500 text-white hover:bg-red-600 h-5 w-5 p-0 flex items-center justify-center rounded-full">
-                            {item.badge}
-                          </Badge>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  )}
                 </Link>
               ))}
             </nav>
@@ -461,16 +508,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )}
                 </div>
                 {user?.user_type === "PERSONAL" ? (
-                  <Button 
+                  <Button
                     className="w-full mt-3 bg-[#f58220] hover:bg-[#f58220]/90"
                     onClick={() => setShowUpgradeModal(true)}
                   >
                     Upgrade Now
                   </Button>
                 ) : (
-                  <Button 
+                  <Button
                     className="w-full mt-3 bg-[#f58220] hover:bg-[#f58220]/90"
-                    onClick={() => router.push('/dashboard/my-products')}
+                    onClick={() => router.push("/dashboard/my-products")}
                   >
                     View My Products
                   </Button>
@@ -489,7 +536,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </motion.div>
 
       {/* Main content */}
-      <main className={`pt-16 bg-white  transition-all duration-300 ${expanded ? "lg:pl-[280px]" : "lg:pl-[80px]"}`}>
+      <main className={`pt-16 bg-white transition-all duration-300 ${expanded ? "lg:pl-[280px]" : "lg:pl-[60px]"}`}>
         <div className="container p-2 lg:p-4 py-8">{children}</div>
       </main>
 
@@ -562,9 +609,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Upgrade to Merchant</DialogTitle>
-            <DialogDescription>
-              Become a merchant to start selling your products on UniStore.
-            </DialogDescription>
+            <DialogDescription>Become a merchant to start selling your products on UniStore.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpgradeSubmit}>
             <div className="space-y-4 py-2">
@@ -582,11 +627,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </div>
             <DialogFooter className="pt-4">
-              <Button 
-                type="submit" 
-                className="bg-[#f58220] hover:bg-[#f58220]/90"
-                disabled={isSubmitting}
-              >
+              <Button type="submit" className="bg-[#f58220] hover:bg-[#f58220]/90" disabled={isSubmitting}>
                 {isSubmitting ? "Upgrading..." : "Upgrade Now"}
               </Button>
             </DialogFooter>

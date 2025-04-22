@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useRef, useMemo } from 
 import { useAuth } from '@/providers/auth-provider'
 import { toast } from 'sonner'
 import { WebSocketManager } from '@/utils/websocket'
-import { usePathname } from '@/hooks/usePathname'
+import { usePathname as useNextPathname } from 'next/navigation'
 
 interface Message {
   id: string
@@ -37,34 +37,29 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const wsRef = useRef<WebSocketManager>(WebSocketManager.getInstance())
   const [isConnected, setIsConnected] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [lastMessage, setLastMessage] = useState<any>(null)
-  const { pathname } = usePathname()
+  const [lastMessage, setLastMessage] = useState<Message | null>(null)
+  const pathname = useNextPathname()
 
   useEffect(() => {
     if (!user?.id) return;
 
-    // Get token from localStorage
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
     wsRef.current.updateToken(token);
     
-    // Handle connection status through message handlers
-    const handleConnect = (data: any) => {
+    const handleConnect = () => {
       console.log('WebSocket connected');
       setIsConnected(true);
     };
 
-    const handleDisconnect = (data: any) => {
+    const handleDisconnect = () => {
       console.log('WebSocket disconnected');
       setIsConnected(false);
     };
 
-    // Add handlers for connection status
     wsRef.current.addMessageHandler('connection_established', handleConnect);
     wsRef.current.addMessageHandler('connection_closed', handleDisconnect);
-
-    // Connect WebSocket
     wsRef.current.connect();
 
     return () => {
@@ -78,19 +73,18 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem("access_token")
     if (!token || !user) return
 
-    // Update token instead of creating new instance
     wsRef.current.updateToken(token)
     
-    // Handle new messages
     const handleNewMessage = (data: any) => {
       const newMessage = data.message;
-      console.log(newMessage)
+      console.log('New message received:', newMessage);
       
-      // Only show toast if:
-      // 1. Not on messages page
-      // 2. Message is not from current user
+      // Safe check for pathname
+      const currentPath = pathname || '';
+      
+      // Only show toast if not on messages page and message is not from current user
       if (
-        !pathname.startsWith('/dashboard/messages') && 
+        !currentPath.includes('/dashboard/messages') && 
         String(newMessage.sender_id) !== String(user.id)
       ) {
         const senderName = newMessage.sender_name || 'Unknown';
@@ -119,7 +113,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         );
       }
 
-      // Only update unread count if message is not from current user
+      // Update unread count for messages not from current user
       if (String(newMessage.sender_id) !== String(user.id)) {
         setUnreadCount(prev => prev + 1);
         setLastMessage(newMessage);
@@ -131,14 +125,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     return () => {
       wsRef.current.removeMessageHandler('new_message', handleNewMessage)
     }
-  }, [user, pathname])
+  }, [user, pathname]);
 
   const markAllRead = () => {
-    // Implement mark all as read functionality
     setUnreadCount(0)
   }
 
-  // Provide WebSocket instance to children
   const contextValue = useMemo(() => ({
     wsInstance: wsRef.current,
     isConnected,
