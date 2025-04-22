@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Fragment } from "react"
 import { motion, AnimatePresence, useInView } from "framer-motion"
 import { useProducts } from "@/providers/product-provider"
 import { useAuth } from "@/providers/auth-provider"
@@ -30,8 +30,11 @@ import { Slider } from "@/components/ui/slider"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { 
     products, 
     categories, 
@@ -48,9 +51,10 @@ export default function DashboardPage() {
   const isWelcomeInView = useInView(welcomeRef, { once: false })
 
   // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(12)
-  const totalPages = Math.ceil(products.length / itemsPerPage)
+  const initialPage = searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1
+  const [currentPage, setCurrentPage] = useState(initialPage)
+  const [pageSize, setPageSize] = useState(20)
+  const [totalPages, setTotalPages] = useState(1)
 
   // State for filters
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -70,6 +74,9 @@ export default function DashboardPage() {
     total_pages: number
   }>>({});
   const [isLoadingCategory, setIsLoadingCategory] = useState<Record<string, boolean>>({});
+
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
 
   // Image handling function - same as in products page
   const getProperImageUrl = (imageUrl: string | undefined) => {
@@ -185,66 +192,105 @@ export default function DashboardPage() {
     handleTabChange();
   }, [activeTab, searchQuery, selectedCondition, selectedUniversity, priceRange, sortBy]);
 
-  // Fetch products with filters
+  // Handle page change with proper data fetching
+  const handlePageChange = async (page: number) => {
+    try {
+      // Update URL first
+      const params = new URLSearchParams(searchParams)
+      params.set('page', page.toString())
+      router.push(`/dashboard?${params.toString()}`, { scroll: false })
+
+      // Show loading state
+      setIsLoading(true)
+
+      // Fetch data for the new page
+      const filters = {
+        page,
+        search: searchQuery || undefined,
+        category: selectedCategory || undefined,
+        min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
+        max_price: priceRange[1] < 2000 ? priceRange[1] : undefined,
+        sort_by: sortBy || undefined,
+      }
+
+      const response = await fetchProducts(filters)
+      setFilteredProducts(response.results)
+      setTotalPages(response.total_pages)
+      setTotalCount(response.count)
+      setCurrentPage(page)
+
+      // Scroll to top smoothly
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (error) {
+      console.error("Error changing page:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Initial data fetch and URL sync
   useEffect(() => {
-    const getProducts = async () => {
-      const filters: Record<string, any> = {}
-
-      if (searchQuery) {
-        filters.search = searchQuery
-      }
-
-      if (selectedCategory) {
-        filters.category = selectedCategory
-      }
-
-      if (selectedCondition) {
-        filters.condition = selectedCondition
-      }
-
-      if (selectedUniversity) {
-        filters.university = selectedUniversity
-      }
-
-      if (priceRange[0] > 0) {
-        filters.price_min = priceRange[0]
-      }
-
-      if (priceRange[1] < 2000) {
-        filters.price_max = priceRange[1]
-      }
-
-      // Handle sorting
-      switch (sortBy) {
-        case "newest":
-          filters.ordering = "-created_at"
-          break
-        case "price_low":
-          filters.ordering = "price"
-          break
-        case "price_high":
-          filters.ordering = "-price"
-          break
-        case "popular":
-          filters.ordering = "-view_count"
-          break
-      }
-
+    const fetchInitialData = async () => {
       try {
-        await fetchProducts(filters)
+        setIsLoading(true)
+        const page = searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1
+        
+        const filters = {
+          page,
+          search: searchQuery || undefined,
+          category: selectedCategory || undefined,
+          min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
+          max_price: priceRange[1] < 2000 ? priceRange[1] : undefined,
+          sort_by: sortBy || undefined,
+        }
+
+        const response = await fetchProducts(filters)
+        setFilteredProducts(response.results)
+        setTotalPages(response.total_pages)
+        setTotalCount(response.count)
+        setCurrentPage(page)
       } catch (error) {
-        console.error("Error fetching products:", error)
+        console.error("Error fetching initial data:", error)
+      } finally {
+        setIsLoading(false)
+        setIsInitialLoad(false)
       }
     }
 
-    getProducts()
-  }, [searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy])
+    fetchInitialData()
+  }, [])
 
-  // Update filtered products when products change
+  // Handle filter changes
   useEffect(() => {
-    setFilteredProducts(products)
-    setCurrentPage(1) // Reset to first page when filters change
-  }, [products])
+    if (isInitialLoad) return
+
+    const updateProducts = async () => {
+      try {
+        setIsLoading(true)
+        
+        const filters = {
+          page: currentPage,
+          search: searchQuery || undefined,
+          category: selectedCategory || undefined,
+          min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
+          max_price: priceRange[1] < 2000 ? priceRange[1] : undefined,
+          sort_by: sortBy || undefined,
+        }
+
+        const response = await fetchProducts(filters)
+        setFilteredProducts(response.results)
+        setTotalPages(response.total_pages)
+        setTotalCount(response.count)
+      } catch (error) {
+        console.error("Error updating products:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    const timeoutId = setTimeout(updateProducts, 300)
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, selectedCategory, priceRange, sortBy, currentPage, isInitialLoad])
 
   // Update active filters
   useEffect(() => {
@@ -288,15 +334,9 @@ export default function DashboardPage() {
 
   // Get paginated products
   const getPaginatedProducts = () => {
-    const startIndex = (currentPage - 1) * itemsPerPage
-    const endIndex = startIndex + itemsPerPage
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
     return filteredProducts.slice(startIndex, endIndex)
-  }
-
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   // Stats (mock data)
@@ -339,6 +379,16 @@ export default function DashboardPage() {
     }
   };
 
+  // Get active filters count
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (selectedCategory) count++
+    if (selectedCondition) count++
+    if (priceRange[0] > 0 || priceRange[1] < 2000) count++
+    if (searchQuery) count++
+    return count
+  }
+
   return (
     <div className="space-y-8">
       {/* Welcome Card */}
@@ -379,7 +429,7 @@ export default function DashboardPage() {
 
       {/* Search and filters */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
@@ -389,24 +439,27 @@ export default function DashboardPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search products..."
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-[#f58220] focus:border-transparent"
             />
           </div>
-          <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex gap-2 items-center">
             <Button
               onClick={() => setShowFilters(!showFilters)}
               variant="outline"
-              className={`flex items-center gap-2 border-gray-200 dark:border-gray-700 ${showFilters ? "bg-gray-100 dark:bg-gray-800" : ""}`}
+              className="flex items-center gap-2 h-12"
             >
               <Filter className="h-5 w-5" />
               <span>Filters</span>
-              <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? "rotate-180" : ""}`} />
+              {getActiveFiltersCount() > 0 && (
+                <Badge className="ml-1 bg-[#f58220]">{getActiveFiltersCount()}</Badge>
+              )}
             </Button>
+
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="border-gray-200 dark:border-gray-700 min-w-[140px]">
+              <SelectTrigger className="w-[180px] h-12">
                 <div className="flex items-center gap-2">
                   <ArrowUpDown className="h-4 w-4" />
-                  <SelectValue placeholder="Sort" />
+                  <span>Sort by</span>
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -416,22 +469,23 @@ export default function DashboardPage() {
                 <SelectItem value="popular">Most Popular</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex h-10 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+
+            <div className="flex items-center gap-1 border rounded-lg p-1">
               <Button
-                onClick={() => setViewMode("grid")}
-                variant="ghost"
+                variant={viewMode === "grid" ? "default" : "ghost"}
                 size="icon"
-                className={`h-10 px-3 ${viewMode === "grid" ? "bg-gray-100 dark:bg-gray-800" : ""}`}
+                onClick={() => setViewMode("grid")}
+                className="h-10 w-10"
               >
-                <Grid className="h-5 w-5" />
+                <Grid className="h-4 w-4" />
               </Button>
               <Button
-                onClick={() => setViewMode("list")}
-                variant="ghost"
+                variant={viewMode === "list" ? "default" : "ghost"}
                 size="icon"
-                className={`h-10 px-3 ${viewMode === "list" ? "bg-gray-100 dark:bg-gray-800" : ""}`}
+                onClick={() => setViewMode("list")}
+                className="h-10 w-10"
               >
-                <List className="h-5 w-5" />
+                <List className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -617,60 +671,41 @@ export default function DashboardPage() {
           {/* Results count */}
           <div className="flex items-center justify-between">
             <p className="text-gray-600 dark:text-gray-400">
-              Showing <span className="font-medium">{getPaginatedProducts().length}</span> of{" "}
-              <span className="font-medium">{filteredProducts.length}</span> products
+              Showing <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> to{" "}
+              <span className="font-medium">
+                {Math.min(currentPage * pageSize, totalCount)}
+              </span> of{" "}
+              <span className="font-medium">{totalCount}</span> products
             </p>
 
-            <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+            <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
               <SelectTrigger className="w-[180px] border-gray-200 dark:border-gray-700">
                 <SelectValue placeholder="Items per page" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="12">12 per page</SelectItem>
-                <SelectItem value="24">24 per page</SelectItem>
-                <SelectItem value="48">48 per page</SelectItem>
+                <SelectItem value="20">20 per page</SelectItem>
+                <SelectItem value="40">40 per page</SelectItem>
+                <SelectItem value="60">60 per page</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Loading state */}
           {isLoading ? (
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
-                  : "space-y-4"
-              }
-            >
-              {Array.from({ length: itemsPerPage }).map((_, index) =>
-                viewMode === "grid" ? (
-                  <div
-                    key={index}
-                    className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
-                  >
-                    <div className="aspect-square bg-gray-200 dark:bg-gray-800"></div>
-                    <div className="p-4 space-y-3">
-                      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
-                      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2"></div>
-                      <div className="h-6 bg-gray-200 dark:bg-gray-800 rounded w-1/3"></div>
-                    </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {Array.from({ length: pageSize }).map((_, index) => (
+                <div
+                  key={index}
+                  className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="aspect-square bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                  <div className="p-4 space-y-3">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 animate-pulse"></div>
                   </div>
-                ) : (
-                  <div
-                    key={index}
-                    className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse"
-                  >
-                    <div className="flex">
-                      <div className="w-32 h-32 sm:w-48 sm:h-48 bg-gray-200 dark:bg-gray-800"></div>
-                      <div className="flex-1 p-4 space-y-3">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
-                        <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2"></div>
-                        <div className="h-6 bg-gray-200 dark:bg-gray-800 rounded w-1/3"></div>
-                      </div>
-                    </div>
-                  </div>
-                ),
-              )}
+                </div>
+              ))}
             </div>
           ) : (
             <>
@@ -770,67 +805,78 @@ export default function DashboardPage() {
               )}
 
               {/* Pagination */}
-              {filteredProducts.length > 0 && totalPages > 1 && (
-                <div className="flex items-center justify-center mt-8">
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className="border-gray-200 dark:border-gray-700"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
+              {totalPages > 1 && (
+                <div className="mt-8">
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Showing page {currentPage} of {totalPages}
+                    </div>
 
-                    <div className="flex items-center space-x-1">
-                      {Array.from({ length: totalPages }).map((_, index) => {
-                        const page = index + 1
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="h-10 w-10 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
 
-                        // Show first page, last page, current page, and pages around current page
-                        if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((page) => {
+                          // Show first page, last page, current page, and pages around current page
+                          return page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)
+                        })
+                        .map((page, index, array) => {
+                          // Add ellipsis
+                          if (index > 0 && array[index - 1] !== page - 1) {
+                            return (
+                              <Fragment key={`ellipsis-${page}`}>
+                                <span className="px-2 text-gray-400 dark:text-gray-500">...</span>
+                                <Button
+                                  variant={currentPage === page ? "default" : "outline"}
+                                  size="icon"
+                                  onClick={() => handlePageChange(page)}
+                                  className={`h-10 w-10 border-gray-200 dark:border-gray-700 ${
+                                    currentPage === page
+                                      ? "bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+                                      : "bg-white dark:bg-gray-800"
+                                  }`}
+                                >
+                                  {page}
+                                </Button>
+                              </Fragment>
+                            )
+                          }
+
                           return (
                             <Button
                               key={page}
                               variant={currentPage === page ? "default" : "outline"}
                               size="icon"
                               onClick={() => handlePageChange(page)}
-                              className={
+                              className={`h-10 w-10 border-gray-200 dark:border-gray-700 ${
                                 currentPage === page
-                                  ? "bg-[#f58220] hover:bg-[#f58220]/90"
-                                  : "border-gray-200 dark:border-gray-700"
-                              }
+                                  ? "bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+                                  : "bg-white dark:bg-gray-800"
+                              }`}
                             >
                               {page}
                             </Button>
                           )
-                        }
+                        })}
 
-                        // Show ellipsis for skipped pages
-                        if (
-                          (page === 2 && currentPage > 3) ||
-                          (page === totalPages - 1 && currentPage < totalPages - 2)
-                        ) {
-                          return (
-                            <span key={page} className="px-2">
-                              ...
-                            </span>
-                          )
-                        }
-
-                        return null
-                      })}
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                        className="h-10 w-10 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
-
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                      className="border-gray-200 dark:border-gray-700"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
               )}
