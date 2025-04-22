@@ -112,20 +112,19 @@ export default function ProductDetailPage() {
       return
     }
 
-    // If we have a message dialog, show it
-    if (product?.merchant_id && product?.merchant_id !== user?.id) {
+    // If we have a message dialog, show 
       setIsMessageDialogOpen(true)
-    }
+    
   }
 
   // Handle message submit
   const handleMessageSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!product?.merchant_id || !message.trim()) return
+    if (!product?.merchant_info?.id || !message.trim()) return
     
     try {
-      await startChatWithMerchant(product.merchant_id, message.trim())
+      await startChatWithMerchant(product?.merchant_info?.id, message.trim())
       setIsMessageDialogOpen(false)
     } catch (error) {
       console.error("Error sending message:", error)
@@ -580,68 +579,69 @@ export default function ProductDetailPage() {
           <DialogHeader>
             <DialogTitle>Message Seller</DialogTitle>
             <DialogDescription>
-              Send a message to the seller about this product.
+              Start a conversation with the seller about this product.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleMessageSubmit}>
-            <div className="flex items-center mb-4">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden mr-3">
-                <Image
-                  src={product.merchant_info?.profile_picture || "/placeholder.svg?height=40&width=40&text=Seller"}
-                  alt={product.merchant_info?.full_name || "Seller"}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <div>
-                <h4 className="font-medium">{product.merchant_info?.full_name || "Seller"}</h4>
-                <p className="text-sm text-gray-500">{product.university_name}</p>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <h4 className="font-medium mb-1">About the product</h4>
-              <p className="text-sm text-gray-600">
-                {product.name} - ₦{formatPrice(product.price)}
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
-                Message
-              </label>
-              <Textarea
-                id="message"
-                rows={4}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Hi, I'm interested in your product. Is it still available?"
-                className="w-full"
-                required
-                disabled={isStartingChat}
+          <div className="flex items-center mb-4">
+            <div className="relative w-10 h-10 rounded-full overflow-hidden mr-3">
+              <Image
+                src={product?.merchant_info?.profile_picture || "/placeholder.svg?height=40&width=40&text=Seller"}
+                alt={product?.merchant_info?.full_name || "Seller"}
+                fill
+                className="object-cover"
               />
             </div>
-            <div className="flex items-center text-sm text-gray-500 mb-4">
-              <AlertTriangle className="h-4 w-4 mr-2 text-amber-500" />
-              <p>Your contact details will be shared with the seller.</p>
+            <div>
+              <h4 className="font-medium">{product?.merchant_info?.full_name || "Seller"}</h4>
+              <p className="text-sm text-gray-500">{product?.university_name}</p>
             </div>
-            <DialogFooter>
-              <Button 
-                type="submit" 
-                className="w-full bg-[#f58220] hover:bg-[#f58220]/90 text-white"
-                disabled={isStartingChat}
-              >
-                {isStartingChat ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  'Send Message'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
+          </div>
+
+          <div className="mb-4">
+            <h4 className="font-medium mb-1">About the product</h4>
+            <p className="text-sm text-gray-600">
+              {product?.name} - ₦{formatPrice(product?.price)}
+            </p>
+          </div>
+
+          <div className="flex items-center text-sm text-gray-500 mb-4">
+            <AlertTriangle className="h-4 w-4 mr-2 text-amber-500" />
+            <p>Your contact details will be shared with the seller.</p>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              onClick={async () => {
+                try {
+                  if (!product?.merchant_info?.id) {
+                    throw new Error("Seller information not available");
+                  }
+                  
+                  const initialMessage = `Hi, I'm interested in your product: ${product.name}`;
+                  await startChatWithMerchant(product.merchant_info.id, initialMessage);
+                  setIsMessageDialogOpen(false);
+                } catch (error) {
+                  console.error("Failed to start chat:", error);
+                  toast({
+                    title: "Error",
+                    description: "Failed to start conversation. Please try again.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              className="w-full bg-[#f58220] hover:bg-[#f58220]/90 text-white"
+              disabled={isStartingChat}
+            >
+              {isStartingChat ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Starting Chat...
+                </>
+              ) : (
+                'Start Chat'
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

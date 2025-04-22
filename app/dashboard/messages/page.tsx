@@ -82,18 +82,28 @@ export default function MessagesPage() {
     }
   }, [currentConversation?.id, currentMessages, markAsRead])
 
-  // Handle URL parameter for conversation
+  // Handle URL parameter for conversation on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const conversationId = urlParams.get('conversation');
     
-    if (conversationId) {
+    if (conversationId && conversations.length > 0) {
+      // Find the conversation
       const conversation = conversations.find(conv => conv.id === conversationId);
       if (conversation) {
+        // Start the conversation with the merchant
         startConversation(conversation.other_user.id);
       }
     }
-  }, [conversations, startConversation]);
+  }, [conversations]);
+
+  // Update URL when conversation changes
+  useEffect(() => {
+    if (currentConversation) {
+      const newUrl = `/dashboard/messages?conversation=${currentConversation.id}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [currentConversation]);
 
   // Add debug logging
   useEffect(() => {
@@ -141,15 +151,12 @@ export default function MessagesPage() {
   }, [user]);
 
   const handleBackClick = () => {
-    // Clear everything and force a complete refresh
-    startConversation(null)
-    setKey(prevKey => prevKey + 1)
-    setNewMessage("")
-    setSearchQuery("")
-    window.location.reload()
-    window.history.replaceState({}, '', '/dashboard/messages')
-    router.refresh()
-    // getConversations() // Reload conversations list
+    startConversation(null);
+    setKey(prevKey => prevKey + 1);
+    setNewMessage("");
+    setSearchQuery("");
+    window.history.replaceState({}, '', '/dashboard/messages');
+    router.refresh();
   }
 
   const renderMessage = (message: Message) => {

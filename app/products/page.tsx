@@ -35,7 +35,7 @@ export default function ProductsPage() {
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null)
   const [selectedUniversity, setSelectedUniversity] = useState<string | null>(null)
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000])
-  const [sortBy, setSortBy] = useState<string>("newest")
+  const [sortBy, setSortBy] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredProducts, setFilteredProducts] = useState(products)
 
