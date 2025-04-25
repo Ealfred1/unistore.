@@ -446,21 +446,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onMouseEnter={() => setAiButtonHovered(true)}
             onMouseLeave={() => setAiButtonHovered(false)}
             onClick={() => router.push("/coming-soon")}
-            className="fixed bottom-20 right-6 z-50 p-4 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300"
+            className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300"
           >
             <motion.div
               animate={{ opacity: aiButtonHovered ? 0 : 1 }}
               transition={{ duration: 0.2 }}
               className="absolute inset-0 flex items-center justify-center"
             >
-              <Brain className="h-6 w-6" />
+              <Brain className="h-8 w-8" />
             </motion.div>
             <motion.div
               animate={{ opacity: aiButtonHovered ? 1 : 0 }}
               transition={{ duration: 0.2 }}
               className="absolute inset-0 flex items-center justify-center"
             >
-              <Zap className="h-6 w-6" />
+              <Zap className="h-8 w-8" />
             </motion.div>
           </motion.button>
         )}
