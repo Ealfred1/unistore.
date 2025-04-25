@@ -168,7 +168,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }
 
-  // Navigation items
+  // Navigation items with unique names/labels
   const navItems = [
     {
       name: "Dashboard",
@@ -207,15 +207,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       name: "Messages",
       href: "/dashboard/messages",
       icon: <MessageCircle className="h-5 w-5" />,
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-100",
+      color: "text-orange-600",
+      bgColor: "bg-orange-100",
+      badge: unreadCount > 0 ? unreadCount : null
     },
     {
       name: "Notifications",
-      href: "/dashboard/notifications",
+      href: "/dashboard/messages", // Temporarily routing to messages
       icon: <Bell className="h-5 w-5" />,
-      color: "text-indigo-600",
-      bgColor: "bg-indigo-100",
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
+      badge: unreadCount > 0 ? unreadCount : null
     },
     {
       name: "Profile",

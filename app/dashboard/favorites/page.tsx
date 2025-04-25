@@ -8,6 +8,8 @@ import { Heart, Search, Filter, ChevronDown, Grid, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { optimizeImageUrl } from "@/lib/image-utils"
+import { formatPrice } from "@/lib/utils"
 import { toast } from "sonner"
 import { 
   DropdownMenu, 
@@ -25,69 +27,44 @@ export default function FavoritesPage() {
   const [sortBy, setSortBy] = useState<"newest" | "price_low" | "price_high">("newest")
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Fix image URL function
-  const getProperImageUrl = (imageUrl: string | undefined) => {
-    if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
-
-    // Check if the URL contains both Appwrite and Cloudinary
-    if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
-      // Find the position of the nested https:// for cloudinary
-      const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
-      if (cloudinaryStart !== -1) {
-        // Extract everything from the cloudinary URL start
-        return imageUrl.substring(cloudinaryStart).split("/view")[0]
-      }
-    }
-
-    // For Appwrite URLs, add project ID query param if missing
-    if (imageUrl.includes("appwrite.io")) {
-      const projectId = "67f47c4200273e45c433"
-      if (!imageUrl.includes("project=")) {
-        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
-      }
-      return imageUrl
-    }
-
-    return imageUrl
-  }
 
   // Add price formatting function
-  const formatPrice = (price: string | number | null) => {
-    if (price === null || price === undefined) return "N/A"
+  // const formatPrice = (price: string | number | null) => {
+  //   if (price === null || price === undefined) return "N/A"
     
-    // If price is already a string with proper formatting
-    if (typeof price === "string") {
-      // Handle "k" suffix (e.g. "13k" -> "13,000") 
-      if (price.toLowerCase().endsWith('k')) {
-        const numValue = parseFloat(price.toLowerCase().replace('k', '')) * 1000
-        return numValue.toLocaleString("en-US")
-      }
+  //   // If price is already a string with proper formatting
+  //   if (typeof price === "string") {
+  //     // Handle "k" suffix (e.g. "13k" -> "13,000") 
+  //     if (price.toLowerCase().endsWith('k')) {
+  //       const numValue = parseFloat(price.toLowerCase().replace('k', '')) * 1000
+  //       return numValue.toLocaleString("en-US")
+  //     }
 
-      // If already formatted with commas, just return the string
-      if (price.includes(",")) {
-        // Remove any spaces
-        return price.replace(/\s/g, '')
-      }
+  //     // If already formatted with commas, just return the string
+  //     if (price.includes(",")) {
+  //       // Remove any spaces
+  //       return price.replace(/\s/g, '')
+  //     }
 
-      // Try parsing as number, preserving any decimals
-      const numValue = parseFloat(price.replace(/,/g, ''))
-      if (!isNaN(numValue)) {
-        return numValue.toLocaleString("en-US", {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2
-        })
-      }
+  //     // Try parsing as number, preserving any decimals
+  //     const numValue = parseFloat(price.replace(/,/g, ''))
+  //     if (!isNaN(numValue)) {
+  //       return numValue.toLocaleString("en-US", {
+  //         minimumFractionDigits: 0,
+  //         maximumFractionDigits: 2
+  //       })
+  //     }
 
-      // If parsing fails, return original string
-      return price
-    }
+  //     // If parsing fails, return original string
+  //     return price
+  //   }
     
-    // Handle numeric input
-    return price.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    })
-  }
+  //   // Handle numeric input
+  //   return price.toLocaleString("en-US", {
+  //     minimumFractionDigits: 0,
+  //     maximumFractionDigits: 2
+  //   })
+  // }
 
   // Fetch favorite products
   useEffect(() => {
@@ -133,7 +110,7 @@ export default function FavoritesPage() {
   })
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 px-3">
       {/* Header with controls */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -238,7 +215,7 @@ export default function FavoritesPage() {
               <ProductCard 
                 product={{
                   ...product,
-                  primary_image: getProperImageUrl(product.primary_image),
+                  primary_image: optimizeImageUrl(product.primary_image),
                   price: formatPrice(product.price || product.price_range || product.fixed_price)
                 }} 
                 viewMode={viewMode}
