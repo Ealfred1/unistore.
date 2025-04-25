@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { UniversityPopup } from "@/components/university-popup"
 import { Header } from "@/components/landing/header"
@@ -16,14 +16,20 @@ import { useAuth } from "@/providers/auth-provider"
 
 export default function LandingPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { isAuthenticated } = useAuth()
   const [showUniversityPopup, setShowUniversityPopup] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Parse URL parameters without using useSearchParams
+  const getUrlParam = (paramName: string): string | null => {
+    if (typeof window === "undefined") return null
+    const urlParams = new URLSearchParams(window.location.search)
+    return urlParams.get(paramName)
+  }
+
   useEffect(() => {
     const checkRedirection = () => {
-      const showLanding = searchParams.get("show_landing")
+      const showLanding = getUrlParam("show_landing")
       const hasVisited = localStorage.getItem("unistore_visited")
       const hasUniversity = localStorage.getItem("unistore_university")
 
@@ -49,7 +55,7 @@ export default function LandingPage() {
     }
 
     checkRedirection()
-  }, [isAuthenticated, router, searchParams])
+  }, [isAuthenticated, router])
 
   // Handle university selection
   const handleSelectUniversity = (universityId: number) => {
@@ -65,23 +71,22 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden flex flex-col relative">
-            <Header />
-          <div className="w-full h-screen flex items-center justify-center overflow-hidden">
-            <AnimatePresence>
-              {showUniversityPopup && (
-                <div className="fixed top-0 left-0 w-full h-screen inset-0 z-50 overflow-x-hidden">
-                  <UniversityPopup
-                    onClose={() => {
-                      setShowUniversityPopup(false)
-                      localStorage.setItem("unistore_visited", "true")
-                    }}
-                    onSelect={handleSelectUniversity}
-                  />
-                </div>
-              )}
-            </AnimatePresence>
+      <Header />
+      <div className="w-full h-screen flex items-center justify-center overflow-hidden">
+        <AnimatePresence>
+          {showUniversityPopup && (
+            <div className="fixed top-0 left-0 w-full h-screen inset-0 z-50 overflow-x-hidden">
+              <UniversityPopup
+                onClose={() => {
+                  setShowUniversityPopup(false)
+                  localStorage.setItem("unistore_visited", "true")
+                }}
+                onSelect={handleSelectUniversity}
+              />
             </div>
-
+          )}
+        </AnimatePresence>
+      </div>
 
       <motion.main initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
         <Hero />
@@ -94,4 +99,4 @@ export default function LandingPage() {
       <Footer />
     </div>
   )
-} 
+}
