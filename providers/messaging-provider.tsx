@@ -46,8 +46,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
-    wsRef.current.updateToken(token);
+    const ws = wsRef.current;
     
+    // Reset WebSocket instance
+    ws.cleanup();
+    ws.updateToken(token);
+
     const handleConnect = () => {
       console.log('WebSocket connected');
       setIsConnected(true);
@@ -58,16 +62,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(false);
     };
 
-    wsRef.current.addMessageHandler('connection_established', handleConnect);
-    wsRef.current.addMessageHandler('connection_closed', handleDisconnect);
-    wsRef.current.connect();
+    ws.addMessageHandler('connection_established', handleConnect);
+    ws.addMessageHandler('connection_closed', handleDisconnect);
+    ws.addMessageHandler('pong', () => console.log('Received pong'));
+
+    ws.connect();
 
     return () => {
-      wsRef.current.removeMessageHandler('connection_established', handleConnect);
-      wsRef.current.removeMessageHandler('connection_closed', handleDisconnect);
-      wsRef.current.disconnect();
+      ws.cleanup();
     };
-  }, [user]);
+  }, [user?.id]); // Only depend on user ID
 
   useEffect(() => {
     const token = localStorage.getItem("access_token")
@@ -146,4 +150,4 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-export const useMessagingContext = () => useContext(MessagingContext)
+export const useMessagingContext = () => useContext(MessagingContext) 

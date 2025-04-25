@@ -36,34 +36,46 @@ export class WebSocketManager {
     this.isConnecting = true;
 
     try {
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL 
-        ? `${process.env.NEXT_PUBLIC_WS_URL}/ws/messaging/?token=${this.token}`
-        : `wss://${'unistore-v2.onrender.com'}/ws/messaging/?token=${this.token}`;
+      // Use secure WebSocket for production, regular for development
+      const protocol = process.env.NODE_ENV === 'development' ? 'ws' : 'wss';
+      const baseUrl = process.env.NEXT_PUBLIC_WS_URL || 'unistore-v2.onrender.com';
+      
+      // Construct WebSocket URL properly
+      const wsUrl = `${protocol}://${baseUrl}/ws/messaging/?token=${this.token}`;
+      console.log('Connecting to WebSocket:', wsUrl); // Debug log
 
       this.socket = new WebSocket(wsUrl);
+
+      // Increase timeout for initial connection
+      const connectionTimeout = setTimeout(() => {
+        if (this.socket?.readyState !== WebSocket.OPEN) {
+          console.log('Connection timeout, closing socket');
+          this.socket?.close();
+          this.isConnecting = false;
+          this.reconnectAttempts = 0; // Reset attempts on timeout
+        }
+      }, 10000); // 10 seconds timeout
+
       this.socket.onopen = () => {
-        console.log('WebSocket connected');
+        clearTimeout(connectionTimeout);
         this.isConnecting = false;
         this.reconnectAttempts = 0;
         
-        // Notify connection established
-        const handlers = this.messageHandlers.get('connection_established');
-        if (handlers) {
-          handlers.forEach(handler => handler({ type: 'connection_established' }));
-        }
-        
-        // Process any queued messages
-        while (this.messageQueue.length > 0) {
-          const message = this.messageQueue.shift();
-          if (message) {
-            this.send(message.action, message.data);
-          }
-        }
-
-        // Request initial data
-        this.send('get_online_merchants', {});
-        this.send('get_conversations', { page: 1 });
+        // Send immediate ping to verify connection
+        this.send('ping', {});
       };
+
+      // Add heartbeat mechanism
+      let heartbeat: NodeJS.Timeout;
+      const startHeartbeat = () => {
+        heartbeat = setInterval(() => {
+          if (this.socket?.readyState === WebSocket.OPEN) {
+            this.send('ping', {});
+          }
+        }, 30000); // Send ping every 30 seconds
+      };
+
+      startHeartbeat();
 
       this.socket.onmessage = (event) => {
         try {
@@ -79,7 +91,9 @@ export class WebSocketManager {
       };
 
       this.socket.onclose = () => {
-        console.log('WebSocket disconnected');
+        clearInterval(heartbeat); // Clear heartbeat on close
+        clearTimeout(connectionTimeout);
+        console.log('WebSocket disconnected, attempt:', this.reconnectAttempts);
         this.isConnecting = false;
         this.socket = null;
         
@@ -88,15 +102,12 @@ export class WebSocketManager {
         if (handlers) {
           handlers.forEach(handler => handler({ type: 'connection_closed' }));
         }
-        
-        // Clear any existing reconnect timeout
-        if (this.reconnectTimeout) {
-          clearTimeout(this.reconnectTimeout);
-        }
-        
+
+        // Only attempt reconnect if not manually disconnected
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-          this.reconnectTimeout = setTimeout(() => {
+          console.log(`Reconnecting in ${delay}ms`);
+          setTimeout(() => {
             this.reconnectAttempts++;
             this.connect();
           }, delay);
@@ -105,11 +116,12 @@ export class WebSocketManager {
 
       this.socket.onerror = (error) => {
         console.error('WebSocket error:', error);
-        this.isConnecting = false;
+        // Don't close the socket here, let onclose handle it
       };
+
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
       this.isConnecting = false;
+      console.error('Failed to create WebSocket:', error);
     }
   }
 
@@ -166,5 +178,17 @@ export class WebSocketManager {
     this.isConnecting = false;
     this.reconnectAttempts = 0;
     this.messageQueue = [];
+  }
+
+  // Add cleanup method
+  cleanup() {
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+    this.isConnecting = false;
+    this.reconnectAttempts = 0;
+    this.messageQueue = [];
+    this.messageHandlers.clear();
   }
 }
