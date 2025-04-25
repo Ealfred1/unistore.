@@ -244,7 +244,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="ml-12">
+          <div className="lg:ml-12">
             <Logo size="lg" universityAbbreviation={universityAbbreviation} />
           </div>
         </div>
@@ -305,12 +305,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </motion.div>
           </motion.button>
 
-          <button
+          {/* <button
             onClick={() => setShowRequestModal(true)}
             className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             <Plus className="h-5 w-5" />
-          </button>
+          </button> */}
           <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 relative">
             <Bell className="h-5 w-5" />
             <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
@@ -371,18 +371,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <div className="flex flex-col h-full">
           {/* Sidebar header */}
-          <div className={cn("p-4 flex items-center justify-between", isMobile ? "pt-20" : "pt-4")}>
+          <div className={cn("p-4 flex items-center justify-between", isMobile ? "pt-4" : "pt-4")}>
             {(expanded || isMobile) && (
               <div className="flex items-center">
                 <Logo size="lg" universityAbbreviation={universityAbbreviation} />
-                {isMobile && (
+                {/* {isMobile && (
                   <button
                     onClick={() => setMobileOpen(false)}
                     className="absolute top-20 right-4 p-1 rounded-full bg-gray-100 text-gray-500"
                   >
                     <X className="h-4 w-4" />
                   </button>
-                )}
+                )} */}
               </div>
             )}
             {!isMobile && (

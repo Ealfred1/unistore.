@@ -156,7 +156,7 @@ export default function MessagesPage() {
     setNewMessage("");
     setSearchQuery("");
     window.history.replaceState({}, '', '/dashboard/messages');
-    router.refresh();
+    window.location.reload(); // force reload to clear params
   }
 
   const renderMessage = (message: Message) => {
@@ -287,7 +287,7 @@ export default function MessagesPage() {
                 ))}
               </div>
             </div>
-          </div>
+          </div> 
 
           {/* Scrollable Conversations List */}
           <div className="flex-1 overflow-y-auto">

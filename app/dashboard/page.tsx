@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, Fragment } from "react"
+import { useState, useEffect, useRef, Fragment, useCallback } from "react"
 import { motion, AnimatePresence, useInView } from "framer-motion"
 import { useProducts } from "@/providers/product-provider"
 import { useAuth } from "@/providers/auth-provider"
@@ -30,15 +30,14 @@ import { Slider } from "@/components/ui/slider"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { useRouter, useSearchParams } from "next/navigation"
+import { optimizeImageUrl } from "@/lib/image-utils"
+
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
   const { 
     products, 
     categories, 
-    isLoading, 
+    isLoading: apiIsLoading, 
     fetchProducts,
     getProductsByCategory,
     toggleFavorite 
@@ -50,8 +49,11 @@ export default function DashboardPage() {
   const welcomeRef = useRef(null)
   const isWelcomeInView = useInView(welcomeRef, { once: false })
 
-  // Pagination
-  const initialPage = searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1
+  // Update initial page state to use localStorage
+  const initialPage = localStorage.getItem('dashboard_page') ? 
+    parseInt(localStorage.getItem('dashboard_page')!) : 1
+
+  // Update pagination state
   const [currentPage, setCurrentPage] = useState(initialPage)
   const [pageSize, setPageSize] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
@@ -78,31 +80,10 @@ export default function DashboardPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
 
-  // Image handling function - same as in products page
-  const getProperImageUrl = (imageUrl: string | undefined) => {
-    if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
-
-    // Check if the URL contains both Appwrite and Cloudinary
-    if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
-      // Find the position of the nested https:// for cloudinary
-      const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
-      if (cloudinaryStart !== -1) {
-        // Extract everything from the cloudinary URL start
-        return imageUrl.substring(cloudinaryStart).split("/view")[0]
-      }
-    }
-
-    // For Appwrite URLs, add project ID query param if missing
-    if (imageUrl.includes("appwrite.io")) {
-      const projectId = "67f47c4200273e45c433"
-      if (!imageUrl.includes("project=")) {
-        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
-      }
-      return imageUrl
-    }
-
-    return imageUrl
-  }
+  // Rename to avoid conflict with apiIsLoading
+  const [isLoadingData, setIsLoadingData] = useState(true)
+  const fetchInProgress = useRef(false)
+  const hasInitiallyLoaded = useRef(false)
 
   // Get display price string - updated to match products page exactly
   const getDisplayPrice = (product: any) => {
@@ -192,105 +173,141 @@ export default function DashboardPage() {
     handleTabChange();
   }, [activeTab, searchQuery, selectedCondition, selectedUniversity, priceRange, sortBy]);
 
-  // Handle page change with proper data fetching
-  const handlePageChange = async (page: number) => {
+  // Update fetchProductsData function
+  const fetchProductsData = useCallback(async (fetchFilters: any) => {
+    if (fetchInProgress.current) return null
+
+    fetchInProgress.current = true
+    setIsLoadingData(true)
+
     try {
-      // Update URL first
-      const params = new URLSearchParams(searchParams)
-      params.set('page', page.toString())
-      router.push(`/dashboard?${params.toString()}`, { scroll: false })
+      const response = await fetchProducts({
+        ...fetchFilters,
+        page_size: pageSize,
+      })
 
-      // Show loading state
-      setIsLoading(true)
+      if (response) {
+        setFilteredProducts(response.results || [])
+        setTotalPages(response.total_pages || 1)
+        setTotalCount(response.count || 0)
+      }
+      return response
+    } catch (error) {
+      console.error("Error fetching products:", error)
+      setFilteredProducts([])
+      setTotalPages(1)
+      setTotalCount(0)
+    } finally {
+      setIsLoadingData(false)
+      fetchInProgress.current = false
+    }
+  }, [fetchProducts, pageSize])
 
-      // Fetch data for the new page
-      const filters = {
+  // Initial data load
+  useEffect(() => {
+    const loadInitialData = async () => {
+      if (hasInitiallyLoaded.current) return
+
+      const storedPage = localStorage.getItem("dashboard_page")
+      const page = storedPage ? parseInt(storedPage) : 1
+
+      const initialFilters = {
         page,
         search: searchQuery || undefined,
         category: selectedCategory || undefined,
-        min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
-        max_price: priceRange[1] < 2000 ? priceRange[1] : undefined,
-        sort_by: sortBy || undefined,
+        condition: selectedCondition || undefined,
+        university: selectedUniversity || undefined,
+        price_min: priceRange[0] > 0 ? priceRange[0] : undefined,
+        price_max: priceRange[1] < 2000 ? priceRange[1] : undefined,
+        ordering: getSortOrder(sortBy),
       }
 
-      const response = await fetchProducts(filters)
-      setFilteredProducts(response.results)
-      setTotalPages(response.total_pages)
-      setTotalCount(response.count)
-      setCurrentPage(page)
-
-      // Scroll to top smoothly
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    } catch (error) {
-      console.error("Error changing page:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Initial data fetch and URL sync
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setIsLoading(true)
-        const page = searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1
-        
-        const filters = {
-          page,
-          search: searchQuery || undefined,
-          category: selectedCategory || undefined,
-          min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
-          max_price: priceRange[1] < 2000 ? priceRange[1] : undefined,
-          sort_by: sortBy || undefined,
-        }
-
-        const response = await fetchProducts(filters)
-        setFilteredProducts(response.results)
-        setTotalPages(response.total_pages)
-        setTotalCount(response.count)
-        setCurrentPage(page)
-      } catch (error) {
-        console.error("Error fetching initial data:", error)
-      } finally {
-        setIsLoading(false)
-        setIsInitialLoad(false)
-      }
+      await fetchProductsData(initialFilters)
+      hasInitiallyLoaded.current = true
     }
 
-    fetchInitialData()
-  }, [])
+    loadInitialData()
+  }, []) // Empty dependency array for initial load only
 
-  // Handle filter changes
+  // Update products when filters change
   useEffect(() => {
-    if (isInitialLoad) return
+    if (isInitialLoad) {
+      setIsInitialLoad(false)
+      return
+    }
 
     const updateProducts = async () => {
-      try {
-        setIsLoading(true)
-        
-        const filters = {
-          page: currentPage,
-          search: searchQuery || undefined,
-          category: selectedCategory || undefined,
-          min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
-          max_price: priceRange[1] < 2000 ? priceRange[1] : undefined,
-          sort_by: sortBy || undefined,
-        }
+      const filters = {
+        page: currentPage,
+        category: selectedCategory || undefined,
+        condition: selectedCondition || undefined,
+        university: selectedUniversity || undefined,
+        search: searchQuery || undefined,
+        sort_by: sortBy || undefined,
+        ...(priceRange[0] > 0 && { price_min: priceRange[0] }),
+        ...(priceRange[1] < 2000 && { price_max: priceRange[1] })
+      }
 
-        const response = await fetchProducts(filters)
-        setFilteredProducts(response.results)
-        setTotalPages(response.total_pages)
-        setTotalCount(response.count)
-      } catch (error) {
-        console.error("Error updating products:", error)
-      } finally {
-        setIsLoading(false)
-      } 
+      await fetchProductsData(filters)
     }
 
-    const timeoutId = setTimeout(updateProducts, 300)
-    return () => clearTimeout(timeoutId)
-  }, [searchQuery, selectedCategory, priceRange, sortBy, currentPage, isInitialLoad])
+    const timer = setTimeout(updateProducts, 300)
+    return () => clearTimeout(timer)
+  }, [currentPage, selectedCategory, selectedCondition, selectedUniversity, searchQuery, sortBy, priceRange])
+
+  // Update handlePageChange
+  const handlePageChange = async (page: number) => {
+    setCurrentPage(page)
+    localStorage.setItem("dashboard_page", page.toString())
+
+    const filters = {
+      page,
+      category: selectedCategory || undefined,
+      condition: selectedCondition || undefined,
+      university: selectedUniversity || undefined,
+      search: searchQuery || undefined,
+      sort_by: sortBy || undefined,
+      ...(priceRange[0] > 0 && { price_min: priceRange[0] }),
+      ...(priceRange[1] < 2000 && { price_max: priceRange[1] })
+    }
+
+    await fetchProductsData(filters)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  // Update getPaginatedProducts to use filteredProducts directly
+  const getPaginatedProducts = () => {
+    return filteredProducts || []
+  }
+
+  // Add localStorage sync for filter changes
+  useEffect(() => {
+    if (selectedCategory) {
+      localStorage.setItem('dashboard_category', selectedCategory)
+    } else {
+      localStorage.removeItem('dashboard_category')
+    }
+  }, [selectedCategory])
+
+  useEffect(() => {
+    if (sortBy) {
+      localStorage.setItem('dashboard_sortBy', sortBy)
+    } else {
+      localStorage.removeItem('dashboard_sortBy')
+    }
+  }, [sortBy])
+
+  useEffect(() => {
+    if (searchQuery) {
+      localStorage.setItem('dashboard_searchQuery', searchQuery)
+    } else {
+      localStorage.removeItem('dashboard_searchQuery')
+    }
+  }, [searchQuery])
+
+  useEffect(() => {
+    localStorage.setItem('dashboard_priceRange', JSON.stringify(priceRange))
+  }, [priceRange])
 
   // Update active filters
   useEffect(() => {
@@ -331,13 +348,6 @@ export default function DashboardPage() {
 
   // Get unique universities from products
   const universities = Array.from(new Set(products.map((p) => p.university_name))).filter(Boolean)
-
-  // Get paginated products
-  const getPaginatedProducts = () => {
-    const startIndex = (currentPage - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    return filteredProducts.slice(startIndex, endIndex)
-  }
 
   // Stats (mock data)
   const stats = [
@@ -388,6 +398,9 @@ export default function DashboardPage() {
     if (searchQuery) count++
     return count
   }
+
+  // Update loading check in the ProductList component
+  const isLoadingDisplay = isLoadingData || apiIsLoading
 
   return (
     <div className="space-y-8">
@@ -691,7 +704,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Loading state */}
-          {isLoading ? (
+          {isLoadingDisplay ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {Array.from({ length: pageSize }).map((_, index) => (
                 <div
@@ -722,7 +735,7 @@ export default function DashboardPage() {
                       <ProductCard 
                         product={{
                           ...product,
-                          primary_image: getProperImageUrl(product.primary_image),
+                          primary_image: optimizeImageUrl(product.primary_image),
                           price: getDisplayPrice(product)
                         }} 
                         onFavoriteToggle={handleFavoriteToggle}
@@ -743,7 +756,7 @@ export default function DashboardPage() {
                       <Link href={`/products/${product.id}`} className="flex">
                         <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
                           <img
-                            src={getProperImageUrl(product.primary_image)}
+                            src={optimizeImageUrl(product.primary_image)}
                             alt={product.name}
                             className="w-full h-full object-cover"
                           />
@@ -791,7 +804,7 @@ export default function DashboardPage() {
               )}
 
               {/* Empty state */}
-              {filteredProducts.length === 0 && !isLoading && (
+              {filteredProducts.length === 0 && !isLoadingDisplay && (
                 <div className="text-center py-16">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                     <Search className="h-8 w-8 text-gray-400" />
@@ -920,7 +933,7 @@ export default function DashboardPage() {
                     <ProductCard 
                       product={{
                         ...product,
-                        primary_image: getProperImageUrl(product.primary_image),
+                        primary_image: optimizeImageUrl(product.primary_image),
                         price: getDisplayPrice(product)
                       }} 
                       onFavoriteToggle={handleFavoriteToggle}

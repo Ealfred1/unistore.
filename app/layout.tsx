@@ -28,7 +28,9 @@ export default function RootLayout({
           <AuthProvider>
 `          <MessagingProvider>
 `            <UniversityProvider>
-              <ProductProvider>{children}</ProductProvider>
+              <ProductProvider>
+                {children}
+              </ProductProvider>
             </UniversityProvider>
           </MessagingProvider>
           </AuthProvider>
