@@ -33,107 +33,11 @@ export default function DashboardProductsPage() {
   const [pageSize, setPageSize] = useState(20)
   const [totalCount, setTotalCount] = useState(0)
 
-  // Load stored values after component mounts
-  useEffect(() => {
-    // Load view mode
-    const storedViewMode = localStorage.getItem("dashboard_products_viewMode")
-    if (storedViewMode === "list") setViewMode("list")
-
-    // Load other stored values
-    const storedCategory = localStorage.getItem("dashboard_products_category")
-    if (storedCategory) setSelectedCategory(storedCategory)
-
-    const storedCondition = localStorage.getItem("dashboard_products_condition")
-    if (storedCondition) setSelectedCondition(storedCondition)
-
-    const storedUniversity = localStorage.getItem("dashboard_products_university")
-    if (storedUniversity) setSelectedUniversity(storedUniversity)
-
-    const storedPriceRange = localStorage.getItem("dashboard_products_priceRange")
-    if (storedPriceRange) setPriceRange(JSON.parse(storedPriceRange))
-
-    const storedSortBy = localStorage.getItem("dashboard_products_sortBy")
-    if (storedSortBy) setSortBy(storedSortBy)
-
-    const storedSearchQuery = localStorage.getItem("dashboard_products_searchQuery")
-    if (storedSearchQuery) setSearchQuery(storedSearchQuery)
-
-    const storedPage = localStorage.getItem("dashboard_products_currentPage")
-    if (storedPage) setCurrentPage(parseInt(storedPage))
-  }, [])
-
-  // Save values to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem("dashboard_products_viewMode", viewMode)
-  }, [viewMode])
-
-  useEffect(() => {
-    if (selectedCategory) {
-      localStorage.setItem("dashboard_products_category", selectedCategory)
-    } else {
-      localStorage.removeItem("dashboard_products_category")
-    }
-  }, [selectedCategory])
-
-  useEffect(() => {
-    if (selectedCondition) {
-      localStorage.setItem("dashboard_products_condition", selectedCondition)
-    } else {
-      localStorage.removeItem("dashboard_products_condition")
-    }
-  }, [selectedCondition])
-
-  useEffect(() => {
-    if (selectedUniversity) {
-      localStorage.setItem("dashboard_products_university", selectedUniversity)
-    } else {
-      localStorage.removeItem("dashboard_products_university")
-    }
-  }, [selectedUniversity])
-
-  useEffect(() => {
-    localStorage.setItem("dashboard_products_priceRange", JSON.stringify(priceRange))
-  }, [priceRange])
-
-  useEffect(() => {
-    localStorage.setItem("dashboard_products_currentPage", currentPage.toString())
-  }, [currentPage])
-
-  useEffect(() => {
-    if (sortBy) {
-      localStorage.setItem("dashboard_products_sortBy", sortBy)
-    } else {
-      localStorage.removeItem("dashboard_products_sortBy")
-    }
-  }, [sortBy])
-
-  useEffect(() => {
-    if (searchQuery) {
-      localStorage.setItem("dashboard_products_searchQuery", searchQuery)
-    } else {
-      localStorage.removeItem("dashboard_products_searchQuery")
-    }
-  }, [searchQuery])
-
-  // Helper function to get sort order
-  const getSortOrder = (sort: string) => {
-    switch (sort) {
-      case "newest":
-        return "-created_at"
-      case "price_low":
-        return "price"
-      case "price_high":
-        return "-price"
-      case "popular":
-        return "-view_count"
-      default:
-        return "-created_at"
-    }
-  }
-
   // Load initial state including page number
   useEffect(() => {
     const loadInitialData = async () => {
+      if (typeof window === 'undefined') return
+
       // Load stored values first
       const storedPage = localStorage.getItem("dashboard_products_currentPage")
       const storedCategory = localStorage.getItem("dashboard_products_category")
@@ -182,12 +86,91 @@ export default function DashboardProductsPage() {
     }
 
     loadInitialData()
-  }, []) // Empty dependency array for initial load only
+  }, [])
+
+  // Save values to localStorage - wrap in window check
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem("dashboard_products_viewMode", viewMode)
+  }, [viewMode])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (selectedCategory) {
+      localStorage.setItem("dashboard_products_category", selectedCategory)
+    } else {
+      localStorage.removeItem("dashboard_products_category")
+    }
+  }, [selectedCategory])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (selectedCondition) {
+      localStorage.setItem("dashboard_products_condition", selectedCondition)
+    } else {
+      localStorage.removeItem("dashboard_products_condition")
+    }
+  }, [selectedCondition])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (selectedUniversity) {
+      localStorage.setItem("dashboard_products_university", selectedUniversity)
+    } else {
+      localStorage.removeItem("dashboard_products_university")
+    }
+  }, [selectedUniversity])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem("dashboard_products_priceRange", JSON.stringify(priceRange))
+  }, [priceRange])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem("dashboard_products_currentPage", currentPage.toString())
+  }, [currentPage])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (sortBy) {
+      localStorage.setItem("dashboard_products_sortBy", sortBy)
+    } else {
+      localStorage.removeItem("dashboard_products_sortBy")
+    }
+  }, [sortBy])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (searchQuery) {
+      localStorage.setItem("dashboard_products_searchQuery", searchQuery)
+    } else {
+      localStorage.removeItem("dashboard_products_searchQuery")
+    }
+  }, [searchQuery])
+
+  // Helper function to get sort order
+  const getSortOrder = (sort: string) => {
+    switch (sort) {
+      case "newest":
+        return "-created_at"
+      case "price_low":
+        return "price"
+      case "price_high":
+        return "-price"
+      case "popular":
+        return "-view_count"
+      default:
+        return "-created_at"
+    }
+  }
 
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    localStorage.setItem("dashboard_products_currentPage", page.toString())
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("dashboard_products_currentPage", page.toString())
+    }
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
@@ -195,7 +178,7 @@ export default function DashboardProductsPage() {
   useEffect(() => {
     const timer = setTimeout(async () => {
       const filters = {
-        page: currentPage,
+        page: localStorage.getItem("dashboard_products_currentPage") ? parseInt(localStorage.getItem("dashboard_products_currentPage")!) : 1,
         page_size: pageSize,
         ...(searchQuery && { search: searchQuery }),
         ...(selectedCategory && { category: selectedCategory }),
@@ -220,32 +203,6 @@ export default function DashboardProductsPage() {
 
     return () => clearTimeout(timer)
   }, [currentPage, searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy, pageSize])
-
-  // Get display price string - updated to handle all cases    
-  // const getDisplayPrice = (product: any) => {
-  //   // Case 1: Regular price (e.g., "20000.00")
-  //   if (product.price) {
-  //     return product.price
-  //   }
-    
-  //   // Case 2: Price range with emoji or text (e.g., "🏷️3500" or "Mini pack ranges from #1300-#1900")
-  //   if (product.price_range) {
-  //     return product.price_range
-  //   }
-    
-  //   // Case 3: Fixed price
-  //   if (product.fixed_price) {
-  //     return product.fixed_price
-  //   }
-    
-  //   // Case 4: Custom range
-  //   if (product.custom_range) {
-  //     return product.custom_range
-  //   }
-
-  //   // Fallback
-  //   return "Contact for price"
-  // }
 
   // Improved favorite toggle handler
   const handleFavoriteToggle = async (productId: number) => {
@@ -287,13 +244,15 @@ export default function DashboardProductsPage() {
     setSearchQuery("")
     setCurrentPage(1)
     
-    // Clear localStorage
-    localStorage.removeItem("dashboard_products_category")
-    localStorage.removeItem("dashboard_products_condition")
-    localStorage.removeItem("dashboard_products_university")
-    localStorage.removeItem("dashboard_products_priceRange")
-    localStorage.removeItem("dashboard_products_sortBy")
-    localStorage.removeItem("dashboard_products_searchQuery")
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("dashboard_products_category")
+      localStorage.removeItem("dashboard_products_condition")
+      localStorage.removeItem("dashboard_products_university")
+      localStorage.removeItem("dashboard_products_priceRange")
+      localStorage.removeItem("dashboard_products_sortBy")
+      localStorage.removeItem("dashboard_products_searchQuery")
+      localStorage.removeItem("dashboard_products_currentPage")
+    }
   }
 
   return (

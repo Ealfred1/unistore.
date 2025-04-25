@@ -49,12 +49,8 @@ export default function DashboardPage() {
   const welcomeRef = useRef(null)
   const isWelcomeInView = useInView(welcomeRef, { once: false })
 
-  // Update initial page state to use localStorage
-  const initialPage = localStorage.getItem('dashboard_page') ? 
-    parseInt(localStorage.getItem('dashboard_page')!) : 1
-
-  // Update pagination state
-  const [currentPage, setCurrentPage] = useState(initialPage)
+  // Update initial page state to use safe localStorage access
+  const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
 
@@ -84,6 +80,31 @@ export default function DashboardPage() {
   const [isLoadingData, setIsLoadingData] = useState(true)
   const fetchInProgress = useRef(false)
   const hasInitiallyLoaded = useRef(false)
+
+  // Load stored values after component mounts
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const storedPage = localStorage.getItem('dashboard_page')
+    if (storedPage) {
+      setCurrentPage(parseInt(storedPage))
+    }
+  }, [])
+
+  // Update pagination state
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem('dashboard_page', currentPage.toString())
+  }, [currentPage])
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboard_page', page.toString())
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   // Get display price string - updated to match products page exactly
   const getDisplayPrice = (product: any) => {
@@ -254,94 +275,6 @@ export default function DashboardPage() {
     const timer = setTimeout(updateProducts, 300)
     return () => clearTimeout(timer)
   }, [currentPage, selectedCategory, selectedCondition, selectedUniversity, searchQuery, sortBy, priceRange])
-
-  // Update handlePageChange
-  const handlePageChange = async (page: number) => {
-    setCurrentPage(page)
-    localStorage.setItem("dashboard_page", page.toString())
-
-    const filters = {
-      page,
-      category: selectedCategory || undefined,
-      condition: selectedCondition || undefined,
-      university: selectedUniversity || undefined,
-      search: searchQuery || undefined,
-      sort_by: sortBy || undefined,
-      ...(priceRange[0] > 0 && { price_min: priceRange[0] }),
-      ...(priceRange[1] < 2000 && { price_max: priceRange[1] })
-    }
-
-    await fetchProductsData(filters)
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
-
-  // Update getPaginatedProducts to use filteredProducts directly
-  const getPaginatedProducts = () => {
-    return filteredProducts || []
-  }
-
-  // Add localStorage sync for filter changes
-  useEffect(() => {
-    if (selectedCategory) {
-      localStorage.setItem('dashboard_category', selectedCategory)
-    } else {
-      localStorage.removeItem('dashboard_category')
-    }
-  }, [selectedCategory])
-
-  useEffect(() => {
-    if (sortBy) {
-      localStorage.setItem('dashboard_sortBy', sortBy)
-    } else {
-      localStorage.removeItem('dashboard_sortBy')
-    }
-  }, [sortBy])
-
-  useEffect(() => {
-    if (searchQuery) {
-      localStorage.setItem('dashboard_searchQuery', searchQuery)
-    } else {
-      localStorage.removeItem('dashboard_searchQuery')
-    }
-  }, [searchQuery])
-
-  useEffect(() => {
-    localStorage.setItem('dashboard_priceRange', JSON.stringify(priceRange))
-  }, [priceRange])
-
-  // Update active filters
-  useEffect(() => {
-    const filters = []
-
-    if (selectedCategory) {
-      const category = categories.find((c) => c.id.toString() === selectedCategory)
-      if (category) filters.push(`Category: ${category.name}`)
-    }
-
-    if (selectedCondition) {
-      filters.push(`Condition: ${selectedCondition.replace("_", " ")}`)
-    }
-
-    if (selectedUniversity) {
-      filters.push(`University: ${selectedUniversity}`)
-    }
-
-    if (priceRange[0] > 0 || priceRange[1] < 2000) {
-      filters.push(`Price: $${priceRange[0]} - $${priceRange[1]}`)
-    }
-
-    setActiveFilters(filters)
-  }, [selectedCategory, selectedCondition, selectedUniversity, priceRange, categories])
-
-  // Reset filters
-  const handleResetFilters = () => {
-    setSelectedCategory(null)
-    setSelectedCondition(null)
-    setSelectedUniversity(null)
-    setPriceRange([0, 2000])
-    setSearchQuery("")
-    setSortBy("newest")
-  }
 
   // Get unique conditions from products
   const conditions = Array.from(new Set(products.map((p) => p.condition))).filter(Boolean)
@@ -518,7 +451,14 @@ export default function DashboardPage() {
               </Badge>
             ))}
             <Button
-              onClick={handleResetFilters}
+              onClick={() => {
+                setSelectedCategory(null)
+                setSelectedCondition(null)
+                setSelectedUniversity(null)
+                setPriceRange([0, 2000])
+                setSearchQuery("")
+                setSortBy("newest")
+              }}
               variant="ghost"
               size="sm"
               className="text-[#f58220] hover:text-[#f58220]/90 hover:bg-[#f58220]/10 h-7 px-2"
@@ -647,7 +587,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-end mt-6">
                   <Button
-                    onClick={handleResetFilters}
+                    onClick={() => {
+                      setSelectedCategory(null)
+                      setSelectedCondition(null)
+                      setSelectedUniversity(null)
+                      setPriceRange([0, 2000])
+                      setSearchQuery("")
+                      setSortBy("newest")
+                    }}
                     variant="outline"
                     className="border-gray-200 dark:border-gray-700"
                   >
@@ -725,7 +672,7 @@ export default function DashboardPage() {
               {/* Products grid */}
               {viewMode === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {getPaginatedProducts().map((product) => (
+                  {filteredProducts.map((product) => (
                     <motion.div
                       key={product.id}
                       initial={{ opacity: 0, y: 20 }}
@@ -745,7 +692,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {getPaginatedProducts().map((product, index) => (
+                  {filteredProducts.map((product, index) => (
                     <motion.div
                       key={product.id}
                       initial={{ opacity: 0, y: 20 }}
@@ -811,7 +758,14 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="text-lg font-medium mb-2">No products found</h3>
                   <p className="text-gray-500 dark:text-gray-400 mb-6">Try adjusting your search or filter criteria</p>
-                  <Button onClick={handleResetFilters} className="bg-[#f58220] hover:bg-[#f58220]/90">
+                  <Button onClick={() => {
+                    setSelectedCategory(null)
+                    setSelectedCondition(null)
+                    setSelectedUniversity(null)
+                    setPriceRange([0, 2000])
+                    setSearchQuery("")
+                    setSortBy("newest")
+                  }} className="bg-[#f58220] hover:bg-[#f58220]/90">
                     Reset Filters
                   </Button>
                 </div>
@@ -948,7 +902,14 @@ export default function DashboardPage() {
                 </div>
                 <h3 className="text-lg font-medium mb-2">No products found in this category</h3>
                 <p className="text-gray-500 dark:text-gray-400 mb-6">Try adjusting your search or filter criteria</p>
-                <Button onClick={handleResetFilters} className="bg-[#f58220] hover:bg-[#f58220]/90">
+                <Button onClick={() => {
+                  setSelectedCategory(null)
+                  setSelectedCondition(null)
+                  setSelectedUniversity(null)
+                  setPriceRange([0, 2000])
+                  setSearchQuery("")
+                  setSortBy("newest")
+                }} className="bg-[#f58220] hover:bg-[#f58220]/90">
                   Reset Filters
                 </Button>
               </div>
