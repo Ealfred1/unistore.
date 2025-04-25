@@ -27,36 +27,66 @@ export default function ProductsPage() {
   const [showUniversityPopup, setShowUniversityPopup] = useState(false)
   const [isProductsLoading, setIsProductsLoading] = useState(true)
 
+  // Initialize with default values
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selectedCondition, setSelectedCondition] = useState<string | null>(null)
+  const [selectedUniversity, setSelectedUniversity] = useState<string | null>(null)
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000])
+  const [sortBy, setSortBy] = useState<string>("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Load stored values after component mounts
+  useEffect(() => {
+    // Load view mode
+    const storedViewMode = localStorage.getItem("unistore_viewMode")
+    if (storedViewMode === "list") setViewMode("list")
+
+    // Load other stored values
+    const storedCategory = localStorage.getItem("unistore_category")
+    if (storedCategory) setSelectedCategory(storedCategory)
+
+    const storedCondition = localStorage.getItem("unistore_condition")
+    if (storedCondition) setSelectedCondition(storedCondition)
+
+    const storedUniversity = localStorage.getItem("unistore_university")
+    if (storedUniversity) setSelectedUniversity(storedUniversity)
+
+    const storedPriceRange = localStorage.getItem("unistore_priceRange")
+    if (storedPriceRange) setPriceRange(JSON.parse(storedPriceRange))
+
+    const storedSortBy = localStorage.getItem("unistore_sortBy")
+    if (storedSortBy) setSortBy(storedSortBy)
+
+    const storedSearchQuery = localStorage.getItem("unistore_searchQuery")
+    if (storedSearchQuery) setSearchQuery(storedSearchQuery)
+
+    const storedPage = localStorage.getItem("unistore_currentPage")
+    if (storedPage) setCurrentPage(parseInt(storedPage))
+  }, [])
+
   // State for UI
-  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
-    const stored = localStorage.getItem("unistore_viewMode")
-    return (stored === "list" ? "list" : "grid") as "grid" | "list"
-  })
   const [showFilters, setShowFilters] = useState(false)
 
   // State for filters
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(() =>
-    localStorage.getItem("unistore_category")
-  )
-  const [selectedCondition, setSelectedCondition] = useState<string | null>(() =>
-    localStorage.getItem("unistore_condition")
-  )
-  const [selectedUniversity, setSelectedUniversity] = useState<string | null>(() =>
-    localStorage.getItem("unistore_university")
-  )
-  const [priceRange, setPriceRange] = useState<[number, number]>(() => {
-    const stored = localStorage.getItem("unistore_priceRange")
-    return stored ? JSON.parse(stored) : [0, 2000]
-  })
-  const [sortBy, setSortBy] = useState<string>(() =>
-    localStorage.getItem("unistore_sortBy") || ""
-  )
-  const [searchQuery, setSearchQuery] = useState(() =>
-    localStorage.getItem("unistore_searchQuery") || ""
-  )
-  const [currentPage, setCurrentPage] = useState(() =>
-    parseInt(localStorage.getItem("unistore_currentPage") || "1")
-  )
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
+
+  // Active filters count
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (selectedCategory) count++
+    if (selectedCondition) count++
+    if (selectedUniversity) count++
+    if (priceRange[0] > 0 || priceRange[1] < 2000) count++
+    if (searchQuery) count++
+    return count
+  }
+
+  // State management
+  const [filteredProducts, setFilteredProducts] = useState(products)
 
   // Update localStorage when states change
   useEffect(() => {
@@ -117,50 +147,6 @@ export default function ProductsPage() {
     localStorage.setItem("unistore_currentPage", page.toString())
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
-
-  // State management
-  const [filteredProducts, setFilteredProducts] = useState(products)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
-
-  // Active filters count
-  const getActiveFiltersCount = () => {
-    let count = 0
-    if (selectedCategory) count++
-    if (selectedCondition) count++
-    if (selectedUniversity) count++
-    if (priceRange[0] > 0 || priceRange[1] < 2000) count++
-    if (searchQuery) count++
-    return count
-  }
-
-  // Initialize from localStorage instead of URL params
-  useEffect(() => {
-    const query = localStorage.getItem("unistore_searchQuery")
-    if (query) {
-      setSearchQuery(query)
-    }
-   
-    const category = localStorage.getItem("unistore_category")
-    if (category) {
-      setSelectedCategory(category)
-    }
-
-    const university = localStorage.getItem("unistore_university")
-    if (!isAuthenticated) {
-      if (university) {
-        setSelectedUniversity(university)
-      } else {
-        setShowUniversityPopup(true)
-      }
-    }
-
-    const page = localStorage.getItem("unistore_currentPage")
-    if (page) {
-      setCurrentPage(Number.parseInt(page))
-    }
-  }, [isAuthenticated])
 
   // Update products when filters change
   const [isInitialLoad, setIsInitialLoad] = useState(true)

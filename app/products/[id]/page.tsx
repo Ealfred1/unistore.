@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
@@ -19,7 +17,7 @@ import {
   AlertTriangle,
   Loader2,
 } from "lucide-react"
-import Navbar from "@/components/navbar"
+import { Header } from "@/components/landing/header"
 import { useProducts } from "@/providers/product-provider"
 import { useAuth } from "@/providers/auth-provider"
 import { Button } from "@/components/ui/button"
@@ -31,13 +29,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
-import { Header } from "@/components/landing/header"
 import { formatPrice } from "@/lib/utils"
-import { useStartConversation } from '@/utils/start-conversation'
+import { useStartConversation } from "@/utils/start-conversation"
 
-export default function ProductDetailPage() {
+export default function ProductDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const { getProductById, toggleFavorite } = useProducts()
@@ -47,10 +43,9 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<any>(null)
   const [similarProducts, setSimilarProducts] = useState<any[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [showContactModal, setShowContactModal] = useState(false)
-  const [message, setMessage] = useState("Hi, I'm interested in your product. Is it still available?")
   const [contactCopied, setContactCopied] = useState(false)
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Fetch product data
   useEffect(() => {
@@ -66,15 +61,18 @@ export default function ProductDetailPage() {
         setProduct(productData)
 
         // Fetch similar products (same category)
-        if (productData.category) {
+        if (productData?.category) {
           const response = await fetch(`/api/products/products/?category=${productData.category}&limit=4`)
           const data = await response.json()
           // Filter out the current product
           const filtered = data.results.filter((p: any) => p.id !== productId)
           setSimilarProducts(filtered.slice(0, 3))
         }
+
+        setIsLoading(false)
       } catch (error) {
         console.error("Error fetching product:", error)
+        setIsLoading(false)
       }
     }
 
@@ -104,43 +102,17 @@ export default function ProductDetailPage() {
     }
   }
 
-  // // Handle contact merchant
-  // const handleContactMerchant = async () => {
-  //   if (!isAuthenticated) {
-  //     const currentPath = encodeURIComponent(window.location.pathname)
-  //     router.push(`/auth/login?next=${currentPath}`)
-  //     return
-  //   }
-    
-  //   // If we have a message dialog, show 
-  //     setIsMessageDialogOpen(true)
-    
-  // }
-
+  // Handle contact merchant
   const handleContactMerchant = async () => {
     if (!isAuthenticated) {
-      // Store the current path in localStorage instead of using URL params 
+      // Store current path in localStorage instead of URL params
       localStorage.setItem("unistore_redirect_after_login", window.location.pathname)
-      router.push("/auth/login")
+      router.push(`/auth/login`)
       return
     }
-    
-    // If we have a message dialog, show
-    setIsMessageDialogOpen(true)
-  }
 
-  // Handle message submit
-  const handleMessageSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!product?.merchant_info?.id || !message.trim()) return
-    
-    try {
-      await startChatWithMerchant(product?.merchant_info?.id, message.trim())
-      setIsMessageDialogOpen(false)
-    } catch (error) {
-      console.error("Error sending message:", error)
-    }
+    // Show message dialog
+    setIsMessageDialogOpen(true)
   }
 
   // Copy contact number
@@ -192,65 +164,46 @@ export default function ProductDetailPage() {
     }
   }
 
-    // Get proper image URL function
-    const getProperImageUrl = (imageUrl: string | undefined) => {
-      if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
-  
-      // Handle case where Appwrite URL contains a Cloudinary URL
-      if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
-        const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
-        if (cloudinaryStart !== -1) {
-          // Extract the Cloudinary URL and remove the "/view" part if present
-          let cloudinaryUrl = imageUrl.substring(cloudinaryStart)
-  
-          // Remove the "/view" and anything after it (like query parameters)
-          if (cloudinaryUrl.includes("/view")) {
-            cloudinaryUrl = cloudinaryUrl.split("/view")[0]
-          }
-  
-          // For HEIC images, convert to auto format for better browser compatibility
-          if (cloudinaryUrl.toLowerCase().endsWith(".heic")) {
-            // Replace the file extension with auto format for Cloudinary
-            cloudinaryUrl = cloudinaryUrl.replace(/\.heic$/i, ".jpg")
-          }
-  
-          return cloudinaryUrl
+  // Get proper image URL function
+  const getProperImageUrl = (imageUrl: string | undefined) => {
+    if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
+
+    // Handle case where Appwrite URL contains a Cloudinary URL
+    if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
+      const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
+      if (cloudinaryStart !== -1) {
+        // Extract the Cloudinary URL and remove the "/view" part if present
+        let cloudinaryUrl = imageUrl.substring(cloudinaryStart)
+
+        // Remove the "/view" and anything after it (like query parameters)
+        if (cloudinaryUrl.includes("/view")) {
+          cloudinaryUrl = cloudinaryUrl.split("/view")[0]
         }
-      }
-  
-      // Handle regular Appwrite URLs
-      if (imageUrl.includes("appwrite.io")) {
-        const projectId = "67f47c4200273e45c433"
-        if (!imageUrl.includes("project=")) {
-          return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+
+        // For HEIC images, convert to auto format for better browser compatibility
+        if (cloudinaryUrl.toLowerCase().endsWith(".heic")) {
+          // Replace the file extension with auto format for Cloudinary
+          cloudinaryUrl = cloudinaryUrl.replace(/\.heic$/i, ".jpg")
         }
-        return imageUrl
+
+        return cloudinaryUrl
       }
-  
-      return imageUrl
     }
 
-  // // Format price for display
-  // const formatPrice = (price: string | number | null) => {
-  //   if (price === null || price === undefined) return "N/A"
+    // Handle regular Appwrite URLs
+    if (imageUrl.includes("appwrite.io")) {
+      const projectId = "67f47c4200273e45c433"
+      if (!imageUrl.includes("project=")) {
+        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+      }
+      return imageUrl
+    }
     
-  //   // If price is already a string with proper formatting, return as-is
-  //   if (typeof price === "string" && price.includes(",")) {
-  //     return price
-  //   }
-    
-  //   // Convert to number if string without formatting
-  //   const numPrice = typeof price === "string" ? Number.parseFloat(price) : price
-    
-  //   // Format with commas and preserve decimals if present
-  //   return numPrice.toLocaleString("en-US", {
-  //     minimumFractionDigits: 0,
-  //     maximumFractionDigits: 2
-  //   })
-  // }
+    return imageUrl
+  }
 
   // Loading state
-  if (isStartingChat) {
+  if (isLoading || isStartingChat) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -285,24 +238,15 @@ export default function ProductDetailPage() {
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="container px-4 py-4 md:py-8">
-          <div className="flex flex-col lg:flex-row gap-4 md:gap-8 animate-pulse">
-            <div className="w-full lg:w-1/2">
-              <div className="aspect-square rounded-xl bg-gray-200"></div>
-              <div className="grid grid-cols-4 gap-2 mt-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="aspect-square rounded-lg bg-gray-200"></div>
-                ))}
-              </div>
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="h-8 w-8 text-red-500" />
             </div>
-            <div className="w-full lg:w-1/2">
-              <div className="bg-white rounded-xl p-4 md:p-6 border border-gray-200 space-y-4">
-                <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-200 rounded w-full"></div>
-                <div className="h-4 bg-gray-200 rounded w-full"></div>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-              </div>
-            </div>
+            <h2 className="text-xl font-bold mb-2">Product Not Found</h2>
+            <p className="text-gray-600 mb-6">The product you're looking for doesn't exist or has been removed.</p>
+            <Button onClick={() => router.push("/products")} className="bg-[#f58220] hover:bg-[#f58220]/90">
+              Browse Products
+            </Button>
           </div>
         </div>
       </div>
@@ -382,17 +326,15 @@ export default function ProductDetailPage() {
 
               <div className="flex items-baseline mb-4">
                 <span className="text-2xl md:text-3xl font-bold">
-                  {product.price ? (
-                    `₦${formatPrice(product.price)}`
-                  ) : product.price_range ? (
-                    `₦${formatPrice(product.price_range)}`
-                  ) : product.fixed_price ? (
-                    `₦${formatPrice(product.fixed_price)}`
-                  ) : product.custom_range ? (
-                    product.custom_range
-                  ) : (
-                    "Contact for price"
-                  )}
+                  {product.price
+                    ? `₦${formatPrice(product.price)}`
+                    : product.price_range
+                      ? `₦${formatPrice(product.price_range)}`
+                      : product.fixed_price
+                        ? `₦${formatPrice(product.fixed_price)}`
+                        : product.custom_range
+                          ? product.custom_range
+                          : "Contact for price"}
                 </span>
                 {product.price_negotiable && <span className="ml-2 text-sm text-gray-500">(Negotiable)</span>}
               </div>
@@ -445,7 +387,9 @@ export default function ProductDetailPage() {
                     />
                   </div>
                   <div>
-                    <h3 className="font-medium">{product.merchant_info.first_name} {product.merchant_info.last_name}</h3>
+                    <h3 className="font-medium">
+                      {product.merchant_info.first_name} {product.merchant_info.last_name}
+                    </h3>
                     <p className="text-sm text-gray-500">
                       Member since {new Date(product.merchant_info.date_joined).getFullYear()}
                     </p>
@@ -458,7 +402,7 @@ export default function ProductDetailPage() {
                   onClick={handleContactMerchant}
                   className="flex-1 bg-[#f58220] hover:bg-[#f58220]/90 text-white"
                 >
-                  <MessageCircle className="h-4 w-4" />
+                  <MessageCircle className="h-4 w-4 mr-2" />
                   {isAuthenticated ? "Message Seller" : "Login to Message Seller"}
                 </Button>
                 <Button
@@ -564,7 +508,8 @@ export default function ProductDetailPage() {
                         <Image
                           src={
                             getProperImageUrl(product.primary_image) ||
-                            "/placeholder.svg?height=200&width=200&text=No+Image"
+                            "/placeholder.svg?height=200&width=200&text=No+Image" ||
+                            "/placeholder.svg"
                           }
                           alt={product.name}
                           fill
@@ -592,14 +537,12 @@ export default function ProductDetailPage() {
         )}
       </div>
 
-      {/* Contact modal */}
+      {/* Message dialog */}
       <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Message Seller</DialogTitle>
-            <DialogDescription>
-              Start a conversation with the seller about this product.
-            </DialogDescription>
+            <DialogDescription>Start a conversation with the seller about this product.</DialogDescription>
           </DialogHeader>
           <div className="flex items-center mb-4">
             <div className="relative w-10 h-10 rounded-full overflow-hidden mr-3">
@@ -629,23 +572,23 @@ export default function ProductDetailPage() {
           </div>
 
           <DialogFooter>
-            <Button 
+            <Button
               onClick={async () => {
                 try {
                   if (!product?.merchant_info?.id) {
-                    throw new Error("Seller information not available");
+                    throw new Error("Seller information not available")
                   }
-                  
-                  const initialMessage = `Hi, I'm interested in your product: ${product.name}`;
-                  await startChatWithMerchant(product.merchant_info.id, initialMessage);
-                  setIsMessageDialogOpen(false);
+
+                  const initialMessage = `Hi, I'm interested in your product: ${product.name}`
+                  await startChatWithMerchant(product.merchant_info.id, initialMessage)
+                  setIsMessageDialogOpen(false)
                 } catch (error) {
-                  console.error("Failed to start chat:", error);
+                  console.error("Failed to start chat:", error)
                   toast({
                     title: "Error",
                     description: "Failed to start conversation. Please try again.",
                     variant: "destructive",
-                  });
+                  })
                 }
               }}
               className="w-full bg-[#f58220] hover:bg-[#f58220]/90 text-white"
@@ -657,7 +600,7 @@ export default function ProductDetailPage() {
                   Starting Chat...
                 </>
               ) : (
-                'Start Chat'
+                "Start Chat"
               )}
             </Button>
           </DialogFooter>
