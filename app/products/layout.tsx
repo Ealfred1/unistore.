@@ -78,6 +78,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [aiButtonHovered, setAiButtonHovered] = useState(false)
   const [showAIButton, setShowAIButton] = useState(true)
 
+  useEffect(() => {
+    const getUniversityInfo = () => {
+      // First check if user has a university in their profile
+      if (user?.university) {
+        const university = getUniversityById(user.university)
+        if (university?.abbreviation) {
+          setUniversityAbbreviation(university.abbreviation)
+          return
+        }
+      }
+
+      // Otherwise check localStorage for selected university
+      const storedUniversityId = localStorage.getItem("unistore_university")
+      if (storedUniversityId) {
+        const university = getUniversityById(Number(storedUniversityId))
+        if (university?.abbreviation) {
+          setUniversityAbbreviation(university.abbreviation)
+          return
+        }
+      }
+
+      // Default to null if no university found
+      setUniversityAbbreviation(null)
+    }
+
+    getUniversityInfo()
+  }, [user, getUniversityById])
+
   // Handle scroll for AI button visibility
   useEffect(() => {
     let lastScrollY = window.scrollY
@@ -417,7 +445,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             transition={{ duration: 0.2 }}
             onMouseEnter={() => setAiButtonHovered(true)}
             onMouseLeave={() => setAiButtonHovered(false)}
-            onClick={() => router.push("/dashboard/ai")}
+            onClick={() => router.push("/coming-soon")}
             className="fixed bottom-20 right-6 z-50 p-4 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300"
           >
             <motion.div

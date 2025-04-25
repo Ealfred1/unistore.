@@ -17,7 +17,6 @@ import {
   AlertTriangle,
   Loader2,
 } from "lucide-react"
-import { Header } from "@/components/landing/header"
 import { useProducts } from "@/providers/product-provider"
 import { useAuth } from "@/providers/auth-provider"
 import { Button } from "@/components/ui/button"
@@ -88,6 +87,7 @@ export default function ProductDetailsPage() {
   // Handle favorite toggle
   const handleToggleFavorite = async () => {
     if (!isAuthenticated) {
+      localStorage.setItem("unistore_redirect_after_login", window.location.pathname)
       router.push("/auth/login")
       return
     }
@@ -206,7 +206,6 @@ export default function ProductDetailsPage() {
   if (isLoading || isStartingChat) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header />
         <div className="container px-4 py-4 md:py-8">
           <div className="flex flex-col lg:flex-row gap-4 md:gap-8 animate-pulse">
             <div className="w-full lg:w-1/2">
@@ -236,7 +235,6 @@ export default function ProductDetailsPage() {
   if (!product) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header />
         <div className="container px-4 py-4 md:py-8">
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -255,9 +253,7 @@ export default function ProductDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
-
-      <div className="container px-4 py-4 md:py-8">
+      <div className="container px-2 lg:px-4 py-4 md:py-8">
         <div className="flex flex-col lg:flex-row gap-4 md:gap-8">
           {/* Product images */}
           <div className="w-full lg:w-1/2">
