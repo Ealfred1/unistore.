@@ -72,7 +72,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen overflow-x-hidden flex flex-col relative">
       <Header />
-      <div className="w-full h-screen flex items-center justify-center overflow-hidden">
+      <div className="w-full overflow-hidden">
         <AnimatePresence>
           {showUniversityPopup && (
             <div className="fixed top-0 left-0 w-full h-screen inset-0 z-50 overflow-x-hidden">

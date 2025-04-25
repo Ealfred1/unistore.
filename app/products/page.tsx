@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Search, Filter, ChevronDown, Grid, List, ArrowUpDown, Heart, ChevronLeft, ChevronRight } from "lucide-react"
-import { Header } from "@/components/landing/header"
 import ProductCard from "@/components/products/product-card"
 import { useProducts } from "@/providers/product-provider"
 import { useAuth } from "@/providers/auth-provider"
@@ -295,8 +294,6 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* Header */}
-      <Header />
 
       {/* University selection popup */}
       <AnimatePresence>

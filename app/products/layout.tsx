@@ -168,35 +168,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }
 
-  // Navigation items with authentication checks
+  // Navigation items with unique names/labels
   const navItems = [
-    // Only show Dashboard, Messages, Notifications for authenticated users
-    ...(user ? [
-      {
-        name: "Dashboard",
-        href: "/dashboard",
-        icon: <Home className="h-5 w-5" />,
-        color: "text-blue-600",
-        bgColor: "bg-blue-100",
-      },
-      {
-        name: "Messages",
-        href: "/dashboard/messages",
-        icon: <MessageCircle className="h-5 w-5" />,
-        color: "text-orange-600",
-        bgColor: "bg-orange-100",
-        badge: unreadCount > 0 ? unreadCount : null
-      },
-      {
-        name: "Notifications",
-        href: "/dashboard/messages",
-        icon: <Bell className="h-5 w-5" />,
-        color: "text-yellow-600",
-        bgColor: "bg-yellow-100",
-        badge: unreadCount > 0 ? unreadCount : null
-      },
-    ] : []),
-    // Products always visible
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: <Home className="h-5 w-5" />,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+    },
     {
       name: "Products",
       href: "/dashboard/products",
@@ -204,44 +184,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },
-    // My Products only for merchants
-    ...(user?.user_type === "MERCHANT" ? [
-      {
-        name: "My Products",
-        href: "/dashboard/my-products",
-        icon: <Store className="h-5 w-5" />,
-        color: "text-green-600",
-        bgColor: "bg-green-100",
-      },
-    ] : []),
-    // Saved, Profile, Settings only for authenticated users
-    ...(user ? [
-      {
-        name: "Saved",
-        href: "/dashboard/favorites",
-        icon: <Heart className="h-5 w-5" />,
-        color: "text-red-600",
-        bgColor: "bg-red-100",
-      },
-      {
-        name: "Profile",
-        href: "/dashboard/profile",
-        icon: <User className="h-5 w-5" />,
-        color: "text-pink-600",
-        bgColor: "bg-pink-100",
-      },
-      {
-        name: "Settings",
-        href: "/dashboard/settings",
-        icon: <Settings className="h-5 w-5" />,
-        color: "text-gray-600",
-        bgColor: "bg-gray-100",
-      },
-    ] : []),
+    // Only show My Products for merchants
+    ...(user?.user_type === "MERCHANT"
+      ? [
+          {
+            name: "My Products",
+            href: "/dashboard/my-products",
+            icon: <Store className="h-5 w-5" />,
+            color: "text-green-600",
+            bgColor: "bg-green-100",
+          },
+        ]
+      : []),
+    {
+      name: "Saved",
+      href: "/dashboard/favorites",
+      icon: <Heart className="h-5 w-5" />,
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+    },
+    {
+      name: "Messages",
+      href: "/dashboard/messages",
+      icon: <MessageCircle className="h-5 w-5" />,
+      color: "text-orange-600",
+      bgColor: "bg-orange-100",
+      badge: unreadCount > 0 ? unreadCount : null
+    },
+    {
+      name: "Notifications",
+      href: "/dashboard/messages", // Temporarily routing to messages
+      icon: <Bell className="h-5 w-5" />,
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
+      badge: unreadCount > 0 ? unreadCount : null
+    },
+    {
+      name: "Profile",
+      href: "/dashboard/profile",
+      icon: <User className="h-5 w-5" />,
+      color: "text-pink-600",
+      bgColor: "bg-pink-100",
+    },
+    {
+      name: "Settings",
+      href: "/dashboard/settings",
+      icon: <Settings className="h-5 w-5" />,
+      color: "text-gray-600",
+      bgColor: "bg-gray-100",
+    },
   ]
-
-  // Update categories display count based on authentication
-  const displayCategoryCount = user ? 5 : 10;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -325,7 +317,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Bell className="h-5 w-5" />
             <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
           </button>
-          { user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center">
@@ -355,7 +346,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          )}
         </div>
       </header>
 
@@ -411,7 +401,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* User profile */}
-          { user && (
           <div className="px-4 py-2">
             <div className={`flex items-center ${expanded || isMobile ? "space-x-3" : "justify-center"}`}>
               <Avatar className="h-10 w-10 shrink-0">
@@ -428,7 +417,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </div>
           </div>
-          )}
 
           {/* Navigation */}
           <div className="flex-1 overflow-y-auto py-4 px-3 no-scrollbar">
@@ -483,7 +471,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
 
                 <div className="space-y-1">
-                  {categories.slice(0, displayCategoryCount).map((category) => (
+                  {categories.slice(0, 5).map((category) => (
                     <Link
                       key={category.id}
                       href={`/dashboard/categories/${category.id}`}
