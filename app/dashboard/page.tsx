@@ -630,7 +630,7 @@ export default function DashboardPage() {
         <TabsContent value="all" className="space-y-6">
           {/* Results count */}
           <div className="flex items-center justify-between">
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-gray-600 text-xs lg:text-base dark:text-gray-400">
               Showing <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> to{" "}
               <span className="font-medium">
                 {Math.min(currentPage * pageSize, totalCount)}

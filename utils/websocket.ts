@@ -9,6 +9,8 @@ export class WebSocketManager {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
   private token: string | null = null;
+  private persistentConnection = false;
+  private disconnectHandler: (() => void) | null = null;
 
   private constructor() {}
 
@@ -27,6 +29,14 @@ export class WebSocketManager {
     }
   }
 
+  setPersistentConnection(persist: boolean) {
+    this.persistentConnection = persist;
+  }
+
+  onDisconnect(handler: () => void) {
+    this.disconnectHandler = handler;
+  }
+
   connect() {
     if (this.socket?.readyState === WebSocket.OPEN || this.isConnecting) {
       return;
@@ -36,15 +46,26 @@ export class WebSocketManager {
     this.isConnecting = true;
 
     try {
-      // Use secure WebSocket for production, regular for development
       const protocol = process.env.NODE_ENV === 'development' ? 'ws' : 'wss';
       const baseUrl = process.env.NEXT_PUBLIC_WS_URL || 'unistore-v2.onrender.com';
-      
-      // Construct WebSocket URL properly
-      const wsUrl = `${protocol}://${baseUrl}/ws/messaging/?token=${this.token}`;
-      console.log('Connecting to WebSocket:', wsUrl); // Debug log
+      const wsUrl = `${protocol}://${baseUrl.replace(/^https?:\/\/|^wss?:\/\//, '')}/ws/messaging/?token=${this.token}`;
 
       this.socket = new WebSocket(wsUrl);
+
+      this.socket.onopen = () => {
+        this.isConnecting = false;
+        this.reconnectAttempts = 0;
+        // Send immediate ping to verify connection
+        this.send('ping', {});
+      };
+
+      this.socket.onclose = () => {
+        this.disconnectHandler?.();
+        if (this.persistentConnection) {
+          console.log('Persistent connection closed, attempting reconnect...');
+          setTimeout(() => this.connect(), 1000);
+        }
+      };
 
       // Increase timeout for initial connection
       const connectionTimeout = setTimeout(() => {
@@ -55,15 +76,6 @@ export class WebSocketManager {
           this.reconnectAttempts = 0; // Reset attempts on timeout
         }
       }, 10000); // 10 seconds timeout
-
-      this.socket.onopen = () => {
-        clearTimeout(connectionTimeout);
-        this.isConnecting = false;
-        this.reconnectAttempts = 0;
-        
-        // Send immediate ping to verify connection
-        this.send('ping', {});
-      };
 
       // Add heartbeat mechanism
       let heartbeat: NodeJS.Timeout;
@@ -90,38 +102,17 @@ export class WebSocketManager {
         }
       };
 
-      this.socket.onclose = () => {
-        clearInterval(heartbeat); // Clear heartbeat on close
-        clearTimeout(connectionTimeout);
-        console.log('WebSocket disconnected, attempt:', this.reconnectAttempts);
-        this.isConnecting = false;
-        this.socket = null;
-        
-        // Notify connection closed
-        const handlers = this.messageHandlers.get('connection_closed');
-        if (handlers) {
-          handlers.forEach(handler => handler({ type: 'connection_closed' }));
-        }
-
-        // Only attempt reconnect if not manually disconnected
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-          console.log(`Reconnecting in ${delay}ms`);
-          setTimeout(() => {
-            this.reconnectAttempts++;
-            this.connect();
-          }, delay);
-        }
-      };
-
       this.socket.onerror = (error) => {
         console.error('WebSocket error:', error);
         // Don't close the socket here, let onclose handle it
       };
 
     } catch (error) {
-      this.isConnecting = false;
-      console.error('Failed to create WebSocket:', error);
+      console.error('WebSocket connection error:', error);
+      this.disconnectHandler?.();
+      if (this.persistentConnection) {
+        setTimeout(() => this.connect(), 1000);
+      }
     }
   }
 
@@ -190,5 +181,9 @@ export class WebSocketManager {
     this.reconnectAttempts = 0;
     this.messageQueue = [];
     this.messageHandlers.clear();
+  }
+
+  isConnected(): boolean {
+    return this.socket?.readyState === WebSocket.OPEN;
   }
 }

@@ -22,6 +22,8 @@ interface MessagingContextType {
   unreadCount: number
   lastMessage: Message | null
   markAllRead: () => void
+  storedConversations: any[]
+  storeOfflineMessage: (conversationId: string, content: string) => void
 }
 
 const MessagingContext = createContext<MessagingContextType>({
@@ -29,7 +31,9 @@ const MessagingContext = createContext<MessagingContextType>({
   isConnected: false,
   unreadCount: 0,
   lastMessage: null,
-  markAllRead: () => {}
+  markAllRead: () => {},
+  storedConversations: [],
+  storeOfflineMessage: () => {}
 })
 
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
@@ -39,19 +43,40 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [lastMessage, setLastMessage] = useState<Message | null>(null)
   const pathname = useNextPathname()
+  const [storedConversations, setStoredConversations] = useState<any[]>([])
+  const pendingMessagesRef = useRef<{[key: string]: any[]}>({})
 
+  // Load stored conversations on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('stored_conversations')
+    if (stored) {
+      try {
+        setStoredConversations(JSON.parse(stored))
+      } catch (e) {
+        console.error('Failed to parse stored conversations:', e)
+      }
+    }
+  }, [])
+
+  // Store conversations when they update
+  useEffect(() => {
+    if (storedConversations.length > 0) {
+      localStorage.setItem('stored_conversations', JSON.stringify(storedConversations))
+    }
+  }, [storedConversations])
+
+  // Update WebSocket connection management
   useEffect(() => {
     if (!user?.id) return;
-
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
     const ws = wsRef.current;
-    
-    // Reset WebSocket instance
     ws.cleanup();
     ws.updateToken(token);
+    ws.setPersistentConnection(true);
 
+    // Update connection status handlers
     const handleConnect = () => {
       console.log('WebSocket connected');
       setIsConnected(true);
@@ -63,15 +88,25 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     };
 
     ws.addMessageHandler('connection_established', handleConnect);
-    ws.addMessageHandler('connection_closed', handleDisconnect);
-    ws.addMessageHandler('pong', () => console.log('Received pong'));
-
+    ws.onDisconnect(handleDisconnect);
     ws.connect();
 
     return () => {
-      ws.cleanup();
+      ws.removeMessageHandler('connection_established', handleConnect);
     };
-  }, [user?.id]); // Only depend on user ID
+  }, [user?.id]);
+
+  // Store new messages when offline
+  const storeOfflineMessage = (conversationId: string, content: string) => {
+    if (!pendingMessagesRef.current[conversationId]) {
+      pendingMessagesRef.current[conversationId] = [];
+    }
+    pendingMessagesRef.current[conversationId].push({
+      content,
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('pending_messages', JSON.stringify(pendingMessagesRef.current));
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("access_token")
@@ -140,8 +175,10 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     isConnected,
     unreadCount,
     lastMessage,
-    markAllRead
-  }), [isConnected, unreadCount, lastMessage])
+    markAllRead,
+    storedConversations,
+    storeOfflineMessage
+  }), [isConnected, unreadCount, lastMessage, storedConversations]);
 
   return (
     <MessagingContext.Provider value={contextValue}>

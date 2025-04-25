@@ -6,6 +6,8 @@ import { useMessaging } from "@/hooks/useMessaging"
 import Image from "next/image"
 import { Send, Phone, Video, MoreVertical, MessageCircle, Search, ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useMessagingContext } from "@/providers/messaging-provider"
+import { toast } from "sonner"
 
 interface Message {
   id: string
@@ -27,6 +29,7 @@ export default function MessagesPage() {
   const [token, setToken] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
   const [key, setKey] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     if (user) {
@@ -48,16 +51,27 @@ export default function MessagesPage() {
     sendMessage, 
     markAsRead, 
     startConversation,
-    isStartingConversation
+    isStartingConversation,
+    setConversations
   } = useMessaging(token)
+
+  const { storedConversations, storeOfflineMessage, isConnected, wsInstance } = useMessagingContext();
 
   const [newMessage, setNewMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Initial load of conversations
+  // Update initial load of conversations
   useEffect(() => {
-    getConversations()
+    const loadConversations = async () => {
+      setIsLoading(true)
+      try {
+        await getConversations()
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadConversations()
   }, [getConversations])
 
   // Load messages when conversation changes
@@ -110,17 +124,35 @@ export default function MessagesPage() {
     console.log('Current conversations:', conversations);
   }, [conversations]);
 
+  // Use stored conversations as fallback
+  useEffect(() => {
+    if (conversations.length === 0 && storedConversations.length > 0) {
+      // Use stored conversations until fresh data arrives
+      setConversations(storedConversations);
+    }
+  }, [storedConversations]);
+
+  // Enhanced message sending with offline support
   const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newMessage.trim() || !currentConversation?.id) return
+    e.preventDefault();
+    if (!newMessage.trim() || !currentConversation?.id) return;
+
+    const messageContent = newMessage.trim();
+    setNewMessage(""); // Clear input immediately for better UX
 
     try {
-      await sendMessage(currentConversation.id, newMessage.trim())
-      setNewMessage("")
+      if (!wsInstance?.isConnected()) {
+        storeOfflineMessage(currentConversation.id, messageContent);
+        toast.info("Message will be sent when connection is restored");
+      } else {
+        await sendMessage(currentConversation.id, messageContent);
+      }
     } catch (error) {
-      console.error("Failed to send message:", error)
+      console.error("Failed to send message:", error);
+      storeOfflineMessage(currentConversation.id, messageContent);
+      toast.error("Message will be retried when connection is restored");
     }
-  }
+  };
 
   // Ensure conversations is an array before filtering
   const filteredConversations = Array.isArray(conversations) 
@@ -226,6 +258,17 @@ export default function MessagesPage() {
     ); 
   };
 
+  // Skeleton loader component
+  const ConversationSkeleton = () => (
+    <div className="animate-pulse flex items-center gap-3 p-4 hover:bg-secondary-100 dark:hover:bg-secondary-800 cursor-pointer border-b border-secondary-200 dark:border-secondary-700">
+      <div className="w-12 h-12 bg-secondary-200 dark:bg-secondary-700 rounded-full"></div>
+      <div className="flex-1">
+        <div className="h-4 bg-secondary-200 dark:bg-secondary-700 rounded w-3/4 mb-2"></div>
+        <div className="h-3 bg-secondary-200 dark:bg-secondary-700 rounded w-1/2"></div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="h-[calc(100vh-4rem)] bg-secondary-50 dark:bg-secondary-900">
       <div className="flex h-full">
@@ -290,13 +333,13 @@ export default function MessagesPage() {
           </div> 
 
           {/* Scrollable Conversations List */}
-          <div className="flex-1 overflow-y-auto">
-            {Array.isArray(conversations) && conversations.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-secondary-500">
-                <MessageCircle className="w-12 h-12 mb-2" />
-                <p>No conversations yet</p>
-              </div>
-            ) : (
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {isLoading ? (
+              // Show 5 skeleton loaders while loading
+              Array(5).fill(0).map((_, i) => (
+                <ConversationSkeleton key={i} />
+              ))
+            ) : filteredConversations.length > 0 ? (
               filteredConversations.map(conversation => (
                 <div
                   key={conversation.id}
@@ -350,6 +393,16 @@ export default function MessagesPage() {
                   </div>
                 </div>
               ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                <MessageCircle className="w-12 h-12 text-secondary-400 mb-2" />
+                <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100">
+                  No conversations yet
+                </h3>
+                <p className="text-secondary-600 dark:text-secondary-400">
+                  Start a conversation with a merchant
+                </p>
+              </div>
             )}
           </div>
         </div>
