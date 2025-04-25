@@ -30,6 +30,7 @@ export default function MessagesPage() {
   const [error, setError] = useState<string | null>(null)
   const [key, setKey] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -61,14 +62,40 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Load stored conversations immediately
+  useEffect(() => {
+    const storedConvs = localStorage.getItem('conversations')
+    if (storedConvs) {
+      try {
+        const parsed = JSON.parse(storedConvs)
+        setConversations(parsed)
+      } catch (e) {
+        console.error('Failed to parse stored conversations:', e)
+      }
+    }
+  }, [])
+
+  // Store conversations when they update
+  useEffect(() => {
+    if (conversations.length > 0) {
+      localStorage.setItem('conversations', JSON.stringify(conversations))
+    }
+  }, [conversations])
+
   // Update initial load of conversations
   useEffect(() => {
     const loadConversations = async () => {
       setIsLoading(true)
       try {
+        // If we have stored conversations, show refresh state instead
+        if (conversations.length > 0) {
+          setIsLoading(false)
+          setIsRefreshing(true)
+        }
         await getConversations()
       } finally {
         setIsLoading(false)
+        setIsRefreshing(false)
       }
     }
     loadConversations()
@@ -339,70 +366,79 @@ export default function MessagesPage() {
               Array(5).fill(0).map((_, i) => (
                 <ConversationSkeleton key={i} />
               ))
-            ) : filteredConversations.length > 0 ? (
-              filteredConversations.map(conversation => (
-                <div
-                  key={conversation.id}
-                  onClick={() => startConversation(conversation.other_user.id)}
-                  className={`
-                    p-4 border-b border-secondary-100 dark:border-secondary-700
-                    hover:bg-secondary-50 dark:hover:bg-secondary-700/50 cursor-pointer
-                    ${currentConversation?.id === conversation.id 
-                      ? 'bg-secondary-100 dark:bg-secondary-700' 
-                      : ''
-                    }
-                  `}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-uniBlue-500 flex items-center justify-center text-white font-medium">
-                        {conversation.other_user.first_name[0]}
-                      </div>
-                      {conversation.other_user.is_online && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-uniOrange-400 rounded-full border-2 border-white dark:border-secondary-800" />
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-medium truncate dark:text-white">
-                          {conversation.other_user.first_name} {conversation.other_user.last_name}
-                          {conversation.other_user.merchant_verified && (
-                            <span className="ml-1 text-uniOrange-500">✓</span>
-                          )}
-                        </h3>
-                        <span className="text-xs text-secondary-500 whitespace-nowrap ml-2">
-                          {new Date(conversation.last_message_at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm text-secondary-500 truncate">
-                          {conversation.last_message?.content || 'No messages yet'}
-                        </p>
-                        {conversation.unread_count > 0 && (
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-uniOrange-400 text-white text-xs flex items-center justify-center">
-                            {conversation.unread_count}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
             ) : (
-              <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                <MessageCircle className="w-12 h-12 text-secondary-400 mb-2" />
-                <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100">
-                  No conversations yet
-                </h3>
-                <p className="text-secondary-600 dark:text-secondary-400">
-                  Start a conversation with a merchant
-                </p>
-              </div>
+              <>
+                {isRefreshing && (
+                  <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm">
+                    Refreshing conversations...
+                  </div>
+                )}
+                {filteredConversations.length > 0 ? (
+                  filteredConversations.map(conversation => (
+                    <div
+                      key={conversation.id}
+                      onClick={() => startConversation(conversation.other_user.id)}
+                      className={`
+                        p-4 border-b border-secondary-100 dark:border-secondary-700
+                        hover:bg-secondary-50 dark:hover:bg-secondary-700/50 cursor-pointer
+                        ${currentConversation?.id === conversation.id 
+                          ? 'bg-secondary-100 dark:bg-secondary-700' 
+                          : ''
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="w-12 h-12 rounded-full bg-uniBlue-500 flex items-center justify-center text-white font-medium">
+                            {conversation.other_user.first_name[0]}
+                          </div>
+                          {conversation.other_user.is_online && (
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-uniOrange-400 rounded-full border-2 border-white dark:border-secondary-800" />
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-center">
+                            <h3 className="font-medium truncate dark:text-white">
+                              {conversation.other_user.first_name} {conversation.other_user.last_name}
+                              {conversation.other_user.merchant_verified && (
+                                <span className="ml-1 text-uniOrange-500">✓</span>
+                              )}
+                            </h3>
+                            <span className="text-xs text-secondary-500 whitespace-nowrap ml-2">
+                              {new Date(conversation.last_message_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-secondary-500 truncate">
+                              {conversation.last_message?.content || 'No messages yet'}
+                            </p>
+                            {conversation.unread_count > 0 && (
+                              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-uniOrange-400 text-white text-xs flex items-center justify-center">
+                                {conversation.unread_count}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                    <MessageCircle className="w-12 h-12 text-secondary-400 mb-2" />
+                    <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100">
+                      No conversations yet
+                    </h3>
+                    <p className="text-secondary-600 dark:text-secondary-400">
+                      Start a conversation with a merchant
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
