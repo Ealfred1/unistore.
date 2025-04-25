@@ -104,17 +104,29 @@ export default function ProductDetailPage() {
     }
   }
 
-  // Handle contact merchant
+  // // Handle contact merchant
+  // const handleContactMerchant = async () => {
+  //   if (!isAuthenticated) {
+  //     const currentPath = encodeURIComponent(window.location.pathname)
+  //     router.push(`/auth/login?next=${currentPath}`)
+  //     return
+  //   }
+
+  //   // If we have a message dialog, show 
+  //     setIsMessageDialogOpen(true)
+    
+  // }
+
   const handleContactMerchant = async () => {
     if (!isAuthenticated) {
-      const currentPath = encodeURIComponent(window.location.pathname)
-      router.push(`/auth/login?next=${currentPath}`)
+      // Store the redirect path in localStorage instead of using URL params
+      localStorage.setItem("unistore_redirect_after_login", `/chat/${product?.merchant_info?.id}`)
+      router.push("/auth/login")
       return
     }
-
-    // If we have a message dialog, show 
-      setIsMessageDialogOpen(true)
     
+    // If we have a message dialog, show
+    setIsMessageDialogOpen(true)
   }
 
   // Handle message submit

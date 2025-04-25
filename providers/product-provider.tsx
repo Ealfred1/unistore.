@@ -75,6 +75,7 @@ interface ProductContextType {
   products: Product[]
   categories: Category[]
   isLoading: boolean
+  setIsLoading: (isLoading: boolean) => void
   fetchProducts: (filters?: Record<string, any>) => Promise<PaginatedResponse<Product>>
   fetchCategories: () => Promise<Category[]>
   getProductById: (id: number) => Promise<Product | undefined>
@@ -108,18 +109,33 @@ export function ProductProvider({ children }: ProductProviderProps) {
     try {
       const queryParams = new URLSearchParams()
 
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== "") {
-            queryParams.append(key, String(value))
-          }
-        })
+      // Get filters from localStorage if not provided
+      const effectiveFilters = filters || {
+        page: localStorage.getItem("unistore_currentPage") || "1",
+        category: localStorage.getItem("unistore_category"),
+        condition: localStorage.getItem("unistore_condition"),
+        university: localStorage.getItem("unistore_university"),
+        search: localStorage.getItem("unistore_searchQuery"),
+        sort_by: localStorage.getItem("unistore_sortBy"),
       }
+
+      // Add price range if exists
+      const storedPriceRange = localStorage.getItem("unistore_priceRange")
+      if (storedPriceRange) {
+        const [min, max] = JSON.parse(storedPriceRange)
+        if (min > 0) effectiveFilters.min_price = min
+        if (max < 2000) effectiveFilters.max_price = max
+      }
+
+      Object.entries(effectiveFilters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          queryParams.append(key, String(value))
+        }
+      })
 
       const response = await axios.get(`/products/products/?${queryParams.toString()}`)
       setProducts(response.data.results)
       
-      // Return the complete response data including pagination info
       return {
         count: response.data.count,
         next: response.data.next,
@@ -381,6 +397,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
         products,
         categories,
         isLoading,
+        setIsLoading,
         fetchProducts,
         fetchCategories,
         getProductById,

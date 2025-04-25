@@ -64,29 +64,27 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* University selection popup */}
-      <AnimatePresence>
-        {showUniversityPopup && (
-          <UniversityPopup
-            onClose={() => {
-              setShowUniversityPopup(false)
-              localStorage.setItem("unistore_visited", "true")
-            }}
-            onSelect={handleSelectUniversity}
-          />
-        )}
-      </AnimatePresence>
+    <div className="min-h-screen overflow-x-hidden flex flex-col relative">
+            <Header />
+          <div className="w-full h-screen flex items-center justify-center overflow-hidden">
+            <AnimatePresence>
+              {showUniversityPopup && (
+                <div className="fixed top-0 left-0 w-full h-screen inset-0 z-50 overflow-x-hidden">
+                  <UniversityPopup
+                    onClose={() => {
+                      setShowUniversityPopup(false)
+                      localStorage.setItem("unistore_visited", "true")
+                    }}
+                    onSelect={handleSelectUniversity}
+                  />
+                </div>
+              )}
+            </AnimatePresence>
+            </div>
 
-      <Header />
 
-      <motion.main 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }} 
-        transition={{ duration: 0.5 }}
-      >
+      <motion.main initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
         <Hero />
-        {/* <ProductShowcase /> */}
         <Features />
         <HowItWorks />
         <Testimonials />

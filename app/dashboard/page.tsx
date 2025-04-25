@@ -285,7 +285,7 @@ export default function DashboardPage() {
         console.error("Error updating products:", error)
       } finally {
         setIsLoading(false)
-      }
+      } 
     }
 
     const timeoutId = setTimeout(updateProducts, 300)

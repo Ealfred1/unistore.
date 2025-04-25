@@ -18,39 +18,111 @@ import { formatPrice } from "@/lib/utils"
 import { UniversityPopup } from "@/components/university-popup"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { optimizeImageUrl } from "@/lib/image-utils"
 
 export default function ProductsPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const { products, categories, isLoading, fetchProducts, toggleFavorite } = useProducts()
+  const { products, categories, fetchProducts, toggleFavorite } = useProducts()
   const { isAuthenticated } = useAuth()
   const [showUniversityPopup, setShowUniversityPopup] = useState(false)
+  const [isProductsLoading, setIsProductsLoading] = useState(true)
 
   // State for UI
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+    const stored = localStorage.getItem("unistore_viewMode")
+    return (stored === "list" ? "list" : "grid") as "grid" | "list"
+  })
   const [showFilters, setShowFilters] = useState(false)
 
   // State for filters
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [selectedCondition, setSelectedCondition] = useState<string | null>(null)
-  const [selectedUniversity, setSelectedUniversity] = useState<string | null>(null)
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000])
-  const [sortBy, setSortBy] = useState<string>("")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [filteredProducts, setFilteredProducts] = useState(products)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() =>
+    localStorage.getItem("unistore_category")
+  )
+  const [selectedCondition, setSelectedCondition] = useState<string | null>(() =>
+    localStorage.getItem("unistore_condition")
+  )
+  const [selectedUniversity, setSelectedUniversity] = useState<string | null>(() =>
+    localStorage.getItem("unistore_university")
+  )
+  const [priceRange, setPriceRange] = useState<[number, number]>(() => {
+    const stored = localStorage.getItem("unistore_priceRange")
+    return stored ? JSON.parse(stored) : [0, 2000]
+  })
+  const [sortBy, setSortBy] = useState<string>(() =>
+    localStorage.getItem("unistore_sortBy") || ""
+  )
+  const [searchQuery, setSearchQuery] = useState(() =>
+    localStorage.getItem("unistore_searchQuery") || ""
+  )
+  const [currentPage, setCurrentPage] = useState(() =>
+    parseInt(localStorage.getItem("unistore_currentPage") || "1")
+  )
 
-  // Get initial filters from URL or set defaults
-  const initialPage = searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1
-  
+  // Update localStorage when states change
+  useEffect(() => {
+    localStorage.setItem("unistore_viewMode", viewMode)
+  }, [viewMode])
+
+  useEffect(() => {
+    if (selectedCategory) {
+      localStorage.setItem("unistore_category", selectedCategory)
+    } else {
+      localStorage.removeItem("unistore_category")
+    }
+  }, [selectedCategory])
+
+  useEffect(() => {
+    if (selectedCondition) {
+      localStorage.setItem("unistore_condition", selectedCondition)
+    } else {
+      localStorage.removeItem("unistore_condition")
+    }
+  }, [selectedCondition])
+
+  useEffect(() => {
+    if (selectedUniversity) {
+      localStorage.setItem("unistore_university", selectedUniversity)
+    } else {
+      localStorage.removeItem("unistore_university")
+    }
+  }, [selectedUniversity])
+
+  useEffect(() => {
+    localStorage.setItem("unistore_priceRange", JSON.stringify(priceRange))
+  }, [priceRange])
+
+  useEffect(() => {
+    if (sortBy) {
+      localStorage.setItem("unistore_sortBy", sortBy)
+    } else {
+      localStorage.removeItem("unistore_sortBy")
+    }
+  }, [sortBy])
+
+  useEffect(() => {
+    if (searchQuery) {
+      localStorage.setItem("unistore_searchQuery", searchQuery)
+    } else {
+      localStorage.removeItem("unistore_searchQuery")
+    }
+  }, [searchQuery])
+
+  useEffect(() => {
+    localStorage.setItem("unistore_currentPage", currentPage.toString())
+  }, [currentPage])
+
+  // Remove duplicate handlePageChange and consolidate functionality
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    localStorage.setItem("unistore_currentPage", page.toString())
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
   // State management
-  const [currentPage, setCurrentPage] = useState(initialPage)
-  const [isInitialLoad, setIsInitialLoad] = useState(true)
-
-  // Get current page from URL params or default to 1
-  const currentPageParam = searchParams.get('page')
+  const [filteredProducts, setFilteredProducts] = useState(products)
   const [totalPages, setTotalPages] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
   const [totalCount, setTotalCount] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
 
   // Active filters count
   const getActiveFiltersCount = () => {
@@ -63,52 +135,44 @@ export default function ProductsPage() {
     return count
   }
 
-  // Initialize search query and filters from URL params
+  // Initialize from localStorage instead of URL params
   useEffect(() => {
-    const query = searchParams.get("search")
-    if (query) { 
+    const query = localStorage.getItem("unistore_searchQuery")
+    if (query) {
       setSearchQuery(query)
     }
    
-    const category = searchParams.get("category")
+    const category = localStorage.getItem("unistore_category")
     if (category) {
       setSelectedCategory(category)
     }
 
-    const university = searchParams.get("university")
-    if (university) {
-      setSelectedUniversity(university)
-    } else if (!isAuthenticated) {
-      // Only check localStorage for university if user is not authenticated
-      const storedUniversity = localStorage.getItem("unistore_university")
-      if (storedUniversity) {
-        setSelectedUniversity(storedUniversity)
+    const university = localStorage.getItem("unistore_university")
+    if (!isAuthenticated) {
+      if (university) {
+        setSelectedUniversity(university)
       } else {
         setShowUniversityPopup(true)
       }
     }
 
-    const page = searchParams.get("page")
-    if (page) { 
+    const page = localStorage.getItem("unistore_currentPage")
+    if (page) {
       setCurrentPage(Number.parseInt(page))
     }
-  }, [searchParams, isAuthenticated])
+  }, [isAuthenticated])
 
-  // Update URL and fetch products when filters change
+  // Update products when filters change
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
   useEffect(() => {
     if (isInitialLoad) {
-      // Ensure page param exists on initial load
-      if (!searchParams.has('page')) {
-        const params = new URLSearchParams(searchParams)
-        params.set('page', '1')
-        router.replace(`/products?${params.toString()}`, { scroll: false })
-      }
       setIsInitialLoad(false)
       return
     }
 
     const getProducts = async () => {
       try {
+        setIsProductsLoading(true)
         // Prepare filters object
         const filters: Record<string, any> = {
           page: currentPage,
@@ -131,27 +195,26 @@ export default function ProductsPage() {
         setTotalCount(response.count)
       } catch (error) {
         console.error("Error fetching products:", error)
+      } finally {
+        setIsProductsLoading(false)
       }
     }
 
     // Debounce the fetch to prevent multiple calls
     const timeoutId = setTimeout(getProducts, 300)
     return () => clearTimeout(timeoutId)
-  }, [currentPage, searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy, isAuthenticated, searchParams, isInitialLoad])
-
-  // Update URL when page changes
-  const handlePageChange = (page: number) => {
-    const params = new URLSearchParams(searchParams)
-    params.set('page', page.toString())
-    router.push(`/products?${params.toString()}`, { scroll: false })
-    setCurrentPage(page)
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
-
-  // Update filtered products when products change
-  useEffect(() => {
-    setFilteredProducts(products)
-  }, [products])
+  }, [
+    currentPage,
+    searchQuery,
+    selectedCategory,
+    selectedCondition,
+    selectedUniversity,
+    priceRange,
+    sortBy,
+    isAuthenticated,
+    isInitialLoad,
+    // fetchProducts
+  ])
 
   // Handle favorite toggle
   const handleToggleFavorite = async (productId: number) => {
@@ -177,6 +240,14 @@ export default function ProductsPage() {
     setSearchQuery("")
     setSortBy("newest")
     setCurrentPage(1)
+    
+    // Clear localStorage
+    localStorage.removeItem("unistore_category")
+    localStorage.removeItem("unistore_condition")
+    localStorage.removeItem("unistore_priceRange")
+    localStorage.removeItem("unistore_sortBy") 
+    localStorage.removeItem("unistore_searchQuery")
+    localStorage.removeItem("unistore_currentPage")
   }
 
   // Get unique conditions from products
@@ -189,12 +260,13 @@ export default function ProductsPage() {
   const handleSelectUniversity = async (universityId: number) => {
     if (!isAuthenticated) {
       localStorage.setItem("unistore_university", String(universityId))
-    }
+    } 
     setShowUniversityPopup(false)
     setSelectedUniversity(String(universityId))
     
     // Fetch products for the selected university
     try {
+      setIsProductsLoading(true)
       const response = await fetchProducts({ 
         university: universityId,
         page: currentPage 
@@ -204,6 +276,8 @@ export default function ProductsPage() {
       setTotalCount(response.count)
     } catch (error) {
       console.error("Error fetching products:", error)
+    } finally {
+      setIsProductsLoading(false)
     }
   }
 
@@ -625,7 +699,7 @@ export default function ProductsPage() {
         </div>
 
         {/* Loading state */}
-        {isLoading ? (
+        {isProductsLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {Array.from({ length: pageSize }).map((_, index) => (
               <div
@@ -656,7 +730,7 @@ export default function ProductsPage() {
                     <ProductCard
                       product={{
                         ...product,
-                        primary_image: getProperImageUrl(product.primary_image),
+                        primary_image: optimizeImageUrl(product.primary_image),
                       }}
                       onFavoriteToggle={() => handleToggleFavorite(product.id)}
                     />
@@ -742,7 +816,7 @@ export default function ProductsPage() {
             )}
 
             {/* Empty state */}
-            {filteredProducts.length === 0 && !isLoading && (
+            {filteredProducts.length === 0 && !isProductsLoading && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}

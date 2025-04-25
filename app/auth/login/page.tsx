@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
 import { Eye, EyeOff, ArrowRight, LogIn, Facebook, Twitter } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
@@ -19,10 +19,9 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const { login, isAuthenticated } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
-  
-  // Get the next page from URL params
-  const nextPage = searchParams.get('next') || '/dashboard'
+
+  // Get redirect path from localStorage instead of URL params
+  const redirectPath = localStorage.getItem("unistore_redirect_after_login") || '/dashboard'
 
   const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -60,8 +59,10 @@ export default function LoginPage() {
       await login({ phone_number, password })
       toast.success("Login successful! Redirecting...")
       
-      // Redirect to the next page
-      router.push(decodeURIComponent(nextPage))
+      // Clear the redirect path from localStorage and redirect
+      const path = redirectPath
+      localStorage.removeItem("unistore_redirect_after_login")
+      router.push(path)
     } catch (error: any) {
       console.error(error)
       
