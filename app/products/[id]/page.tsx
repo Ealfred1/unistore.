@@ -31,6 +31,7 @@ import {
 import { toast } from "@/hooks/use-toast"
 import { formatPrice } from "@/lib/utils"
 import { useStartConversation } from "@/utils/start-conversation"
+import { optimizeImageUrl } from "@/lib/image-utils"
 
 export default function ProductDetailsPage() {
   const params = useParams()
@@ -261,7 +262,7 @@ export default function ProductDetailsPage() {
               <Image
                 src={
                   product.images && product.images.length > 0
-                    ? getProperImageUrl(product.images[currentImageIndex].image_url)
+                    ? optimizeImageUrl(product.images[currentImageIndex].image_url)
                     : "/placeholder.svg?height=600&width=600&text=No+Image"
                 }
                 alt={product.name}
@@ -281,7 +282,7 @@ export default function ProductDetailsPage() {
                   >
                     <div className="relative w-full h-full">
                       <Image
-                        src={getProperImageUrl(image.image_url) || "/placeholder.svg"}
+                        src={optimizeImageUrl(image.image_url) || "/placeholder.svg"}
                         alt={`${product.name} ${index + 1}`}
                         fill
                         className="object-cover"
@@ -503,7 +504,7 @@ export default function ProductDetailsPage() {
                       <div className="relative aspect-square overflow-hidden">
                         <Image
                           src={
-                            getProperImageUrl(product.primary_image) ||
+                            optimizeImageUrl(product.primary_image) ||
                             "/placeholder.svg?height=200&width=200&text=No+Image" ||
                             "/placeholder.svg"
                           }

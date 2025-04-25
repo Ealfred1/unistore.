@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import EditProductModal from "@/components/products/edit-product-modal"
+import { optimizeImageUrl } from "@/lib/image-utils"
 
 export default function MyProductsPage() {
   const { user } = useAuth()
@@ -321,7 +322,7 @@ export default function MyProductsPage() {
                   <ProductCard 
                     product={{
                       ...product,
-                      primary_image: getProperImageUrl(product.primary_image),
+                      primary_image: optimizeImageUrl(product.primary_image),
                       price: formatPrice(product.price)
                     }} 
                     viewMode={viewMode}

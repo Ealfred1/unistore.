@@ -733,7 +733,7 @@ export default function ProductsPage() {
                     <Link href={`/products/${product.id}`} className="flex flex-col sm:flex-row">
                       <div className="w-full sm:w-48 h-48 relative flex-shrink-0">
                         <img
-                          src={getProperImageUrl(product.primary_image) || "/placeholder.svg"}
+                          src={optimizeImageUrl(product.primary_image) || "/placeholder.svg"}
                           alt={product.name}
                           className="w-full h-full object-cover"
                         />

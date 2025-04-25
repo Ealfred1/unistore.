@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import axios from "@/lib/axios"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
+import { optimizeImageUrl } from "@/lib/image-utils"
 
 export default function CategoryDetailPage() {
   const params = useParams()
@@ -278,7 +279,7 @@ export default function CategoryDetailPage() {
                   <ProductCard 
                     product={{
                       ...product,
-                      primary_image: getProperImageUrl(product.primary_image),
+                      primary_image: optimizeImageUrl(product.primary_image),
                       price: getDisplayPrice(product)
                     }} 
                   />
@@ -298,7 +299,7 @@ export default function CategoryDetailPage() {
                   <Link href={`/products/${product.id}`} className="flex">
                     <div className="w-32 h-32 sm:w-48 sm:h-48 relative flex-shrink-0">
                       <img
-                        src={getProperImageUrl(product.primary_image)}
+                        src={optimizeImageUrl(product.primary_image)}
                         alt={product.name}
                         className="w-full h-full object-cover"
                       />

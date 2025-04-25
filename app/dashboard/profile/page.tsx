@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import axios from "@/lib/axios"
+import { optimizeImageUrl } from "@/lib/image-utils"
 
 export default function ProfilePage() {
   const { user, setUser } = useAuth()
@@ -248,7 +249,7 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <Image
-                  src={previewUrl || getProperImageUrl(user?.profile_image) || "/placeholder.svg?height=96&width=96"}
+                  src={previewUrl || optimizeImageUrl(user?.profile_image) || "/placeholder.svg?height=96&width=96"}
                   alt={user?.first_name || "User"}
                   width={96}
                   height={96}
@@ -462,7 +463,7 @@ export default function ProfilePage() {
                   <ProductCard 
                     product={{
                       ...product,
-                      primary_image: getProperImageUrl(product.primary_image),
+                      primary_image: optimizeImageUrl(product.primary_image),
                     }} 
                   />
                 </motion.div>

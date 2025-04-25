@@ -545,7 +545,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={item.name}
                   href={item.href}
                   className={`flex items-center rounded-xl px-3 py-2.5 transition-all relative group ${
-                    pathname === item.href ? `${item.bgColor} ${item.color} font-medium` : `hover:${item.bgColor}`
+                    pathname === item.href ? `${item.color} font-medium` : `hover:${item.bgColor}`
                   }`}
                   onClick={() => isMobile && setMobileOpen(false)}
                 >
