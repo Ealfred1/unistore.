@@ -76,6 +76,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [merchantName, setMerchantName] = useState("")
   const [universityAbbreviation, setUniversityAbbreviation] = useState<string | null>(null)
   const [aiButtonHovered, setAiButtonHovered] = useState(false)
+  const [showAIButton, setShowAIButton] = useState(true)
+
+  // Handle scroll for AI button visibility
+  useEffect(() => {
+    let lastScrollY = window.scrollY
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      setShowAIButton(currentScrollY <= 100 || currentScrollY < lastScrollY)
+      lastScrollY = currentScrollY
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Add keyboard shortcut for toggling sidebar
   useEffect(() => {
@@ -171,6 +185,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Navigation items with authentication checks
   const navItems = [
     // Only show Dashboard, Messages, Notifications for authenticated users
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: <Home className="h-5 w-5" />,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+    },
     ...(user ? [
       {
         name: "Dashboard",
@@ -199,7 +220,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // Products always visible
     {
       name: "Products",
-      href: "/dashboard/products",
+      href: "/products",
       icon: <ShoppingBag className="h-5 w-5" />,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
@@ -261,7 +282,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="flex items-center space-x-3">
           {/* AI Button with animation */}
-          <motion.button
+          {/* <motion.button
             className="relative p-2 rounded-lg bg-gradient-to-r from-indigo-500 via-orange-500 to-indigo-500 text-white overflow-hidden"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -313,7 +334,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Zap className="h-4 w-4" />
               </motion.div>
             </motion.div>
-          </motion.button>
+          </motion.button> */}
 
           {/* <button
             onClick={() => setShowRequestModal(true)}
@@ -321,10 +342,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <Plus className="h-5 w-5" />
           </button> */}
-          <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
-          </button>
+          <div className="flex items-center gap-1">
+            {user && (
+              <>
+                {/* Messages Icon */}
+                <Link
+                  href="/dashboard/messages"
+                  className="relative p-2 hover:bg-secondary-100 dark:hover:bg-secondary-800 rounded-lg"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+
+                {/* Notifications Icon */}
+                <Link
+                  href="/dashboard/notifications"
+                  className="relative p-2 hover:bg-secondary-100 dark:hover:bg-secondary-800 rounded-lg"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+              </>
+            )}
+          </div>
+
           { user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -358,6 +407,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </div>
       </header>
+
+      <AnimatePresence>
+        {showAIButton && (
+          <motion.button
+            initial={{ opacity: 0, scale: 1.2 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.6 }}
+            transition={{ duration: 0.2 }}
+            onMouseEnter={() => setAiButtonHovered(true)}
+            onMouseLeave={() => setAiButtonHovered(false)}
+            onClick={() => router.push("/dashboard/ai")}
+            className="fixed bottom-20 right-6 z-50 p-4 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300"
+          >
+            <motion.div
+              animate={{ opacity: aiButtonHovered ? 0 : 1 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <Brain className="h-6 w-6" />
+            </motion.div>
+            <motion.div
+              animate={{ opacity: aiButtonHovered ? 1 : 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <Zap className="h-6 w-6" />
+            </motion.div>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Overlay for mobile - closes sidebar when clicked outside */}
       <AnimatePresence>
