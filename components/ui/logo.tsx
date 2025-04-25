@@ -31,7 +31,7 @@ export function Logo({
               <span className="text-[#f58220]">
                 {universityAbbreviation ? universityAbbreviation : "Uni"}
               </span>
-              <span className="text-[#0a2472]">store</span>
+              <span className="text-[#0a2472]">store.</span>
             </div>
           )}
         </div>

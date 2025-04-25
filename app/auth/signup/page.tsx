@@ -186,7 +186,7 @@ export default function SignupPage() {
           >
             <h1 className="text-4xl font-bold mb-6">
               <span className="text-[#f58220]">Uni</span>
-              <span className="text-[#0a2472]">store</span>
+              <span className="text-[#0a2472]">store.</span>
             </h1>
             <p className="text-gray-600 text-lg max-w-md mx-auto">
               Create your account and start buying, selling, and connecting with fellow students.

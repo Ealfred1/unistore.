@@ -99,15 +99,15 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       {/* Left side - Login form */}
-      <div className="w-full md:w-1/2 flex items-center justify-center p-8 md:p-16">
+      <div className="w-full md:w-1/2 flex items-center justify-center p-4 md:p-16">
         <div className="w-full max-w-md">
-          <div className="mb-8">
+          <div className="mb-8 flex items-center justify-center lg:justify-start">
             <Logo className="text-2xl" />
           </div>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <h1 className="text-3xl font-bold mb-2">Login to Your Account!</h1>
-            <p className="text-gray-600 mb-8">Sign in to your account to continue</p>
+            <h1 className="text-2xl text-center lg:text-left lg:text-3xl font-bold mb-2">Login to Your Account!</h1>
+            <p className="text-gray-600 mb-8 text-center lg:text-left">Sign in to your account to continue</p>
 
             <div className="flex space-x-3 mb-6">
               <button className="flex-1 flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">

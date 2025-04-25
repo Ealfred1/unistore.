@@ -111,7 +111,7 @@ export default function ProductDetailPage() {
   //     router.push(`/auth/login?next=${currentPath}`)
   //     return
   //   }
-
+    
   //   // If we have a message dialog, show 
   //     setIsMessageDialogOpen(true)
     
@@ -119,8 +119,8 @@ export default function ProductDetailPage() {
 
   const handleContactMerchant = async () => {
     if (!isAuthenticated) {
-      // Store the redirect path in localStorage instead of using URL params
-      localStorage.setItem("unistore_redirect_after_login", `/chat/${product?.merchant_info?.id}`)
+      // Store the current path in localStorage instead of using URL params 
+      localStorage.setItem("unistore_redirect_after_login", window.location.pathname)
       router.push("/auth/login")
       return
     }
@@ -192,36 +192,43 @@ export default function ProductDetailPage() {
     }
   }
 
-  // Get proper image URL function
-  const getProperImageUrl = (imageUrl: string | undefined) => {
-    if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
-
-    // Check if the URL contains both Appwrite and Cloudinary
-    if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
-      // Find the position of the nested https:// for cloudinary
-      const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
-      if (cloudinaryStart !== -1) {
-        // Extract everything from the cloudinary URL start
-        return imageUrl.substring(cloudinaryStart).split("/view")[0]
+    // Get proper image URL function
+    const getProperImageUrl = (imageUrl: string | undefined) => {
+      if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
+  
+      // Handle case where Appwrite URL contains a Cloudinary URL
+      if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
+        const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
+        if (cloudinaryStart !== -1) {
+          // Extract the Cloudinary URL and remove the "/view" part if present
+          let cloudinaryUrl = imageUrl.substring(cloudinaryStart)
+  
+          // Remove the "/view" and anything after it (like query parameters)
+          if (cloudinaryUrl.includes("/view")) {
+            cloudinaryUrl = cloudinaryUrl.split("/view")[0]
+          }
+  
+          // For HEIC images, convert to auto format for better browser compatibility
+          if (cloudinaryUrl.toLowerCase().endsWith(".heic")) {
+            // Replace the file extension with auto format for Cloudinary
+            cloudinaryUrl = cloudinaryUrl.replace(/\.heic$/i, ".jpg")
+          }
+  
+          return cloudinaryUrl
+        }
       }
-    }
-
-    // Handle Cloudinary-only URLs
-    if (imageUrl.includes("cloudinary.com")) {
+  
+      // Handle regular Appwrite URLs
+      if (imageUrl.includes("appwrite.io")) {
+        const projectId = "67f47c4200273e45c433"
+        if (!imageUrl.includes("project=")) {
+          return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
+        }
+        return imageUrl
+      }
+  
       return imageUrl
     }
-
-    // For Appwrite URLs, add project ID query param if missing
-    if (imageUrl.includes("appwrite.io")) {
-      const projectId = "67f47c4200273e45c433"
-      if (!imageUrl.includes("project=")) {
-        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
-      }
-      return imageUrl
-    }
-
-    return imageUrl
-  }
 
   // // Format price for display
   // const formatPrice = (price: string | number | null) => {
@@ -246,7 +253,7 @@ export default function ProductDetailPage() {
   if (isStartingChat) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
+        <Header />
         <div className="container px-4 py-4 md:py-8">
           <div className="flex flex-col lg:flex-row gap-4 md:gap-8 animate-pulse">
             <div className="w-full lg:w-1/2">
@@ -276,7 +283,7 @@ export default function ProductDetailPage() {
   if (!product) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
+        <Header />
         <div className="container px-4 py-4 md:py-8">
           <div className="flex flex-col lg:flex-row gap-4 md:gap-8 animate-pulse">
             <div className="w-full lg:w-1/2">
