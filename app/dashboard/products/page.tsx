@@ -11,12 +11,18 @@ import { Separator } from "@/components/ui/separator"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
+import { formatPrice } from "@/lib/utils"
+import { optimizeImageUrl } from "@/lib/image-utils"
 
 export default function DashboardProductsPage() {
   const { products, categories, isLoading, fetchProducts, toggleFavorite } = useProducts()
   
-  // State for UI
+  // State for UI and filters
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selectedCondition, setSelectedCondition] = useState<string | null>(null)
+  const [selectedUniversity, setSelectedUniversity] = useState<string | null>(null)
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000])
   const [sortBy, setSortBy] = useState<string>("newest")
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredProducts, setFilteredProducts] = useState(products)
@@ -26,6 +32,88 @@ export default function DashboardProductsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [totalCount, setTotalCount] = useState(0)
+
+  // Load stored values after component mounts
+  useEffect(() => {
+    // Load view mode
+    const storedViewMode = localStorage.getItem("dashboard_products_viewMode")
+    if (storedViewMode === "list") setViewMode("list")
+
+    // Load other stored values
+    const storedCategory = localStorage.getItem("dashboard_products_category")
+    if (storedCategory) setSelectedCategory(storedCategory)
+
+    const storedCondition = localStorage.getItem("dashboard_products_condition")
+    if (storedCondition) setSelectedCondition(storedCondition)
+
+    const storedUniversity = localStorage.getItem("dashboard_products_university")
+    if (storedUniversity) setSelectedUniversity(storedUniversity)
+
+    const storedPriceRange = localStorage.getItem("dashboard_products_priceRange")
+    if (storedPriceRange) setPriceRange(JSON.parse(storedPriceRange))
+
+    const storedSortBy = localStorage.getItem("dashboard_products_sortBy")
+    if (storedSortBy) setSortBy(storedSortBy)
+
+    const storedSearchQuery = localStorage.getItem("dashboard_products_searchQuery")
+    if (storedSearchQuery) setSearchQuery(storedSearchQuery)
+
+    const storedPage = localStorage.getItem("dashboard_products_currentPage")
+    if (storedPage) setCurrentPage(parseInt(storedPage))
+  }, [])
+
+  // Save values to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem("dashboard_products_viewMode", viewMode)
+  }, [viewMode])
+
+  useEffect(() => {
+    if (selectedCategory) {
+      localStorage.setItem("dashboard_products_category", selectedCategory)
+    } else {
+      localStorage.removeItem("dashboard_products_category")
+    }
+  }, [selectedCategory])
+
+  useEffect(() => {
+    if (selectedCondition) {
+      localStorage.setItem("dashboard_products_condition", selectedCondition)
+    } else {
+      localStorage.removeItem("dashboard_products_condition")
+    }
+  }, [selectedCondition])
+
+  useEffect(() => {
+    if (selectedUniversity) {
+      localStorage.setItem("dashboard_products_university", selectedUniversity)
+    } else {
+      localStorage.removeItem("dashboard_products_university")
+    }
+  }, [selectedUniversity])
+
+  useEffect(() => {
+    localStorage.setItem("dashboard_products_priceRange", JSON.stringify(priceRange))
+  }, [priceRange])
+
+  useEffect(() => {
+    localStorage.setItem("dashboard_products_currentPage", currentPage.toString())
+  }, [currentPage])
+
+  useEffect(() => {
+    if (sortBy) {
+      localStorage.setItem("dashboard_products_sortBy", sortBy)
+    } else {
+      localStorage.removeItem("dashboard_products_sortBy")
+    }
+  }, [sortBy])
+
+  useEffect(() => {
+    if (searchQuery) {
+      localStorage.setItem("dashboard_products_searchQuery", searchQuery)
+    } else {
+      localStorage.removeItem("dashboard_products_searchQuery")
+    }
+  }, [searchQuery])
 
   // Helper function to get sort order
   const getSortOrder = (sort: string) => {
@@ -43,13 +131,78 @@ export default function DashboardProductsPage() {
     }
   }
 
-  // Fetch products with filters and pagination
+  // Load initial state including page number
   useEffect(() => {
-    const getProducts = async () => {
-      const filters: Record<string, any> = {
+    const loadInitialData = async () => {
+      // Load stored values first
+      const storedPage = localStorage.getItem("dashboard_products_currentPage")
+      const storedCategory = localStorage.getItem("dashboard_products_category")
+      const storedCondition = localStorage.getItem("dashboard_products_condition")
+      const storedUniversity = localStorage.getItem("dashboard_products_university")
+      const storedPriceRange = localStorage.getItem("dashboard_products_priceRange")
+      const storedSortBy = localStorage.getItem("dashboard_products_sortBy")
+      const storedSearchQuery = localStorage.getItem("dashboard_products_searchQuery")
+      const storedViewMode = localStorage.getItem("dashboard_products_viewMode")
+
+      // Set initial states from localStorage
+      if (storedPage) setCurrentPage(parseInt(storedPage))
+      if (storedCategory) setSelectedCategory(storedCategory)
+      if (storedCondition) setSelectedCondition(storedCondition)
+      if (storedUniversity) setSelectedUniversity(storedUniversity)
+      if (storedPriceRange) setPriceRange(JSON.parse(storedPriceRange))
+      if (storedSortBy) setSortBy(storedSortBy)
+      if (storedSearchQuery) setSearchQuery(storedSearchQuery)
+      if (storedViewMode === "list") setViewMode("list")
+
+      // Fetch products with stored filters
+      const initialFilters = {
+        page: storedPage ? parseInt(storedPage) : 1,
+        page_size: pageSize,
+        ...(storedSearchQuery && { search: storedSearchQuery }),
+        ...(storedCategory && { category: storedCategory }),
+        ...(storedCondition && { condition: storedCondition }),
+        ...(storedUniversity && { university: storedUniversity }),
+        ...(storedPriceRange && {
+          price_min: JSON.parse(storedPriceRange)[0],
+          price_max: JSON.parse(storedPriceRange)[1]
+        }),
+        ...(storedSortBy && { ordering: getSortOrder(storedSortBy) })
+      }
+
+      try {
+        const response = await fetchProducts(initialFilters)
+        if (response) {
+          setFilteredProducts(response.results)
+          setTotalPages(response.total_pages)
+          setTotalCount(response.count)
+        }
+      } catch (error) {
+        console.error("Error fetching initial products:", error)
+      }
+    }
+
+    loadInitialData()
+  }, []) // Empty dependency array for initial load only
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    localStorage.setItem("dashboard_products_currentPage", page.toString())
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  // Handle filter changes
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const filters = {
         page: currentPage,
         page_size: pageSize,
         ...(searchQuery && { search: searchQuery }),
+        ...(selectedCategory && { category: selectedCategory }),
+        ...(selectedCondition && { condition: selectedCondition }),
+        ...(selectedUniversity && { university: selectedUniversity }),
+        ...(priceRange[0] > 0 && { price_min: priceRange[0] }),
+        ...(priceRange[1] < 2000 && { price_max: priceRange[1] }),
         ...(sortBy && { ordering: getSortOrder(sortBy) })
       }
 
@@ -57,72 +210,42 @@ export default function DashboardProductsPage() {
         const response = await fetchProducts(filters)
         if (response) {
           setFilteredProducts(response.results)
-          setTotalCount(response.count)
           setTotalPages(response.total_pages)
+          setTotalCount(response.count)
         }
       } catch (error) {
-        console.error("Error fetching products:", error)
+        console.error("Error fetching filtered products:", error)
       }
-    }
+    }, 500)
 
-    getProducts()
-  }, [searchQuery, sortBy, currentPage, pageSize])
+    return () => clearTimeout(timer)
+  }, [currentPage, searchQuery, selectedCategory, selectedCondition, selectedUniversity, priceRange, sortBy, pageSize])
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-  }
-
-  // Add this function to handle image URLs
-  const getProperImageUrl = (imageUrl: string | undefined) => {
-    if (!imageUrl) return "/placeholder.svg?height=200&width=200&text=No+Image"
-
-    // Check if the URL contains both Appwrite and Cloudinary
-    if (imageUrl.includes("appwrite.io") && imageUrl.includes("cloudinary.com")) {
-      // Find the position of the nested https:// for cloudinary
-      const cloudinaryStart = imageUrl.indexOf("https://res.cloudinary.com")
-      if (cloudinaryStart !== -1) {
-        // Extract everything from the cloudinary URL start
-        return imageUrl.substring(cloudinaryStart).split("/view")[0]
-      }
-    }
-
-    // For Appwrite URLs, add project ID query param if missing
-    if (imageUrl.includes("appwrite.io")) {
-      const projectId = "67f47c4200273e45c433"
-      if (!imageUrl.includes("project=")) {
-        return `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}project=${projectId}`
-      }
-      return imageUrl
-    }
-
-    return imageUrl
-  }
-
-  // Get display price string - updated to handle all cases
-  const getDisplayPrice = (product: any) => {
-    // Case 1: Regular price (e.g., "20000.00")
-    if (product.price) {
-      return product.price
-    }
+  // Get display price string - updated to handle all cases    
+  // const getDisplayPrice = (product: any) => {
+  //   // Case 1: Regular price (e.g., "20000.00")
+  //   if (product.price) {
+  //     return product.price
+  //   }
     
-    // Case 2: Price range with emoji or text (e.g., "🏷️3500" or "Mini pack ranges from #1300-#1900")
-    if (product.price_range) {
-      return product.price_range
-    }
+  //   // Case 2: Price range with emoji or text (e.g., "🏷️3500" or "Mini pack ranges from #1300-#1900")
+  //   if (product.price_range) {
+  //     return product.price_range
+  //   }
     
-    // Case 3: Fixed price
-    if (product.fixed_price) {
-      return product.fixed_price
-    }
+  //   // Case 3: Fixed price
+  //   if (product.fixed_price) {
+  //     return product.fixed_price
+  //   }
     
-    // Case 4: Custom range
-    if (product.custom_range) {
-      return product.custom_range
-    }
+  //   // Case 4: Custom range
+  //   if (product.custom_range) {
+  //     return product.custom_range
+  //   }
 
-    // Fallback
-    return "Contact for price"
-  }
+  //   // Fallback
+  //   return "Contact for price"
+  // }
 
   // Improved favorite toggle handler
   const handleFavoriteToggle = async (productId: number) => {
@@ -154,12 +277,31 @@ export default function DashboardProductsPage() {
     }
   }
 
+  // Update handleResetFilters
+  const handleResetFilters = () => {
+    setSelectedCategory(null)
+    setSelectedCondition(null)
+    setSelectedUniversity(null)
+    setPriceRange([0, 2000])
+    setSortBy("newest")
+    setSearchQuery("")
+    setCurrentPage(1)
+    
+    // Clear localStorage
+    localStorage.removeItem("dashboard_products_category")
+    localStorage.removeItem("dashboard_products_condition")
+    localStorage.removeItem("dashboard_products_university")
+    localStorage.removeItem("dashboard_products_priceRange")
+    localStorage.removeItem("dashboard_products_sortBy")
+    localStorage.removeItem("dashboard_products_searchQuery")
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">My Products</h1>
-        <p className="text-gray-500">Manage your product listings</p>
+        <h1 className="text-2xl font-bold">Products</h1>
+        <p className="text-gray-500">Find recent products</p>
       </div>
 
       {/* Controls */}
@@ -247,8 +389,8 @@ export default function DashboardProductsPage() {
                   <ProductCard 
                     product={{
                       ...product,
-                      primary_image: getProperImageUrl(product.primary_image),
-                      price: getDisplayPrice(product)
+                      primary_image: optimizeImageUrl(product.primary_image),
+                      price: formatPrice(product)
                     }} 
                     onFavoriteToggle={() => handleFavoriteToggle(product.id)}
                   />
@@ -260,7 +402,7 @@ export default function DashboardProductsPage() {
                     {/* Image Container */}
                     <div className={viewMode === "list" ? "w-32 h-32 relative flex-shrink-0" : "aspect-square relative"}>
                       <img
-                        src={getProperImageUrl(product.primary_image) || "/placeholder.svg"}
+                        src={optimizeImageUrl(product.primary_image) || "/placeholder.svg"}
                         alt={product.name}
                         className="w-full h-full object-cover"
                       />
@@ -297,7 +439,7 @@ export default function DashboardProductsPage() {
                       <div className="flex items-center justify-between mt-auto">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-base">
-                            {getDisplayPrice(product)}
+                            {formatPrice(product)}
                           </span>
                           {product.price_negotiable && 
                             <span className="text-xs text-gray-500">(Negotiable)</span>

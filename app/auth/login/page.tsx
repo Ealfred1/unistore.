@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -20,8 +20,16 @@ export default function LoginPage() {
   const { login, isAuthenticated } = useAuth()
   const router = useRouter()
 
-  // Get redirect path from localStorage instead of URL params
-  const redirectPath = localStorage.getItem("unistore_redirect_after_login") || '/dashboard'
+  // Get redirect path safely
+  const getRedirectPath = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("unistore_redirect_after_login") || '/dashboard'
+    }
+    return '/dashboard'
+  }
+
+  // Use state to store redirect path
+  const [redirectPath, setRedirectPath] = useState(getRedirectPath())
 
   const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -60,9 +68,10 @@ export default function LoginPage() {
       toast.success("Login successful! Redirecting...")
       
       // Clear the redirect path from localStorage and redirect
-      const path = redirectPath
-      localStorage.removeItem("unistore_redirect_after_login")
-      router.push(path)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem("unistore_redirect_after_login")
+      }
+      router.push(redirectPath)
     } catch (error: any) {
       console.error(error)
       
@@ -95,6 +104,15 @@ export default function LoginPage() {
       setIsSubmitting(false)
     }
   }
+
+  // Move localStorage operations into useEffect
+  useEffect(() => {
+    // Now it's safe to access localStorage
+    const storedPath = localStorage.getItem("unistore_redirect_after_login")
+    if (storedPath) {
+      setRedirectPath(storedPath)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
