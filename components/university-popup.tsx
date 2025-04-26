@@ -46,9 +46,6 @@ export function UniversityPopup({ onClose, onSelect }: UniversityPopupProps) {
         >
           <div className="flex items-center justify-between p-4 border-b">
             <h2 className="text-xl font-semibold">Select Your University</h2>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
           </div>
 
           <div className="p-4">
@@ -131,10 +128,10 @@ export function UniversityPopup({ onClose, onSelect }: UniversityPopupProps) {
           </div>
 
           <div className="p-4 border-t flex justify-between">
-            <Button variant="outline" onClick={onClose}>
+            {/* <Button variant="outline" onClick={onClose}>
               Skip for Now
-            </Button>
-            <Button className="bg-[#f58220] hover:bg-[#f58220]/90" onClick={onClose}>
+            </Button> */}
+            <Button className="bg-[#f58220] w-full hover:bg-[#f58220]/90" onClick={onClose}>
               Continue
             </Button>
           </div>

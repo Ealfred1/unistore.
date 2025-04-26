@@ -5,6 +5,17 @@ import { cookies } from 'next/headers'
 export function middleware(request: NextRequest) {
   // Get the path of the request
   const path = request.nextUrl.pathname
+
+  // Define exempt paths
+  const exemptPaths = [
+    '/dashboard/categories',
+    '/dashboard/product'
+  ]
+
+  // Skip middleware for exempt paths
+  if (exemptPaths.some(exemptPath => path === exemptPath || path.startsWith(exemptPath + '/'))) {
+    return NextResponse.next()
+  }
   
   // Check if the path is a dashboard route
   const isDashboardRoute = path.startsWith('/dashboard')

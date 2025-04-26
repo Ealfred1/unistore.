@@ -213,13 +213,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Navigation items with authentication checks
   const navItems = [
     // Only show Dashboard, Messages, Notifications for authenticated users
-    {
-      name: "Dashboard",
-      href: "/dashboard",
-      icon: <Home className="h-5 w-5" />,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-    },
+    // {
+    //   name: "Dashboard",
+    //   href: "/dashboard",
+    //   icon: <Home className="h-5 w-5" />,
+    //   color: "text-blue-600",
+    //   bgColor: "bg-blue-100",
+    // },
     ...(user ? [
       {
         name: "Dashboard",
