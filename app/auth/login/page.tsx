@@ -67,7 +67,7 @@ export default function LoginPage() {
       await login({ phone_number, password })
       toast.success("Login successful! Redirecting...")
       
-      // Clear the redirect path from localStorage and redirect
+      // Clear the redirect path from localStorage and redirect 
       if (typeof window !== 'undefined') {
         localStorage.removeItem("unistore_redirect_after_login")
       }

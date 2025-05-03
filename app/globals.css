@@ -544,4 +544,12 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .bg-pattern {
+    background-image: url("/pattern.webp");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
 }
+
