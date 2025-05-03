@@ -193,8 +193,13 @@ export default function NewProductPage() {
       // Create product
       const newProduct = await createProduct(productData)
       
-      toast.success("Product created successfully!")
-      router.push(`/dashboard/my-products`)
+      // Show success modal instead of immediate redirect
+      setShowSuccessModal(true)
+      
+      // Redirect after a delay
+      setTimeout(() => {
+        router.push(`/dashboard/my-products`)
+      }, 3000)
     } catch (error: any) {
       console.error("Error creating product:", error)
       toast.error(error.response?.data?.message || "Failed to create product")
@@ -203,8 +208,70 @@ export default function NewProductPage() {
     }
   }
 
+  // Add state for modal
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+
+  // Add this before the return statement
+  const SuccessModal = () => (
+    <AnimatePresence>
+      {showSuccessModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-white dark:bg-gray-900 rounded-2xl p-8 max-w-md mx-4 relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-uniOrange via-uniOrange/50 to-uniBlue animate-shimmer bg-[length:200%_100%]" />
+            
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <motion.div
+                  initial={{ rotate: 0 }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.6 }}
+                  className="bg-uniOrange/10 rounded-full p-4"
+                >
+                  <CheckCircle2 className="h-12 w-12 text-uniOrange" />
+                </motion.div>
+              </div>
+              
+              <h2 className="text-2xl font-bold">Product Submitted! 🎉</h2>
+              
+              <div className="space-y-2 text-gray-600 dark:text-gray-300">
+                <p>Your product has been successfully submitted for review ✨</p>
+                <p className="text-sm">Our team will verify your listing shortly 🔍</p>
+              </div>
+
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 3 }}
+                className="h-1 bg-uniOrange/20 rounded-full mt-6 overflow-hidden"
+              >
+                <div className="h-full bg-uniOrange rounded-full animate-pulse" />
+              </motion.div>
+
+              <p className="text-sm text-gray-500">
+                Redirecting to your products...
+              </p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+
   return (
     <div className="lg:container max-w-5xl py-8">
+      {/* Add the modal component */}
+      <SuccessModal />
+      
       <div className="flex items-center mb-6">
         <Button
           variant="ghost"
@@ -235,19 +302,19 @@ export default function NewProductPage() {
         <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger
             value="details"
-            className="data-[state=active]:bg-uniOrange/10 data-[state=active]:text-uniOrange"
+            className="data-[state=active]:bg-uniOrange data-[state=active]:text-white"
           >
             Product Details
           </TabsTrigger>
           <TabsTrigger
             value="images"
-            className="data-[state=active]:bg-uniOrange/10 data-[state=active]:text-uniOrange"
+            className="data-[state=active]:bg-uniOrange data-[state=active]:text-white"
           >
             Images
           </TabsTrigger>
           <TabsTrigger
             value="pricing"
-            className="data-[state=active]:bg-uniOrange/10 data-[state=active]:text-uniOrange"
+            className="data-[state=active]:bg-uniOrange data-[state=active]:text-white"
           >
             Pricing
           </TabsTrigger>

@@ -640,7 +640,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     className="w-full mt-3 bg-[#f58220] hover:bg-[#f58220]/90"
                     onClick={() => router.push("/dashboard/my-products")}
                   >
-                    View My Products
+                    { user ? 'View My Products' : 'Login to View Products' }
                   </Button>
                 )}
               </div>
