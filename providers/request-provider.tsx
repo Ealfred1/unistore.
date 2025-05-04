@@ -203,14 +203,26 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
     const handleRequestCreated = (data: any) => {
       console.log('Received request creation response:', data)
       
-      if (requestCallbacks.current['pending']) {
+      if (data.type === 'request_created' && requestCallbacks.current['pending']) {
         requestCallbacks.current['pending'](data)
         delete requestCallbacks.current['pending']
+      }
+      
+      // Handle new request notifications
+      if (data.type === 'new_request' && data.request) {
+        if (data.notification_type === 'request_created') {
+          setCurrentRequest(data.request)
+        }
       }
     }
 
     wsRef.current.addMessageHandler('request_created', handleRequestCreated)
-    return () => wsRef.current.removeMessageHandler('request_created')
+    wsRef.current.addMessageHandler('new_request', handleRequestCreated)
+    
+    return () => {
+      wsRef.current.removeMessageHandler('request_created')
+      wsRef.current.removeMessageHandler('new_request')
+    }
   }, [])
 
   // Provider methods
@@ -239,6 +251,7 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
           reject(new Error('Request creation timeout'))
         }, 10000)
 
+        // Handle both success and error responses
         requestCallbacks.current['pending'] = (response: any) => {
           clearTimeout(timeoutId)
           
@@ -248,9 +261,11 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
             return
           }
           
-          if (response.request) {
-            console.log('Request created successfully:', response.request)
-            resolve(response.request)
+          if (response.status === 'success' && response.request_id) {
+            console.log('Request created successfully, ID:', response.request_id)
+            // Store the request ID for navigation
+            setCurrentRequest({ id: response.request_id } as Request)
+            resolve({ id: response.request_id } as Request)
           } else {
             reject(new Error('Invalid response format'))
           }

@@ -52,24 +52,20 @@ export default function NewRequestPage() {
     setIsSubmitting(true)
     
     try {
-      // Show loading toast
-      toast.loading("Creating your request... 🚀")
-      
-      // Create request and wait for response
-      const createdRequest = await createRequest({
+      const request = await createRequest({
         title: requestForm.title,
         description: requestForm.description,
         category_id: requestForm.category
       })
       
-      // Show success toast
-      toast.success("Request created successfully! 🎉")
-      
-      // Navigate to request details with correct ID
-      router.push(`/dashboard/requests/${createdRequest.id}`)
+      // Navigate to the request details page
+      if (request.id) {
+        toast.success('Request created successfully!')
+        router.push(`/dashboard/requests/${request.id}`)
+      }
     } catch (error) {
       console.error('Error creating request:', error)
-      toast.error("Failed to create request. Please try again.")
+      toast.error(error instanceof Error ? error.message : 'Failed to create request')
     } finally {
       setIsSubmitting(false)
     }
