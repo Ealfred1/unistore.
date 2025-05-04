@@ -201,18 +201,15 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   // Handle new request creation response
   useEffect(() => {
     const handleRequestCreated = (data: any) => {
-      console.log('Received request creation response:', data)
+      console.log('Received request message:', data)
       
-      if (data.type === 'request_created' && requestCallbacks.current['pending']) {
+      if (requestCallbacks.current['pending']) {
         requestCallbacks.current['pending'](data)
-        delete requestCallbacks.current['pending']
       }
       
-      // Handle new request notifications
+      // Always update current request with full data when available
       if (data.type === 'new_request' && data.request) {
-        if (data.notification_type === 'request_created') {
-          setCurrentRequest(data.request)
-        }
+        setCurrentRequest(data.request)
       }
     }
 
@@ -245,29 +242,48 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
           }
         })
 
-        const timeoutId = setTimeout(() => {
+        let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
           console.log('Request creation timed out')
+          timeoutId = null
           delete requestCallbacks.current['pending']
           reject(new Error('Request creation timeout'))
         }, 10000)
 
         // Handle both success and error responses
         requestCallbacks.current['pending'] = (response: any) => {
+          console.log('Handling request creation response:', response)
+          
+          // Only process if timeout hasn't occurred
+          if (!timeoutId) return
+          
+          // Clear timeout
           clearTimeout(timeoutId)
+          timeoutId = null
           
           if (response.status === 'error') {
             console.error('Request creation failed:', response.message)
+            delete requestCallbacks.current['pending']
             reject(new Error(response.message))
             return
           }
           
-          if (response.status === 'success' && response.request_id) {
+          // Handle initial success response
+          if (response.type === 'request_created' && response.status === 'success') {
             console.log('Request created successfully, ID:', response.request_id)
-            // Store the request ID for navigation
-            setCurrentRequest({ id: response.request_id } as Request)
-            resolve({ id: response.request_id } as Request)
-          } else {
-            reject(new Error('Invalid response format'))
+            const requestData = { id: response.request_id } as Request
+            setCurrentRequest(requestData)
+            delete requestCallbacks.current['pending']
+            resolve(requestData)
+            return
+          }
+          
+          // Handle full request data
+          if (response.type === 'new_request' && response.notification_type === 'request_created') {
+            console.log('Received full request data:', response.request)
+            setCurrentRequest(response.request)
+            delete requestCallbacks.current['pending']
+            resolve(response.request)
+            return
           }
         }
       } catch (error) {
