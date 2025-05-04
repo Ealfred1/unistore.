@@ -11,6 +11,7 @@ export class WebSocketManager {
   private token: string | null = null;
   private persistentConnection = false;
   private disconnectHandler: (() => void) | null = null;
+  private currentEndpoint: string | null = null;
 
   private constructor() {}
 
@@ -37,7 +38,7 @@ export class WebSocketManager {
     this.disconnectHandler = handler;
   }
 
-  connect() {
+  connect(endpoint?: string) {
     if (this.socket?.readyState === WebSocket.OPEN || this.isConnecting) {
       return;
     }
@@ -48,8 +49,10 @@ export class WebSocketManager {
     try {
       const protocol = process.env.NODE_ENV === 'development' ? 'ws' : 'wss';
       const baseUrl = process.env.NEXT_PUBLIC_WS_URL || 'unistore-v2.onrender.com';
-      const wsUrl = `${protocol}://${baseUrl.replace(/^https?:\/\/|^wss?:\/\//, '')}/ws/messaging/?token=${this.token}`;
+      this.currentEndpoint = endpoint || 'ws/messaging/';
+      const wsUrl = `${protocol}://${baseUrl.replace(/^https?:\/\/|^wss?:\/\//, '')}/${this.currentEndpoint}?token=${this.token}`;
 
+      console.log('Connecting to WebSocket:', wsUrl);
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
@@ -62,8 +65,8 @@ export class WebSocketManager {
       this.socket.onclose = () => {
         this.disconnectHandler?.();
         if (this.persistentConnection) {
-          console.log('Persistent connection closed, attempting reconnect...');
-          setTimeout(() => this.connect(), 1000);
+          console.log(`Persistent connection closed, attempting reconnect to ${this.currentEndpoint}...`);
+          setTimeout(() => this.connect(this.currentEndpoint), 1000);
         }
       };
 
@@ -111,7 +114,7 @@ export class WebSocketManager {
       console.error('WebSocket connection error:', error);
       this.disconnectHandler?.();
       if (this.persistentConnection) {
-        setTimeout(() => this.connect(), 1000);
+        setTimeout(() => this.connect(this.currentEndpoint), 1000);
       }
     }
   }
@@ -171,7 +174,6 @@ export class WebSocketManager {
     this.messageQueue = [];
   }
 
-  // Add cleanup method
   cleanup() {
     if (this.socket) {
       this.socket.close();
@@ -181,6 +183,7 @@ export class WebSocketManager {
     this.reconnectAttempts = 0;
     this.messageQueue = [];
     this.messageHandlers.clear();
+    this.currentEndpoint = null;
   }
 
   isConnected(): boolean {

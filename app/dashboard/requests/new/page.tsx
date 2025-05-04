@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { 
@@ -10,15 +10,22 @@ import {
   BookOpen,
   GraduationCap,
   Tags,
-  MessageSquarePlus
+  MessageSquarePlus,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import { useRequest } from "@/providers/request-provider"
+import { useProducts } from "@/providers/product-provider"
 
 export default function NewRequestPage() {
   const router = useRouter()
+  const { createRequest } = useRequest()
+  const { categories, isLoading: categoriesLoading } = useProducts()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   
   const [requestForm, setRequestForm] = useState({
     title: "",
@@ -26,28 +33,42 @@ export default function NewRequestPage() {
     category: "",
   })
 
-  const dummyCategories = [
-    { id: "1", name: "📚 Textbooks", icon: "📚" },
-    { id: "2", name: "💻 Electronics", icon: "💻" },
-    { id: "3", name: "✏️ Study Materials", icon: "✏️" },
-    { id: "4", name: "🎨 Art Supplies", icon: "🎨" },
-    { id: "5", name: "🔬 Lab Equipment", icon: "🔬" },
-  ]
+  // Scroll handlers for category carousel
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 300 // Adjust this value as needed
+      const newScrollLeft = scrollContainerRef.current.scrollLeft + 
+        (direction === 'left' ? -scrollAmount : scrollAmount)
+      
+      scrollContainerRef.current.scrollTo({
+        left: newScrollLeft,
+        behavior: 'smooth'
+      })
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Show loading toast
+      toast.loading("Creating your request... 🚀")
+      
+      // Create request and wait for response
+      const createdRequest = await createRequest({
+        title: requestForm.title,
+        description: requestForm.description,
+        category_id: requestForm.category
+      })
       
       // Show success toast
       toast.success("Request created successfully! 🎉")
       
-      // Redirect to request details
-      router.push(`/dashboard/requests/123`) // Replace with actual request ID
+      // Navigate to request details with correct ID
+      router.push(`/dashboard/requests/${createdRequest.id}`)
     } catch (error) {
+      console.error('Error creating request:', error)
       toast.error("Failed to create request. Please try again.")
     } finally {
       setIsSubmitting(false)
@@ -120,26 +141,68 @@ export default function NewRequestPage() {
             </div>
 
             <div>
-              <Label htmlFor="category" className="text-base font-medium flex items-center">
+              <Label htmlFor="category" className="text-base font-medium flex items-center mb-4">
                 <GraduationCap className="h-4 w-4 mr-2 text-uniOrange" />
                 Category*
               </Label>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                {dummyCategories.map((category) => (
-                  <button
-                    key={category.id}
-                    type="button"
-                    onClick={() => setRequestForm(prev => ({ ...prev, category: category.id }))}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      requestForm.category === category.id
-                        ? "border-uniOrange bg-uniOrange/5"
-                        : "border-gray-200 dark:border-gray-700 hover:border-uniOrange/50"
-                    }`}
-                  >
-                    <div className="text-2xl mb-2">{category.icon}</div>
-                    <div className="text-sm font-medium">{category.name}</div>
-                  </button>
-                ))}
+              
+              <div className="relative">
+                {/* Left scroll button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm"
+                  onClick={() => handleScroll('left')}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                {/* Scrollable categories container */}
+                <div 
+                  ref={scrollContainerRef}
+                  className="flex overflow-x-auto scrollbar-hide gap-3 px-8 pb-2 -mx-2"
+                  style={{ scrollBehavior: 'smooth' }}
+                >
+                  {categoriesLoading ? (
+                    // Loading skeletons
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <div 
+                        key={i}
+                        className="flex-shrink-0 w-[200px] h-[100px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse"
+                      />
+                    ))
+                  ) : (
+                    // Actual categories
+                    categories.map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => setRequestForm(prev => ({ ...prev, category: category.id }))}
+                        className={`flex-shrink-0 w-[200px] p-4 rounded-lg border-2 transition-all ${
+                          requestForm.category === category.id
+                            ? "border-uniOrange bg-uniOrange/5"
+                            : "border-gray-200 dark:border-gray-700 hover:border-uniOrange/50"
+                        }`}
+                      >
+                        <div className="text-2xl mb-2">{category.icon}</div>
+                        <div className="text-sm font-medium">{category.name}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {category.product_count} items available
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {/* Right scroll button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm"
+                  onClick={() => handleScroll('right')}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
