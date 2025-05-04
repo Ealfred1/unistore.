@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   ArrowLeft,
@@ -12,56 +12,29 @@ import {
   Store,
   BadgeCheck,
   Star,
-  SendHorizonal
+  SendHorizonal,
+  Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { useRequest } from '@/providers/request-provider'
 
-// Dummy data
-const requestData = {
-  id: "123",
-  title: "Looking for Chemistry 101 Textbook",
-  description: "Need the latest edition of Chemistry 101 by John Smith. Preferably in good condition.",
-  category: "📚 Textbooks",
-  status: "active",
-  createdAt: "2024-03-15T10:00:00Z",
-  views: 24,
-  offers: [
-    {
-      id: "1",
-      merchant: {
-        name: "Campus Bookstore",
-        rating: 4.8,
-        verified: true,
-        image: "https://ui-avatars.com/api/?name=Campus+Bookstore"
-      },
-      price: 15000,
-      description: "We have a new copy of Chemistry 101, latest edition available.",
-      createdAt: "2024-03-15T11:30:00Z"
-    },
-    {
-      id: "2",
-      merchant: {
-        name: "Student Exchange",
-        rating: 4.5,
-        verified: false,
-        image: "https://ui-avatars.com/api/?name=Student+Exchange"
-      },
-      price: 12000,
-      description: "Used copy in excellent condition, all pages intact.",
-      createdAt: "2024-03-15T12:15:00Z"
-    }
-  ]
-}
-
-export default function RequestDetailsPage() {
+export default function RequestDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const { 
+    viewRequest, 
+    acceptOffer, 
+    currentRequest,
+    requestViews,
+    pendingOffers 
+  } = useRequest()
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null)
   const [showMessageModal, setShowMessageModal] = useState(false)
   const [message, setMessage] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -72,21 +45,54 @@ export default function RequestDetailsPage() {
     })
   }
 
+  useEffect(() => {
+    // Record view and fetch request details
+    if (params.id) {
+      viewRequest(params.id)
+    }
+  }, [params.id])
+
+  // Listen for new offers
+  useEffect(() => {
+    if (pendingOffers.length > 0) {
+      // Update UI when new offers arrive
+      const latestOffer = pendingOffers[pendingOffers.length - 1]
+      toast(
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-uniOrange/10 flex items-center justify-center">
+            💰
+          </div>
+          <div>
+            <p className="font-medium">New Offer!</p>
+            <p className="text-sm text-gray-600">
+              {latestOffer.merchant.name} made an offer
+            </p>
+          </div>
+        </div>
+      )
+    }
+  }, [pendingOffers])
+
+  if (!currentRequest) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-uniOrange" />
+          <p className="text-gray-500">Loading request details...</p>
+        </div>
+      </div>
+    )
+  }
+
   const handleAcceptOffer = async (offerId: string) => {
     setSelectedOffer(offerId)
     
     try {
-      // Show loading toast
       toast.loading("Processing your acceptance... ⚡️")
+      acceptOffer(currentRequest.id, offerId)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // Show success toast
-      toast.success("Offer accepted successfully! 🎉")
-      
-      // Navigate to accepted page
-      router.push(`/dashboard/requests/${requestData.id}/accepted`)
+      // Navigate after successful acceptance
+      router.push(`/dashboard/requests/${currentRequest.id}/accepted`)
     } catch (error) {
       toast.error("Failed to accept offer")
       setSelectedOffer(null)
@@ -128,22 +134,22 @@ export default function RequestDetailsPage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-xl font-semibold">{requestData.title}</h2>
+              <h2 className="text-xl font-semibold">{currentRequest.title}</h2>
               <div className="flex items-center mt-2 text-sm text-gray-500">
                 <Clock className="h-4 w-4 mr-1" />
-                {formatDate(requestData.createdAt)}
+                {formatDate(currentRequest.createdAt)}
                 <span className="mx-2">•</span>
                 <Eye className="h-4 w-4 mr-1" />
-                {requestData.views} views
+                {requestViews[currentRequest.id] || 0} views
               </div>
             </div>
             <span className="px-3 py-1 bg-uniOrange/10 text-uniOrange rounded-full text-sm font-medium">
-              {requestData.category}
+              {currentRequest.category}
             </span>
           </div>
 
           <p className="mt-4 text-gray-600 dark:text-gray-300">
-            {requestData.description}
+            {currentRequest.description}
           </p>
         </motion.div>
 
@@ -151,43 +157,33 @@ export default function RequestDetailsPage() {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center">
             <MessageSquare className="h-5 w-5 mr-2 text-uniOrange" />
-            Offers ({requestData.offers.length})
+            Offers ({pendingOffers.length})
           </h3>
 
           <AnimatePresence>
-            {requestData.offers.map((offer, index) => (
+            {pendingOffers.map((offer) => (
               <motion.div
                 key={offer.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className={`bg-white dark:bg-gray-950 rounded-xl border ${
-                  selectedOffer === offer.id
-                    ? "border-uniOrange"
-                    : "border-gray-200 dark:border-gray-800"
-                } shadow-sm p-6`}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
               >
-                <div className="flex items-start justify-between">
+                {/* Offer details */}
+                <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center">
-                    <div className="relative h-12 w-12 rounded-full overflow-hidden">
-                      <Image
-                        src={offer.merchant.image}
-                        alt={offer.merchant.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="ml-4">
-                      <div className="flex items-center">
-                        <h4 className="font-semibold">{offer.merchant.name}</h4>
-                        {offer.merchant.verified && (
-                          <BadgeCheck className="h-4 w-4 ml-1 text-uniOrange" />
-                        )}
-                      </div>
-                      <div className="flex items-center mt-1 text-sm text-gray-500">
-                        <Star className="h-4 w-4 mr-1 text-yellow-400 fill-current" />
-                        {offer.merchant.rating}
-                      </div>
+                    <Image
+                      src={offer.merchant.image}
+                      alt={offer.merchant.name}
+                      width={40}
+                      height={40}
+                      className="rounded-full"
+                    />
+                    <div className="ml-3">
+                      <h4 className="font-semibold">{offer.merchant.name}</h4>
+                      {offer.merchant.verified && (
+                        <BadgeCheck className="h-4 w-4 ml-1 text-uniOrange" />
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -200,14 +196,13 @@ export default function RequestDetailsPage() {
                   </div>
                 </div>
 
-                <p className="mt-4 text-gray-600 dark:text-gray-300">
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
                   {offer.description}
                 </p>
 
-                <div className="mt-6 flex justify-end space-x-3">
+                <div className="flex justify-end space-x-3">
                   <Button
                     variant="outline"
-                    className="border-gray-200 dark:border-gray-700"
                     onClick={() => setSelectedOffer(null)}
                   >
                     <XCircle className="h-4 w-4 mr-2" />

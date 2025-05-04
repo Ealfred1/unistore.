@@ -8,6 +8,7 @@ import { ProductProvider } from "@/providers/product-provider"
 import { UniversityProvider } from "@/providers/university-provider"
 import { Toaster } from 'sonner'
 import { MessagingProvider } from '@/providers/messaging-provider'
+import { RequestProvider } from '@/providers/request-provider'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -25,16 +26,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-          <AuthProvider>
-`          <MessagingProvider>
-`            <UniversityProvider>
-              <ProductProvider>
-                {children}
-              </ProductProvider>
-            </UniversityProvider>
-          </MessagingProvider>
-          </AuthProvider>
+        <AuthProvider>
+        <RequestProvider>
+            <MessagingProvider>
+              <UniversityProvider>
+                <ProductProvider>
+                  {children}
+                </ProductProvider>
+              </UniversityProvider>
+            </MessagingProvider>
+        </RequestProvider>
           <Toaster position="bottom-right" richColors />
+          </AuthProvider>
       </body>
     </html>
   )
