@@ -43,6 +43,8 @@ interface RequestContextType {
   currentRequest: Request | null
   requestViews: { [key: string]: number }
   pendingOffers: Array<Offer>
+  pendingRequests: Request[]
+  getRequestDetails: (requestId: string) => Request | null
 }
 
 const RequestContext = createContext<RequestContextType>({
@@ -54,7 +56,9 @@ const RequestContext = createContext<RequestContextType>({
   acceptOffer: () => {},
   currentRequest: null,
   requestViews: {},
-  pendingOffers: []
+  pendingOffers: [],
+  pendingRequests: [],
+  getRequestDetails: () => null
 })
 
 export function RequestProvider({ children }: { children: React.ReactNode }) {
@@ -64,6 +68,7 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   const [currentRequest, setCurrentRequest] = useState<Request | null>(null)
   const [requestViews, setRequestViews] = useState<{ [key: string]: number }>({})
   const [pendingOffers, setPendingOffers] = useState<Array<Offer>>([])
+  const [pendingRequests, setPendingRequests] = useState<Request[]>([])
   const pathname = usePathname()
   const requestCallbacks = useRef<{ [key: string]: (request: Request) => void }>({})
 
@@ -198,29 +203,18 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
     return () => wsRef.current.removeMessageHandler('offer_accepted')
   }, [user])
 
-  // Handle new request creation response
+  // Handle pending requests message
   useEffect(() => {
-    const handleRequestCreated = (data: any) => {
-      console.log('Received request message:', data)
-      
-      if (requestCallbacks.current['pending']) {
-        requestCallbacks.current['pending'](data)
+    const handlePendingRequests = (data: any) => {
+      if (data.type === 'pending_requests' && Array.isArray(data.requests)) {
+        console.log('Received pending requests:', data.requests);
+        setPendingRequests(data.requests);
       }
-      
-      // Always update current request with full data when available
-      if (data.type === 'new_request' && data.request) {
-        setCurrentRequest(data.request)
-      }
-    }
+    };
 
-    wsRef.current.addMessageHandler('request_created', handleRequestCreated)
-    wsRef.current.addMessageHandler('new_request', handleRequestCreated)
-    
-    return () => {
-      wsRef.current.removeMessageHandler('request_created')
-      wsRef.current.removeMessageHandler('new_request')
-    }
-  }, [])
+    wsRef.current.addMessageHandler('pending_requests', handlePendingRequests);
+    return () => wsRef.current.removeMessageHandler('pending_requests');
+  }, []);
 
   // Provider methods
   const createRequest = (requestData: any): Promise<Request> => {
@@ -230,9 +224,40 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      let hasResolved = false
+
       try {
         console.log('Sending create request:', requestData)
         
+        // Handler for both request_created and new_request messages
+        const handleMessage = (data: any) => {
+          console.log('Received message in createRequest:', data)
+          
+          if (hasResolved) return
+
+          // For request_created type
+          if (data.type === 'request_created' && data.status === 'success') {
+            console.log('Request created successfully with ID:', data.request_id)
+            // Find request in pending requests
+            const request = pendingRequests.find(r => r.id === data.request_id)
+            if (request) {
+              hasResolved = true
+              resolve(request)
+              wsRef.current.removeMessageHandler('request_created', handleMessage)
+              wsRef.current.removeMessageHandler('new_request', handleMessage)
+            }
+          }
+          
+          // For new_request type with request_created notification
+          if (data.type === 'new_request' && data.request) {
+            console.log('Full request data received:', data.request)
+            hasResolved = true
+            resolve(data.request)
+            wsRef.current.removeMessageHandler('request_created', handleMessage)
+            wsRef.current.removeMessageHandler('new_request', handleMessage)
+          }
+        }
+
         wsRef.current.send('create_request', {
           type: 'create_request',
           request_data: {
@@ -242,50 +267,10 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
           }
         })
 
-        let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
-          console.log('Request creation timed out')
-          timeoutId = null
-          delete requestCallbacks.current['pending']
-          reject(new Error('Request creation timeout'))
-        }, 10000)
+        // Add handlers for both message types
+        wsRef.current.addMessageHandler('request_created', handleMessage)
+        wsRef.current.addMessageHandler('new_request', handleMessage)
 
-        // Handle both success and error responses
-        requestCallbacks.current['pending'] = (response: any) => {
-          console.log('Handling request creation response:', response)
-          
-          // Only process if timeout hasn't occurred
-          if (!timeoutId) return
-          
-          // Clear timeout
-          clearTimeout(timeoutId)
-          timeoutId = null
-          
-          if (response.status === 'error') {
-            console.error('Request creation failed:', response.message)
-            delete requestCallbacks.current['pending']
-            reject(new Error(response.message))
-            return
-          }
-          
-          // Handle initial success response
-          if (response.type === 'request_created' && response.status === 'success') {
-            console.log('Request created successfully, ID:', response.request_id)
-            const requestData = { id: response.request_id } as Request
-            setCurrentRequest(requestData)
-            delete requestCallbacks.current['pending']
-            resolve(requestData)
-            return
-          }
-          
-          // Handle full request data
-          if (response.type === 'new_request' && response.notification_type === 'request_created') {
-            console.log('Received full request data:', response.request)
-            setCurrentRequest(response.request)
-            delete requestCallbacks.current['pending']
-            resolve(response.request)
-            return
-          }
-        }
       } catch (error) {
         console.error('Error sending request:', error)
         reject(error)
@@ -294,10 +279,17 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   }
 
   const viewRequest = (requestId: string) => {
+    // First try to find the request in pending requests
+    const request = pendingRequests.find(r => r.id.toString() === requestId);
+    if (request) {
+      setCurrentRequest(request);
+    }
+
+    // Still send the view_request message to track views
     wsRef.current.send('view_request', {
       type: 'view_request',
       request_id: requestId
-    })
+    });
   }
 
   const makeOffer = (requestId: string, offerData: any) => {
@@ -316,6 +308,25 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  // Add a method to get request details
+  const getRequestDetails = (requestId: string) => {
+    console.log('Getting request details for:', requestId);
+    console.log('Current pending requests:', pendingRequests);
+    
+    // Find request in pending requests
+    const request = pendingRequests.find(r => r.id.toString() === requestId);
+    
+    if (request) {
+      console.log('Found request:', request);
+      setCurrentRequest(request);
+      return request;
+    } else {
+      console.log('Request not found');
+      return null;
+    }
+  }
+
+  // Update the context value to include getRequestDetails
   const contextValue = useMemo(() => ({
     wsInstance: wsRef.current,
     isConnected,
@@ -325,8 +336,10 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
     acceptOffer,
     currentRequest,
     requestViews,
-    pendingOffers
-  }), [isConnected, currentRequest, requestViews, pendingOffers])
+    pendingOffers,
+    pendingRequests,
+    getRequestDetails
+  }), [isConnected, currentRequest, requestViews, pendingOffers, pendingRequests])
 
   // Show connection status in UI
   useEffect(() => {

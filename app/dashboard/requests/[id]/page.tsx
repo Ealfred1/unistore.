@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import React from "react"
 import { 
   ArrowLeft,
   Eye,
@@ -23,13 +24,17 @@ import { toast } from "sonner"
 import { useRequest } from '@/providers/request-provider'
 
 export default function RequestDetailsPage({ params }: { params: { id: string } }) {
+  const unwrappedParams = React.use(params as any);
+  const requestId = unwrappedParams.id;
+  
   const router = useRouter()
   const { 
     viewRequest, 
     acceptOffer, 
     currentRequest,
     requestViews,
-    pendingOffers 
+    pendingOffers,
+    pendingRequests
   } = useRequest()
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null)
   const [showMessageModal, setShowMessageModal] = useState(false)
@@ -46,11 +51,30 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   }
 
   useEffect(() => {
-    // Record view and fetch request details
-    if (params.id) {
-      viewRequest(params.id)
-    }
-  }, [params.id])
+    const loadRequest = async () => {
+      if (!requestId) return;
+
+      try {
+        // Find request in pending requests
+        const request = pendingRequests.find(r => r.id.toString() === requestId);
+        
+        if (request) {
+          // View the request to track views
+          viewRequest(requestId);
+          setIsLoading(false);
+        } else {
+          console.log('Request not found in pending requests:', requestId);
+          // Don't redirect immediately, show the not found state instead
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error loading request:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadRequest();
+  }, [requestId, viewRequest, pendingRequests]);
 
   // Listen for new offers
   useEffect(() => {
@@ -73,7 +97,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     }
   }, [pendingOffers])
 
-  if (!currentRequest) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center space-y-4">
@@ -81,7 +105,23 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
           <p className="text-gray-500">Loading request details...</p>
         </div>
       </div>
-    )
+    );
+  }
+
+  if (!currentRequest) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center space-y-4">
+          <p className="text-gray-500">Request not found</p>
+          <Button 
+            variant="ghost"
+            onClick={() => router.push('/dashboard/requests')}
+          >
+            Back to Requests
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const handleAcceptOffer = async (offerId: string) => {
@@ -126,32 +166,33 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
       </div>
 
       <div className="grid gap-6">
-        {/* Request Details Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6"
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">{currentRequest.title}</h2>
-              <div className="flex items-center mt-2 text-sm text-gray-500">
-                <Clock className="h-4 w-4 mr-1" />
-                {formatDate(currentRequest.createdAt)}
-                <span className="mx-2">•</span>
-                <Eye className="h-4 w-4 mr-1" />
-                {requestViews[currentRequest.id] || 0} views
+        {currentRequest && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">{currentRequest.title}</h2>
+                <div className="flex items-center mt-2 text-sm text-gray-500">
+                  <Clock className="h-4 w-4 mr-1" />
+                  {formatDate(currentRequest.created_at)}
+                  <span className="mx-2">•</span>
+                  <Eye className="h-4 w-4 mr-1" />
+                  {requestViews[currentRequest.id] || 0} views
+                </div>
               </div>
+              <span className="px-3 py-1 bg-uniOrange/10 text-uniOrange rounded-full text-sm font-medium">
+                {currentRequest.category_name}
+              </span>
             </div>
-            <span className="px-3 py-1 bg-uniOrange/10 text-uniOrange rounded-full text-sm font-medium">
-              {currentRequest.category}
-            </span>
-          </div>
 
-          <p className="mt-4 text-gray-600 dark:text-gray-300">
-            {currentRequest.description}
-          </p>
-        </motion.div>
+            <p className="mt-4 text-gray-600 dark:text-gray-300">
+              {currentRequest.description}
+            </p>
+          </motion.div>
+        )}
 
         {/* Offers Section */}
         <div className="space-y-4">
