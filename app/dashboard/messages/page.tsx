@@ -91,8 +91,8 @@ export default function MessagesPage() {
       setIsLoading(true)
       try {
         // Check if we have cached conversations from the provider
-        if (cachedConversations.length > 0) {
-          console.log('Using cached conversations from provider');
+        if (cachedConversations && cachedConversations.length > 0) {
+          console.log('Using cached conversations from provider:', cachedConversations.length);
           setConversations(cachedConversations);
           setIsLoading(false);
           
@@ -107,20 +107,39 @@ export default function MessagesPage() {
           return;
         }
         
-        // If we have stored conversations, show refresh state instead
-        if (conversations.length > 0) {
-          setIsLoading(false)
-          setIsRefreshing(true)
+        // If we have stored conversations, use them while we fetch fresh ones
+        const storedConvs = localStorage.getItem('conversations');
+        if (storedConvs) {
+          try {
+            const parsed = JSON.parse(storedConvs);
+            if (parsed && parsed.length > 0) {
+              console.log('Using stored conversations from localStorage:', parsed.length);
+              setConversations(parsed);
+              setIsLoading(false);
+              setIsRefreshing(true);
+            }
+          } catch (e) {
+            console.error('Failed to parse stored conversations:', e);
+          }
         }
         
-        await getConversations()
+        // Always fetch fresh conversations if we don't have cached ones
+        console.log('Fetching fresh conversations');
+        await getConversations();
+      } catch (error) {
+        console.error('Error loading conversations:', error);
+        setError('Failed to load conversations');
       } finally {
-        setIsLoading(false)
-        setIsRefreshing(false)
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
+    };
+    
+    // Only run this if we have a token
+    if (token) {
+      loadConversations();
     }
-    loadConversations()
-  }, [getConversations, cachedConversations, lastFetchTime])
+  }, [getConversations, cachedConversations, lastFetchTime, token]);
 
   // Load messages when conversation changes
   useEffect(() => {
@@ -182,12 +201,23 @@ export default function MessagesPage() {
 
   // Add this effect to use cached merchants
   useEffect(() => {
-    if (cachedMerchants?.length > 0 && onlineMerchants?.length === 0) {
-      console.log('Using cached merchants from provider');
-      // You'll need to add a setOnlineMerchants function to your useMessaging hook
+    if (cachedMerchants && cachedMerchants.length > 0) {
+      console.log('Using cached merchants from provider:', cachedMerchants.length);
       setOnlineMerchants(cachedMerchants);
+    } else if (!onlineMerchants || onlineMerchants.length === 0) {
+      // If no cached merchants and no current merchants, we need to ensure
+      // the WebSocket connection is established to get them
+      console.log('No cached merchants available, ensuring WebSocket connection');
+      if (wsInstance && !isConnected) {
+        wsInstance.connect();
+      }
     }
-  }, [cachedMerchants, onlineMerchants]);
+  }, [cachedMerchants, onlineMerchants, wsInstance, isConnected]);
+
+  // Add a debug effect to monitor conversations
+  useEffect(() => {
+    console.log('Conversations updated:', conversations.length);
+  }, [conversations]);
 
   // Enhanced message sending with offline support
   const handleSendMessage = async (e: React.FormEvent) => {
