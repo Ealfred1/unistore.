@@ -76,21 +76,20 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     ws.updateToken(token);
     ws.setPersistentConnection(true);
 
+    // Update connection status handlers
     const handleConnect = () => {
-      console.log('✅ Messaging WebSocket connected successfully');
+      console.log('WebSocket connected');
       setIsConnected(true);
     };
 
     const handleDisconnect = () => {
-      console.log('❌ Messaging WebSocket disconnected');
+      console.log('WebSocket disconnected');
       setIsConnected(false);
     };
 
     ws.addMessageHandler('connection_established', handleConnect);
     ws.onDisconnect(handleDisconnect);
-    
-    // Connect to messaging endpoint
-    ws.connect('ws/messaging/');
+    ws.connect();
 
     return () => {
       ws.removeMessageHandler('connection_established', handleConnect);

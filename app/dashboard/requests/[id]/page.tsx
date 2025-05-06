@@ -22,6 +22,7 @@ import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { useRequest } from '@/providers/request-provider'
+import { useRequestDetails } from '@/hooks/useRequestDetails'
 
 export default function RequestDetailsPage({ params }: { params: { id: string } }) {
   const unwrappedParams = React.use(params as any);
@@ -31,15 +32,16 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   const { 
     viewRequest, 
     acceptOffer, 
-    currentRequest,
     requestViews,
-    pendingOffers,
-    pendingRequests
+    pendingOffers
   } = useRequest()
+
+  // Use the hook to get request details
+  const { request: currentRequest, loading: isLoading, error } = useRequestDetails(Number(requestId));
+
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null)
   const [showMessageModal, setShowMessageModal] = useState(false)
   const [message, setMessage] = useState("")
-  const [isLoading, setIsLoading] = useState(true)
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -51,30 +53,11 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   }
 
   useEffect(() => {
-    const loadRequest = async () => {
-      if (!requestId) return;
-
-      try {
-        // Find request in pending requests
-        const request = pendingRequests.find(r => r.id.toString() === requestId);
-        
-        if (request) {
-          // View the request to track views
-          viewRequest(requestId);
-          setIsLoading(false);
-        } else {
-          console.log('Request not found in pending requests:', requestId);
-          // Don't redirect immediately, show the not found state instead
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error('Error loading request:', error);
-        setIsLoading(false);
-      }
-    };
-
-    loadRequest();
-  }, [requestId, viewRequest, pendingRequests]);
+    if (requestId && currentRequest) {
+      // Only track view if we have the request
+      viewRequest(requestId);
+    }
+  }, [requestId, currentRequest, viewRequest]);
 
   // Listen for new offers
   useEffect(() => {
@@ -103,6 +86,22 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-uniOrange" />
           <p className="text-gray-500">Loading request details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center space-y-4">
+          <p className="text-gray-500">Error: {error}</p>
+          <Button 
+            variant="ghost"
+            onClick={() => router.push('/dashboard/requests')}
+          >
+            Back to Requests
+          </Button>
         </div>
       </div>
     );

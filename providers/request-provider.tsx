@@ -63,7 +63,7 @@ const RequestContext = createContext<RequestContextType>({
 
 export function RequestProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const wsRef = useRef<WebSocketManager>(WebSocketManager.getInstance())
+  const wsRef = useRef<WebSocketManager>(WebSocketManager.getInstance('requests'))
   const [isConnected, setIsConnected] = useState(false)
   const [currentRequest, setCurrentRequest] = useState<Request | null>(null)
   const [requestViews, setRequestViews] = useState<{ [key: string]: number }>({})
@@ -74,54 +74,44 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize WebSocket connection
   useEffect(() => {
-    if (!user?.id) {
-      console.log('No user ID found, skipping WS connection')
-      return
-    }
+    if (!user?.id) return;
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
 
-    const token = localStorage.getItem("access_token")
-    if (!token) {
-      console.log('No token found, skipping WS connection')
-      return
-    }
+    console.log('Initializing Request WebSocket connection...');
 
-    console.log('Initializing Request WebSocket connection...')
-
-    const ws = wsRef.current
-    ws.cleanup()
-    ws.updateToken(token)
-    ws.setPersistentConnection(true)
+    const ws = wsRef.current;
+    ws.cleanup();
+    ws.updateToken(token);
+    ws.setPersistentConnection(true);
 
     const handleConnect = () => {
-      console.log('✅ Request WebSocket connected successfully')
-      setIsConnected(true)
+      console.log('✅ Request WebSocket connected successfully');
+      setIsConnected(true);
       
       // Send initialize message after successful connection
       ws.send('initialize', {
         type: 'initialize',
         user_id: user.id,
         university_id: user.university_id
-      })
-    }
+      });
+    };
 
     const handleDisconnect = () => {
-      console.log('❌ Request WebSocket disconnected')
-      setIsConnected(false)
-      toast.error("Lost connection to server. Reconnecting...")
-    }
+      console.log('❌ Request WebSocket disconnected');
+      setIsConnected(false);
+    };
 
-    ws.addMessageHandler('connection_established', handleConnect)
-    ws.onDisconnect(handleDisconnect)
+    ws.addMessageHandler('connection_established', handleConnect);
+    ws.onDisconnect(handleDisconnect);
 
     // Connect to requests endpoint
-    ws.connect('ws/requests/')
+    ws.connect('ws/requests/');
 
     return () => {
-      console.log('Cleaning up Request WebSocket connection...')
-      ws.removeMessageHandler('connection_established', handleConnect)
-      ws.cleanup()
-    }
-  }, [user?.id])
+      ws.removeMessageHandler('connection_established', handleConnect);
+    };
+  }, [user?.id]);
 
   // Handle request views
   useEffect(() => {
