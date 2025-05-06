@@ -301,13 +301,13 @@ export default function MessagesPage() {
       <div className="flex h-full">
         {/* Left Sidebar - Conversations List */}
         <div className={`
-          w-full md:w-[380px] z-50 flex flex-col bg-white dark:bg-secondary-800
+          w-full md:w-[380px] flex flex-col bg-white dark:bg-secondary-800
           border-r border-secondary-100 dark:border-secondary-700
           ${currentConversation ? 'hidden md:flex' : 'flex'}
           h-full
         `}>
           {/* Sticky Header */}
-          <div className="sticky top-0 z-20">
+          <div className="sticky top-0">
             {/* Messages Header */}
             <div className="h-16 bg-uniOrange-400/90 dark:bg-uniOrange-500/90">
               <div className="flex items-center justify-between h-full px-4">
@@ -446,13 +446,13 @@ export default function MessagesPage() {
         {/* Right Side - Chat Area */}
         <div key={key} className={`
           flex-1 flex flex-col bg-orange-200 no-scrollbar bg-pattern dark:bg-secondary-900
-          ${currentConversation ? 'fixed md:relative left-0 right-0 top-0 bottom-0 md:inset-auto z-50' : 'hidden md:flex'}
+          ${currentConversation ? 'fixed md:relative left-0 right-0 top-0 bottom-0 z-50 md:inset-auto ' : 'hidden md:flex'}
           h-full
         `}>
           {currentConversation ? (
             <div className="flex flex-col h-full">
               {/* Chat Header - Fixed on mobile */}
-              <div className="sticky top-0 z-20 flex-none">
+              <div className="sticky top-0 z-40 flex-none">
                 <div className="h-16 bg-uniOrange-400/90 dark:bg-uniOrange-500/90">
                   <div className="flex items-center h-full px-4 gap-3">
                     {/* Mobile Back Button */}
