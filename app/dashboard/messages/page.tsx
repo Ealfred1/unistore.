@@ -53,7 +53,10 @@ export default function MessagesPage() {
     markAsRead, 
     startConversation,
     isStartingConversation,
-    setConversations
+    setConversations,
+    cachedConversations,
+    cachedMerchants,
+    lastFetchTime
   } = useMessaging(token)
 
   const { storedConversations, storeOfflineMessage, isConnected, wsInstance } = useMessagingContext();
@@ -87,11 +90,29 @@ export default function MessagesPage() {
     const loadConversations = async () => {
       setIsLoading(true)
       try {
+        // Check if we have cached conversations from the provider
+        if (cachedConversations.length > 0) {
+          console.log('Using cached conversations from provider');
+          setConversations(cachedConversations);
+          setIsLoading(false);
+          
+          // If cache is older than 30 seconds, refresh in background
+          const cacheAge = lastFetchTime ? Date.now() - lastFetchTime : Infinity;
+          if (cacheAge > 30000) { // 30 seconds
+            console.log('Cache is older than 30 seconds, refreshing in background');
+            setIsRefreshing(true);
+            await getConversations();
+            setIsRefreshing(false);
+          }
+          return;
+        }
+        
         // If we have stored conversations, show refresh state instead
         if (conversations.length > 0) {
           setIsLoading(false)
           setIsRefreshing(true)
         }
+        
         await getConversations()
       } finally {
         setIsLoading(false)
@@ -99,7 +120,7 @@ export default function MessagesPage() {
       }
     }
     loadConversations()
-  }, [getConversations])
+  }, [getConversations, cachedConversations, lastFetchTime])
 
   // Load messages when conversation changes
   useEffect(() => {
@@ -158,6 +179,15 @@ export default function MessagesPage() {
       setConversations(storedConversations);
     }
   }, [storedConversations]);
+
+  // Add this effect to use cached merchants
+  useEffect(() => {
+    if (cachedMerchants?.length > 0 && onlineMerchants?.length === 0) {
+      console.log('Using cached merchants from provider');
+      // You'll need to add a setOnlineMerchants function to your useMessaging hook
+      setOnlineMerchants(cachedMerchants);
+    }
+  }, [cachedMerchants, onlineMerchants]);
 
   // Enhanced message sending with offline support
   const handleSendMessage = async (e: React.FormEvent) => {
