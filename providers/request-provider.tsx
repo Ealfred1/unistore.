@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { toast } from 'sonner'
-import { WebSocketManager } from '@/utils/websocket'
+import { RequestWebSocketManager } from '@/utils/request-socket'
 import { usePathname } from 'next/navigation'
 
 interface Request {
@@ -34,7 +34,7 @@ interface Offer {
 }
 
 interface RequestContextType {
-  wsInstance: WebSocketManager | null
+  wsInstance: RequestWebSocketManager | null
   isConnected: boolean
   createRequest: (requestData: any) => void
   viewRequest: (requestId: string) => void
@@ -63,7 +63,7 @@ const RequestContext = createContext<RequestContextType>({
 
 export function RequestProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const wsRef = useRef<WebSocketManager>(WebSocketManager.getInstance('requests'))
+  const wsRef = useRef<RequestWebSocketManager>(RequestWebSocketManager.getInstance())
   const [isConnected, setIsConnected] = useState(false)
   const [currentRequest, setCurrentRequest] = useState<Request | null>(null)
   const [requestViews, setRequestViews] = useState<{ [key: string]: number }>({})
@@ -85,31 +85,19 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
     ws.updateToken(token);
     ws.setPersistentConnection(true);
 
-    const handleConnect = () => {
-      console.log('✅ Request WebSocket connected successfully');
-      setIsConnected(true);
-      
-      // Send initialize message after successful connection
-      ws.send('initialize', {
-        type: 'initialize',
-        user_id: user.id,
-        university_id: user.university_id
-      });
-    };
+    // Add handlers for request-specific events
+    ws.addMessageHandler('new_request', handleNewRequest);
+    ws.addMessageHandler('request_view', handleRequestView);
+    ws.addMessageHandler('new_offer', handleNewOffer);
+    ws.addMessageHandler('offer_status_update', handleOfferStatusUpdate);
+    ws.addMessageHandler('request_status_update', handleRequestStatusUpdate);
+    ws.addMessageHandler('pending_requests', handlePendingRequests);
 
-    const handleDisconnect = () => {
-      console.log('❌ Request WebSocket disconnected');
-      setIsConnected(false);
-    };
-
-    ws.addMessageHandler('connection_established', handleConnect);
-    ws.onDisconnect(handleDisconnect);
-
-    // Connect to requests endpoint
-    ws.connect('ws/requests/');
+    // Connect
+    ws.connect();
 
     return () => {
-      ws.removeMessageHandler('connection_established', handleConnect);
+      ws.cleanup();
     };
   }, [user?.id]);
 
