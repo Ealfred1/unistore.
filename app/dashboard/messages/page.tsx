@@ -53,7 +53,10 @@ export default function MessagesPage() {
     markAsRead, 
     startConversation,
     isStartingConversation,
-    setConversations
+    setConversations,
+    cachedConversations,
+    cachedMerchants,
+    lastFetchTime
   } = useMessaging(token)
 
   const { storedConversations, storeOfflineMessage, isConnected, wsInstance } = useMessagingContext();
@@ -87,19 +90,56 @@ export default function MessagesPage() {
     const loadConversations = async () => {
       setIsLoading(true)
       try {
-        // If we have stored conversations, show refresh state instead
-        if (conversations.length > 0) {
-          setIsLoading(false)
-          setIsRefreshing(true)
+        // Check if we have cached conversations from the provider
+        if (cachedConversations && cachedConversations.length > 0) {
+          console.log('Using cached conversations from provider:', cachedConversations.length);
+          setConversations(cachedConversations);
+          setIsLoading(false);
+          
+          // If cache is older than 30 seconds, refresh in background
+          const cacheAge = lastFetchTime ? Date.now() - lastFetchTime : Infinity;
+          if (cacheAge > 30000) { // 30 seconds
+            console.log('Cache is older than 30 seconds, refreshing in background');
+            setIsRefreshing(true);
+            await getConversations();
+            setIsRefreshing(false);
+          }
+          return;
         }
-        await getConversations()
+        
+        // If we have stored conversations, use them while we fetch fresh ones
+        const storedConvs = localStorage.getItem('conversations');
+        if (storedConvs) {
+          try {
+            const parsed = JSON.parse(storedConvs);
+            if (parsed && parsed.length > 0) {
+              console.log('Using stored conversations from localStorage:', parsed.length);
+              setConversations(parsed);
+              setIsLoading(false);
+              setIsRefreshing(true);
+            }
+          } catch (e) {
+            console.error('Failed to parse stored conversations:', e);
+          }
+        }
+        
+        // Always fetch fresh conversations if we don't have cached ones
+        console.log('Fetching fresh conversations');
+        await getConversations();
+      } catch (error) {
+        console.error('Error loading conversations:', error);
+        setError('Failed to load conversations');
       } finally {
-        setIsLoading(false)
-        setIsRefreshing(false)
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
+    };
+    
+    // Only run this if we have a token
+    if (token) {
+      loadConversations();
     }
-    loadConversations()
-  }, [getConversations])
+  }, [getConversations, cachedConversations, lastFetchTime, token]);
 
   // Load messages when conversation changes
   useEffect(() => {
@@ -158,6 +198,26 @@ export default function MessagesPage() {
       setConversations(storedConversations);
     }
   }, [storedConversations]);
+
+  // Add this effect to use cached merchants
+  useEffect(() => {
+    if (cachedMerchants && cachedMerchants.length > 0) {
+      console.log('Using cached merchants from provider:', cachedMerchants.length);
+      setOnlineMerchants(cachedMerchants);
+    } else if (!onlineMerchants || onlineMerchants.length === 0) {
+      // If no cached merchants and no current merchants, we need to ensure
+      // the WebSocket connection is established to get them
+      console.log('No cached merchants available, ensuring WebSocket connection');
+      if (wsInstance && !isConnected) {
+        wsInstance.connect();
+      }
+    }
+  }, [cachedMerchants, onlineMerchants, wsInstance, isConnected]);
+
+  // Add a debug effect to monitor conversations
+  useEffect(() => {
+    console.log('Conversations updated:', conversations.length);
+  }, [conversations]);
 
   // Enhanced message sending with offline support
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -301,13 +361,13 @@ export default function MessagesPage() {
       <div className="flex h-full">
         {/* Left Sidebar - Conversations List */}
         <div className={`
-          w-full md:w-[380px] z-50 flex flex-col bg-white dark:bg-secondary-800
+          w-full md:w-[380px] flex flex-col bg-white dark:bg-secondary-800
           border-r border-secondary-100 dark:border-secondary-700
           ${currentConversation ? 'hidden md:flex' : 'flex'}
           h-full
         `}>
           {/* Sticky Header */}
-          <div className="sticky top-0 z-20">
+          <div className="sticky top-0">
             {/* Messages Header */}
             <div className="h-16 bg-uniOrange-400/90 dark:bg-uniOrange-500/90">
               <div className="flex items-center justify-between h-full px-4">
@@ -446,13 +506,13 @@ export default function MessagesPage() {
         {/* Right Side - Chat Area */}
         <div key={key} className={`
           flex-1 flex flex-col bg-orange-200 no-scrollbar bg-pattern dark:bg-secondary-900
-          ${currentConversation ? 'fixed md:relative left-0 right-0 top-0 bottom-0 md:inset-auto z-50' : 'hidden md:flex'}
+          ${currentConversation ? 'fixed md:relative left-0 right-0 top-0 bottom-0 z-50 md:inset-auto ' : 'hidden md:flex'}
           h-full
         `}>
           {currentConversation ? (
             <div className="flex flex-col h-full">
               {/* Chat Header - Fixed on mobile */}
-              <div className="sticky top-0 z-20 flex-none">
+              <div className="sticky top-0 z-40 flex-none">
                 <div className="h-16 bg-uniOrange-400/90 dark:bg-uniOrange-500/90">
                   <div className="flex items-center h-full px-4 gap-3">
                     {/* Mobile Back Button */}

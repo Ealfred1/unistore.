@@ -66,7 +66,7 @@ axiosInstance.interceptors.response.use(
         localStorage.removeItem("user")
         
         // Use window.location for hard redirect to ensure complete page refresh
-        window.location.href = "/auth/login"
+        window.location.reload()
         return Promise.reject(refreshError)
       }
     }
