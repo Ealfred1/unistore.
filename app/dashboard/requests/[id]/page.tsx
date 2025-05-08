@@ -66,6 +66,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   const { user } = useAuth()
   const { requestWs, isRequestConnected } = useWebSocket()
   const { startChatWithMerchant, isLoading: isMessageLoading } = useStartConversation()
+  const { getRequestDetails, trackRequestView, acceptOffer, declineOffer, cancelRequest } = useRequest()
   
   const [requestDetails, setRequestDetails] = useState<RequestDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -83,6 +84,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
+      year: 'numeric',
       hour: 'numeric',
       minute: 'numeric',
       hour12: true
@@ -93,30 +95,38 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     console.log(`Fetching request details for ID: ${params.id}`)
     
     if (isRequestConnected && requestWs) {
-      // Join request view group
-      requestWs.sendMessage({
-        type: 'get_request_details',
-        request_id: params.id
-      })
+      // Use the request provider methods instead of direct WebSocket calls
+      getRequestDetails(params.id)
+        .then(data => {
+          if (data) {
+            setRequestDetails(data)
+            setIsLoading(false)
+            setIsOwner(data.is_owner)
+          } else {
+            setError("Request not found")
+            setIsLoading(false)
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching request details:", err)
+          toast.error("Failed to load request details")
+        })
       
       // Track view if user is not the owner
       if (user?.id && requestDetails?.user_id !== user.id) {
-        requestWs.sendMessage({
-          type: 'track_request_view',
-          request_id: params.id
-        })
+        trackRequestView(params.id)
       }
       
-      // Set up event handlers
-      const handleRequestDetails = (data: any) => {
+      // Set up event handlers for WebSocket events
+      const handleWebSocketMessage = (event: any) => {
+        const data = JSON.parse(event.data)
+        console.log("WebSocket message received:", data)
+        
         if (data.type === 'request_details' && data.request) {
           setRequestDetails(data.request)
           setIsLoading(false)
-          setIsOwner(data.request.is_owner)
         }
-      }
-      
-      const handleRequestView = (data: any) => {
+        
         if (data.type === 'request_viewed' && data.request_id === parseInt(params.id)) {
           // Add to viewing merchants
           const newViewer = {
@@ -127,10 +137,10 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
           
           setViewingMerchants(prev => {
             // Check if merchant is already in the list
-            if (!prev.some(m => m.id === newViewer.id)) {
-              return [...prev, newViewer]
+            if (prev.some(m => m.id === newViewer.id)) {
+              return prev
             }
-            return prev
+            return [...prev, newViewer]
           })
           
           // Update request details view count if available
@@ -142,11 +152,8 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
             }
           })
         }
-      }
-      
-      const handleNewOffer = (data: any) => {
-        if ((data.type === 'new_offer' || data.type === 'offer_created') && 
-            data.request_id === parseInt(params.id)) {
+        
+        if (data.type === 'new_offer' && data.request_id === parseInt(params.id)) {
           // Update request details with new offer
           setRequestDetails(prev => {
             if (!prev) return prev
@@ -157,30 +164,31 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
               merchant_name: data.offer.merchant_name,
               price: data.offer.price,
               description: data.offer.description,
-              status: 'PENDING',
-              created_at: new Date().toISOString()
+              status: data.offer.status,
+              created_at: data.offer.created_at
             }
             
-            const updatedOffers = prev.offers ? [newOffer, ...prev.offers] : [newOffer]
+            const offers = prev.offers ? [...prev.offers, newOffer] : [newOffer]
             
             return {
               ...prev,
-              offers: updatedOffers,
-              offer_count: (prev.offer_count || 0) + 1
+              offers,
+              offer_count: offers.length
             }
           })
           
-          toast.success(`New offer received from ${data.offer.merchant_name}!`)
+          toast.success("New offer received!")
         }
-      }
-      
-      const handleOfferStatusUpdate = (data: any) => {
-        if (data.type === 'offer_status_update') {
+        
+        if (data.type === 'offer_status_updated' && data.request_id === parseInt(params.id)) {
+          // Update offer status
           setRequestDetails(prev => {
             if (!prev || !prev.offers) return prev
             
             const updatedOffers = prev.offers.map(offer => 
-              offer.id === data.offer_id ? { ...offer, status: data.status } : offer
+              offer.id === data.offer_id 
+                ? { ...offer, status: data.status }
+                : offer
             )
             
             return {
@@ -195,85 +203,55 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
           } else if (data.status === 'DECLINED') {
             toast.info('Offer declined')
           }
-          
-          setSelectedOffer(null)
         }
       }
       
-      const handleRequestStatusUpdate = (data: any) => {
-        if (data.type === 'request_status_update' && 
-            data.request_id === parseInt(params.id)) {
-          setRequestDetails(prev => prev ? { ...prev, status: data.status } : prev)
-          
-          toast.info(`Request status updated to ${data.status}`)
-          
-          if (data.status === 'CANCELLED') {
-            setTimeout(() => {
-              router.push('/dashboard/requests')
-            }, 2000)
-          }
-        }
+      // Add event listener for WebSocket messages
+      if (requestWs.socket) {
+        requestWs.socket.addEventListener('message', handleWebSocketMessage)
       }
-      
-      // Add event listeners
-      requestWs.addMessageHandler('request_details', handleRequestDetails)
-      requestWs.addMessageHandler('request_viewed', handleRequestView)
-      requestWs.addMessageHandler('new_offer', handleNewOffer)
-      requestWs.addMessageHandler('offer_created', handleNewOffer)
-      requestWs.addMessageHandler('offer_status_update', handleOfferStatusUpdate)
-      requestWs.addMessageHandler('request_status_update', handleRequestStatusUpdate)
       
       return () => {
-        // Remove event listeners
-        requestWs.removeMessageHandler('request_details', handleRequestDetails)
-        requestWs.removeMessageHandler('request_viewed', handleRequestView)
-        requestWs.removeMessageHandler('new_offer', handleNewOffer)
-        requestWs.removeMessageHandler('offer_created', handleNewOffer)
-        requestWs.removeMessageHandler('offer_status_update', handleOfferStatusUpdate)
-        requestWs.removeMessageHandler('request_status_update', handleRequestStatusUpdate)
+        // Remove event listener when component unmounts
+        if (requestWs.socket) {
+          requestWs.socket.removeEventListener('message', handleWebSocketMessage)
+        }
       }
     }
-  }, [params.id, isRequestConnected, requestWs, user?.id, requestDetails?.user_id, router])
+  }, [isRequestConnected, params.id, requestWs, user?.id, requestDetails?.user_id])
   
-  const handleAcceptOffer = (offerId: string) => {
-    if (!isRequestConnected || !requestWs) {
-      toast.error('Connection lost. Please refresh the page.')
-      return
+  const handleAcceptOffer = async (offerId: string) => {
+    try {
+      setSelectedOffer(offerId)
+      await acceptOffer(params.id, offerId)
+      toast.success("Offer accepted successfully!")
+    } catch (error) {
+      console.error("Error accepting offer:", error)
+      toast.error("Failed to accept offer")
+    } finally {
+      setSelectedOffer(null)
     }
-    
-    setSelectedOffer(offerId)
-    
-    requestWs.sendMessage({
-      type: 'update_offer_status',
-      offer_id: offerId,
-      status: 'ACCEPTED'
-    })
   }
   
-  const handleDeclineOffer = (offerId: string) => {
-    if (!isRequestConnected || !requestWs) {
-      toast.error('Connection lost. Please refresh the page.')
-      return
+  const handleDeclineOffer = async (offerId: string) => {
+    try {
+      await declineOffer(params.id, offerId)
+      toast.success("Offer declined")
+    } catch (error) {
+      console.error("Error declining offer:", error)
+      toast.error("Failed to decline offer")
     }
-    
-    requestWs.sendMessage({
-      type: 'update_offer_status',
-      offer_id: offerId,
-      status: 'DECLINED'
-    })
   }
   
-  const handleCancelRequest = () => {
-    if (!isRequestConnected || !requestWs) {
-      toast.error('Connection lost. Please refresh the page.')
-      return
+  const handleCancelRequest = async () => {
+    try {
+      await cancelRequest(params.id)
+      toast.success("Request cancelled successfully")
+      router.push('/dashboard/requests')
+    } catch (error) {
+      console.error("Error cancelling request:", error)
+      toast.error("Failed to cancel request")
     }
-    
-    requestWs.sendMessage({
-      type: 'update_request_status',
-      request_id: params.id,
-      status: 'CANCELLED'
-    })
   }
   
   const handleSendMessage = async () => {
