@@ -294,8 +294,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   }
 
   const makeOffer = (requestId: string, offerData: any) => {
-    requestWs.send('make_offer', {
-      type: 'make_offer',
+    requestWs.send('create_offer', {
+      type: 'create_offer',
       request_id: requestId,
       ...offerData
     })
