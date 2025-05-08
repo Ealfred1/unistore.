@@ -251,7 +251,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     } catch (error) {
       console.error("Error cancelling request:", error)
       toast.error("Failed to cancel request")
-    }
+    }  
   }
   
   const handleSendMessage = async () => {
@@ -290,7 +290,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Requests
         </Button>
-      </div>
+      </div>   
     )
   }
   
@@ -552,4 +552,4 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
       </Dialog>
     </div>
   )
-} 
+}
