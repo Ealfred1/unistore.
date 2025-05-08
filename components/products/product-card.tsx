@@ -81,7 +81,7 @@ export default function ProductCard({ product, onFavoriteToggle }: ProductCardPr
               animate={{ opacity: 1, scale: 1 }}
               className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-medium"
             >
-              <Sparkles className="w-3 h-3" />
+              <Sparkles className="w-3 h-3" /> 
             </motion.div>
           </div>
         )}
