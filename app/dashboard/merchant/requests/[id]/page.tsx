@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { 
   ArrowLeft,
@@ -53,6 +53,9 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
     description: ""
   })
 
+  // Track if we've sent the view request
+  const viewSent = useRef(false)
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -70,6 +73,12 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
       if (data.request) {
         setRequestDetails(data.request);
         setIsLoading(false);
+        
+        // Send view request only once when details are loaded
+        if (!viewSent.current) {
+          viewRequest(params.id);
+          viewSent.current = true;
+        }
       }
     };
 
@@ -85,9 +94,6 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
     // Request the details
     wsInstance.send('get_request_details', { request_id: params.id });
 
-    // Track view - this will increment the view count
-    viewRequest(params.id);
-
     return () => {
       wsInstance.removeMessageHandler('request_details');
       wsInstance.removeMessageHandler('error');
@@ -99,7 +105,7 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
     setIsSubmitting(true)
 
     try {
-      // Use the real makeOffer function from the provider
+      // Use the makeOffer function from the provider
       await makeOffer(params.id, {
         offer_data: {
           price: parseFloat(offerForm.price),
@@ -110,6 +116,9 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
       toast.success("Offer sent successfully! 🎉")
       setShowOfferModal(false)
       setOfferForm({ price: "", description: "" })
+      
+      // Navigate back to requests page after successful offer
+      router.push('/dashboard/merchant/requests')
     } catch (error) {
       toast.error("Failed to send offer")
       console.error("Error making offer:", error)
