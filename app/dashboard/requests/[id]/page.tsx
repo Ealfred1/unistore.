@@ -25,6 +25,7 @@ import { toast } from "sonner"
 import { useRequest } from '@/providers/request-provider'
 import { useAuth } from '@/providers/auth-provider'
 import { useWebSocket } from '@/providers/websocket-provider'
+import { useStartConversation } from '@/utils/start-conversation'
 
 interface RequestDetails {
   id: string;
@@ -64,6 +65,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   const router = useRouter()
   const { user } = useAuth()
   const { requestWs, isRequestConnected } = useWebSocket()
+  const { startChatWithMerchant, isLoading: isMessageLoading } = useStartConversation()
   
   const [requestDetails, setRequestDetails] = useState<RequestDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -88,238 +90,205 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   }
 
   useEffect(() => {
-    if (!isRequestConnected || !requestWs || !params.id) return
+    console.log(`Fetching request details for ID: ${params.id}`)
     
-    // Function to fetch request details
-    const fetchRequestDetails = () => {
-      if (requestWs.isConnected()) {
-        console.log("Fetching request details for ID:", params.id)
+    if (isRequestConnected && requestWs) {
+      // Join request view group
+      requestWs.sendMessage({
+        type: 'get_request_details',
+        request_id: params.id
+      })
+      
+      // Track view if user is not the owner
+      if (user?.id && requestDetails?.user_id !== user.id) {
         requestWs.sendMessage({
-          type: 'get_request_details',
+          type: 'track_request_view',
           request_id: params.id
         })
       }
-    }
-    
-    // Set up message handlers
-    const handleRequestDetails = (data: any) => {
-      if (data.type === 'request_details') {
-        console.log("Received request details:", data.request)
-        setRequestDetails(data.request)
-        setIsLoading(false)
-        setIsOwner(data.request.is_owner)
+      
+      // Set up event handlers
+      const handleRequestDetails = (data: any) => {
+        if (data.type === 'request_details' && data.request) {
+          setRequestDetails(data.request)
+          setIsLoading(false)
+          setIsOwner(data.request.is_owner)
+        }
       }
-    }
-    
-    const handleRequestView = (data: any) => {
-      if (data.type === 'request_viewed' || data.type === 'request_view_notification') {
-        console.log("Merchant viewing request:", data)
-        
-        setViewingMerchants(prev => {
-          // Create new merchant entry
-          const newMerchant = {
+      
+      const handleRequestView = (data: any) => {
+        if (data.type === 'request_viewed' && data.request_id === parseInt(params.id)) {
+          // Add to viewing merchants
+          const newViewer = {
             id: data.viewer_id,
             name: data.viewer_name,
             timestamp: data.timestamp
           }
           
-          // Update merchants list
-          const updated = [...prev]
-          const existingIndex = updated.findIndex(m => m.id === newMerchant.id)
+          setViewingMerchants(prev => {
+            // Check if merchant is already in the list
+            if (!prev.some(m => m.id === newViewer.id)) {
+              return [...prev, newViewer]
+            }
+            return prev
+          })
           
-          if (existingIndex >= 0) {
-            // Update existing merchant timestamp
-            updated[existingIndex] = newMerchant
-          } else {
-            // Add new merchant
-            updated.push(newMerchant)
-          }
-          
-          return updated
-        })
-        
-        // Update request details view count if available
-        setRequestDetails(prev => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            view_count: data.view_count || prev.view_count
-          }
-        })
+          // Update request details view count if available
+          setRequestDetails(prev => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              view_count: data.view_count || prev.view_count
+            }
+          })
+        }
       }
-    }
-    
-    const handleOfferNotification = (data: any) => {
-      if (data.type === 'offer_notification') {
-        console.log("New offer received:", data.offer)
-        
-        const offerData = data.offer
-        const offerIdString = offerData.id.toString()
-        
-        if (!declinedOffers.has(offerIdString)) {
+      
+      const handleNewOffer = (data: any) => {
+        if ((data.type === 'new_offer' || data.type === 'offer_created') && 
+            data.request_id === parseInt(params.id)) {
+          // Update request details with new offer
           setRequestDetails(prev => {
             if (!prev) return prev
             
-            const existingOffers = prev.offers || []
-            const offerExists = existingOffers.some(o => o.id.toString() === offerIdString)
+            const newOffer = {
+              id: data.offer.id,
+              merchant_id: data.offer.merchant_id,
+              merchant_name: data.offer.merchant_name,
+              price: data.offer.price,
+              description: data.offer.description,
+              status: 'PENDING',
+              created_at: new Date().toISOString()
+            }
             
-            if (offerExists) return prev
+            const updatedOffers = prev.offers ? [newOffer, ...prev.offers] : [newOffer]
             
             return {
               ...prev,
-              offers: [offerData, ...existingOffers],
+              offers: updatedOffers,
               offer_count: (prev.offer_count || 0) + 1
             }
           })
           
-          toast.success(`New offer from ${offerData.merchant_name}!`)
+          toast.success(`New offer received from ${data.offer.merchant_name}!`)
         }
       }
-    }
-    
-    const handleOfferStatusUpdate = (data: any) => {
-      if (data.type === 'offer_status_update') {
-        console.log("Offer status updated:", data)
-        
-        const { offer_id, status } = data
-        
-        setRequestDetails(prev => {
-          if (!prev || !prev.offers) return prev
-          
-          return {
-            ...prev,
-            offers: prev.offers.map(offer => 
-              offer.id.toString() === offer_id.toString() 
-                ? { ...offer, status } 
-                : offer
+      
+      const handleOfferStatusUpdate = (data: any) => {
+        if (data.type === 'offer_status_update') {
+          setRequestDetails(prev => {
+            if (!prev || !prev.offers) return prev
+            
+            const updatedOffers = prev.offers.map(offer => 
+              offer.id === data.offer_id ? { ...offer, status: data.status } : offer
             )
+            
+            return {
+              ...prev,
+              offers: updatedOffers,
+              status: data.request_status || prev.status
+            }
+          })
+          
+          if (data.status === 'ACCEPTED') {
+            toast.success('Offer accepted successfully!')
+          } else if (data.status === 'DECLINED') {
+            toast.info('Offer declined')
           }
-        })
-        
-        toast.info(`Offer status updated to ${status}`)
-      }
-    }
-    
-    const handleRequestStatusUpdate = (data: any) => {
-      if (data.type === 'request_status_update') {
-        console.log("Request status updated:", data)
-        
-        setRequestDetails(prev => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            status: data.status
-          }
-        })
-        
-        if (data.status === 'CANCELLED' || data.status === 'COMPLETED') {
-          toast.info(`Request has been ${data.status.toLowerCase()}`)
-          setTimeout(() => {
-            router.push('/dashboard/requests')
-          }, 2000)
+          
+          setSelectedOffer(null)
         }
       }
+      
+      const handleRequestStatusUpdate = (data: any) => {
+        if (data.type === 'request_status_update' && 
+            data.request_id === parseInt(params.id)) {
+          setRequestDetails(prev => prev ? { ...prev, status: data.status } : prev)
+          
+          toast.info(`Request status updated to ${data.status}`)
+          
+          if (data.status === 'CANCELLED') {
+            setTimeout(() => {
+              router.push('/dashboard/requests')
+            }, 2000)
+          }
+        }
+      }
+      
+      // Add event listeners
+      requestWs.addMessageHandler('request_details', handleRequestDetails)
+      requestWs.addMessageHandler('request_viewed', handleRequestView)
+      requestWs.addMessageHandler('new_offer', handleNewOffer)
+      requestWs.addMessageHandler('offer_created', handleNewOffer)
+      requestWs.addMessageHandler('offer_status_update', handleOfferStatusUpdate)
+      requestWs.addMessageHandler('request_status_update', handleRequestStatusUpdate)
+      
+      return () => {
+        // Remove event listeners
+        requestWs.removeMessageHandler('request_details', handleRequestDetails)
+        requestWs.removeMessageHandler('request_viewed', handleRequestView)
+        requestWs.removeMessageHandler('new_offer', handleNewOffer)
+        requestWs.removeMessageHandler('offer_created', handleNewOffer)
+        requestWs.removeMessageHandler('offer_status_update', handleOfferStatusUpdate)
+        requestWs.removeMessageHandler('request_status_update', handleRequestStatusUpdate)
+      }
     }
-    
-    // Register message handlers
-    requestWs.addMessageHandler('request_details', handleRequestDetails)
-    requestWs.addMessageHandler('request_viewed', handleRequestView)
-    requestWs.addMessageHandler('request_view_notification', handleRequestView)
-    requestWs.addMessageHandler('offer_notification', handleOfferNotification)
-    requestWs.addMessageHandler('offer_status_update', handleOfferStatusUpdate)
-    requestWs.addMessageHandler('request_status_update', handleRequestStatusUpdate)
-    
-    // Fetch request details
-    fetchRequestDetails()
-    
-    // Cleanup
-    return () => {
-      requestWs.removeMessageHandler('request_details', handleRequestDetails)
-      requestWs.removeMessageHandler('request_viewed', handleRequestView)
-      requestWs.removeMessageHandler('request_view_notification', handleRequestView)
-      requestWs.removeMessageHandler('offer_notification', handleOfferNotification)
-      requestWs.removeMessageHandler('offer_status_update', handleOfferStatusUpdate)
-      requestWs.removeMessageHandler('request_status_update', handleRequestStatusUpdate)
-    }
-  }, [isRequestConnected, requestWs, params.id, router, declinedOffers])
+  }, [params.id, isRequestConnected, requestWs, user?.id, requestDetails?.user_id, router])
   
-  const handleAcceptOffer = async (offerId: string) => {
-    if (!requestWs || !requestWs.isConnected()) {
-      toast.error("Connection lost. Please refresh the page.")
+  const handleAcceptOffer = (offerId: string) => {
+    if (!isRequestConnected || !requestWs) {
+      toast.error('Connection lost. Please refresh the page.')
       return
     }
     
     setSelectedOffer(offerId)
     
-    try {
-      requestWs.sendMessage({
-        type: 'update_offer_status',
-        offer_id: offerId,
-        status: 'ACCEPTED'
-      })
-      
-      toast.success("Offer accepted! The merchant will be notified.")
-    } catch (error) {
-      console.error("Error accepting offer:", error)
-      toast.error("Failed to accept offer. Please try again.")
-    } finally {
-      setTimeout(() => setSelectedOffer(null), 1000)
-    }
+    requestWs.sendMessage({
+      type: 'update_offer_status',
+      offer_id: offerId,
+      status: 'ACCEPTED'
+    })
   }
   
   const handleDeclineOffer = (offerId: string) => {
-    if (!requestWs || !requestWs.isConnected()) {
-      toast.error("Connection lost. Please refresh the page.")
+    if (!isRequestConnected || !requestWs) {
+      toast.error('Connection lost. Please refresh the page.')
       return
     }
     
-    try {
-      requestWs.sendMessage({
-        type: 'update_offer_status',
-        offer_id: offerId,
-        status: 'DECLINED'
-      })
-      
-      toast.success("Offer declined.")
-    } catch (error) {
-      console.error("Error declining offer:", error)
-      toast.error("Failed to decline offer. Please try again.")
-    }
+    requestWs.sendMessage({
+      type: 'update_offer_status',
+      offer_id: offerId,
+      status: 'DECLINED'
+    })
   }
   
   const handleCancelRequest = () => {
-    if (!requestWs || !requestWs.isConnected() || !params.id) {
-      toast.error("Connection lost. Please refresh the page.")
+    if (!isRequestConnected || !requestWs) {
+      toast.error('Connection lost. Please refresh the page.')
+      return
+    }
+    
+    requestWs.sendMessage({
+      type: 'update_request_status',
+      request_id: params.id,
+      status: 'CANCELLED'
+    })
+  }
+  
+  const handleSendMessage = async () => {
+    if (!currentMerchant || !message.trim()) {
+      toast.error('Please enter a message')
       return
     }
     
     try {
-      requestWs.sendMessage({
-        type: 'update_request_status',
-        request_id: params.id,
-        status: 'CANCELLED'
-      })
-      
-      toast.success("Request cancelled successfully.")
-      setTimeout(() => {
-        router.push('/dashboard/requests')
-      }, 2000)
+      await startChatWithMerchant(currentMerchant, message)
+      setShowMessageModal(false)
+      setMessage('')
     } catch (error) {
-      console.error("Error cancelling request:", error)
-      toast.error("Failed to cancel request. Please try again.")
+      console.error('Error sending message:', error)
     }
-  }
-  
-  const handleSendMessage = () => {
-    if (!message.trim() || !currentMerchant) {
-      toast.error("Please enter a message.")
-      return
-    }
-    
-    // Implement message sending logic here
-    toast.success("Message sent successfully!")
-    setShowMessageModal(false)
-    setMessage("")
   }
   
   if (isLoading) {
@@ -590,8 +559,13 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
               <Button 
                 className="bg-uniBlue hover:bg-uniBlue-600 text-white"
                 onClick={handleSendMessage}
+                disabled={isMessageLoading}
               >
-                <SendHorizonal className="h-4 w-4 mr-2" />
+                {isMessageLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <SendHorizonal className="h-4 w-4 mr-2" />
+                )}
                 Send Message
               </Button>
             </div>
