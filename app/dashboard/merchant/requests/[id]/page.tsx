@@ -11,39 +11,26 @@ import {
   SendHorizonal,
   X,
   User,
-  Building,
-  Tag
+  Building
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { useRequest } from '@/providers/request-provider'
-
-interface RequestDetails {
-  id: string;
-  title: string;
-  description: string;
-  category_name: string;
-  status: string;
-  created_at: string;
-  view_count: number;
-  offer_count: number;
-  user_name: string;
-  university_name: string;
-}
+import { formatDistanceToNow } from 'date-fns'
 
 export default function MerchantRequestDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { 
-    wsInstance, 
-    isConnected,
+    pendingRequests,
     viewRequest,
-    makeOffer
+    makeOffer,
+    wsInstance,
+    isConnected
   } = useRequest()
 
-  const [requestDetails, setRequestDetails] = useState<RequestDetails | null>(null)
+  const [requestDetails, setRequestDetails] = useState<any | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showOfferModal, setShowOfferModal] = useState(false)
@@ -56,76 +43,74 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
   // Track if we've sent the view request
   const viewSent = useRef(false)
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
+  // Find the request in pendingRequests
   useEffect(() => {
-    if (!isConnected || !wsInstance) return;
-
-    // Add handlers for this specific request
-    const handleRequestDetails = (data: any) => {
-      if (data.request) {
-        setRequestDetails(data.request);
+    if (pendingRequests.length > 0) {
+      const request = pendingRequests.find(r => r.id.toString() === params.id);
+      
+      if (request) {
+        console.log('Found request in pendingRequests:', request);
+        setRequestDetails(request);
         setIsLoading(false);
         
         // Send view request only once when details are loaded
-        if (!viewSent.current) {
+        if (!viewSent.current && isConnected && wsInstance) {
+          console.log('Sending view request for:', params.id);
           viewRequest(params.id);
           viewSent.current = true;
         }
+      } else {
+        setError("Request not found");
+        setIsLoading(false);
       }
-    };
+    }
+  }, [pendingRequests, params.id, viewRequest, isConnected, wsInstance]);
 
-    const handleError = (data: any) => {
-      setError(data.message);
-      setIsLoading(false);
-    };
-
-    // Add WebSocket handlers
-    wsInstance.addMessageHandler('request_details', handleRequestDetails);
-    wsInstance.addMessageHandler('error', handleError);
-
-    // Request the details
-    wsInstance.send('get_request_details', { request_id: params.id });
-
-    return () => {
-      wsInstance.removeMessageHandler('request_details');
-      wsInstance.removeMessageHandler('error');
-    };
-  }, [isConnected, wsInstance, params.id, viewRequest]);
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch (e) {
+      return dateString;
+    }
+  };
 
   const handleMakeOffer = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+    e.preventDefault();
+    setIsSubmitting(true);
 
     try {
-      // Use the makeOffer function from the provider
-      await makeOffer(params.id, {
+      console.log('Making offer for request:', params.id);
+      console.log('Offer data:', {
         offer_data: {
           price: parseFloat(offerForm.price),
           description: offerForm.description
         }
-      })
+      });
       
-      toast.success("Offer sent successfully! 🎉")
-      setShowOfferModal(false)
-      setOfferForm({ price: "", description: "" })
+      // Use the makeOffer function from the provider
+      makeOffer(params.id, {
+        offer_data: {
+          price: parseFloat(offerForm.price),
+          description: offerForm.description
+        }
+      });
+      
+      toast.success("Offer sent successfully! 🎉");
+      setShowOfferModal(false);
+      setOfferForm({ price: "", description: "" });
       
       // Navigate back to requests page after successful offer
-      router.push('/dashboard/merchant/requests')
+      setTimeout(() => {
+        router.push('/dashboard/merchant/requests');
+      }, 1500);
     } catch (error) {
-      toast.error("Failed to send offer")
-      console.error("Error making offer:", error)
+      toast.error("Failed to send offer");
+      console.error("Error making offer:", error);
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -177,7 +162,7 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-xl font-semibold">{requestDetails.title}</h2>
             <span className="px-3 py-1 bg-uniOrange/10 text-uniOrange rounded-full text-sm">
-              {requestDetails.category_name}
+              {requestDetails.category_name || "Uncategorized"}
             </span>
           </div>
           
@@ -205,11 +190,19 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
               <Eye className="h-4 w-4 mr-1" />
               {requestDetails.view_count || 0} views
             </div>
-            <div className="flex items-center">
-              <MessageSquarePlus className="h-4 w-4 mr-1" />
-              {requestDetails.offer_count || 0} offers
-            </div>
           </div>
+          
+          {/* Budget information if available */}
+          {(requestDetails.budget_min || requestDetails.budget_max) && (
+            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+              <p className="text-sm font-medium">Budget Range:</p>
+              <p className="text-uniOrange font-semibold">
+                {requestDetails.budget_min ? `₦${requestDetails.budget_min.toLocaleString()}` : 'Open'} 
+                {' - '} 
+                {requestDetails.budget_max ? `₦${requestDetails.budget_max.toLocaleString()}` : 'Open'}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Action Button */}
