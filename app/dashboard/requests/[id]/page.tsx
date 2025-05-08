@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import React from "react"
 import { 
@@ -14,7 +14,8 @@ import {
   BadgeCheck,
   Star,
   SendHorizonal,
-  Loader2
+  Loader2,
+  MessageSquare as MessageSquareIcon
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -22,7 +23,8 @@ import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { useRequest } from '@/providers/request-provider'
-import { useRequestDetails } from '@/hooks/useRequestDetails'
+import { useAuth } from '@/providers/auth-provider'
+import { useWebSocket } from '@/providers/websocket-provider'
 
 interface RequestDetails {
   id: string;
@@ -33,9 +35,12 @@ interface RequestDetails {
   created_at: string;
   view_count: number;
   offer_count: number;
+  user_id: string;
+  is_owner: boolean;
   offers?: Array<{
     id: string;
     merchant_name: string;
+    merchant_id: string;
     price: number;
     description: string;
     status: string;
@@ -44,190 +49,428 @@ interface RequestDetails {
   views?: Array<{
     id: string;
     merchant_name: string;
+    merchant_id: string;
     viewed_at: string;
   }>;
 }
 
+interface ViewingMerchant {
+  id: string;
+  name: string;
+  timestamp: string;
+}
+
 export default function RequestDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const { 
-    wsInstance, 
-    isConnected,
-    viewRequest,
-    requestViews,
-    pendingOffers,
-    acceptOffer
-  } = useRequest()
-
+  const { user } = useAuth()
+  const { requestWs, isRequestConnected } = useWebSocket()
+  
   const [requestDetails, setRequestDetails] = useState<RequestDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
+  const [viewingMerchants, setViewingMerchants] = useState<ViewingMerchant[]>([])
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null)
   const [showMessageModal, setShowMessageModal] = useState(false)
   const [message, setMessage] = useState("")
-
+  const [currentMerchant, setCurrentMerchant] = useState<string | null>(null)
+  const [isOwner, setIsOwner] = useState(false)
+  const [declinedOffers] = useState<Set<string>>(new Set())
+  
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = new Date(dateString)
+    return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    }).format(date)
   }
 
   useEffect(() => {
-    if (!isConnected || !wsInstance) return;
-
-    // Add handlers for this specific request
-    const handleRequestDetails = (data: any) => {
-      if (data.request) {
-        setRequestDetails(data.request);
-        setIsLoading(false);
+    if (!isRequestConnected || !requestWs || !params.id) return
+    
+    // Function to fetch request details
+    const fetchRequestDetails = () => {
+      if (requestWs.isConnected()) {
+        console.log("Fetching request details for ID:", params.id)
+        requestWs.sendMessage({
+          type: 'get_request_details',
+          request_id: params.id
+        })
       }
-    };
-
-    const handleError = (data: any) => {
-      setError(data.message);
-      setIsLoading(false);
-    };
-
-    // Add WebSocket handlers
-    wsInstance.addMessageHandler('request_details', handleRequestDetails);
-    wsInstance.addMessageHandler('error', handleError);
-
-    // Request the details
-    wsInstance.send('get_request_details', { request_id: params.id });
-
-    // Track view
-    viewRequest(params.id);
-
-    return () => {
-      wsInstance.removeMessageHandler('request_details');
-      wsInstance.removeMessageHandler('error');
-    };
-  }, [isConnected, wsInstance, params.id, viewRequest]);
-
-  // Listen for new offers
-  useEffect(() => {
-    if (pendingOffers.length > 0) {
-      // Update UI when new offers arrive
-      const latestOffer = pendingOffers[pendingOffers.length - 1]
-      toast(
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-uniOrange/10 flex items-center justify-center">
-            💰
-          </div>
-          <div>
-            <p className="font-medium">New Offer!</p>
-            <p className="text-sm text-gray-600">
-              {latestOffer.merchant.name} made an offer
-            </p>
-          </div>
-        </div>
-      )
     }
-  }, [pendingOffers])
-
+    
+    // Set up message handlers
+    const handleRequestDetails = (data: any) => {
+      if (data.type === 'request_details') {
+        console.log("Received request details:", data.request)
+        setRequestDetails(data.request)
+        setIsLoading(false)
+        setIsOwner(data.request.is_owner)
+      }
+    }
+    
+    const handleRequestView = (data: any) => {
+      if (data.type === 'request_viewed' || data.type === 'request_view_notification') {
+        console.log("Merchant viewing request:", data)
+        
+        setViewingMerchants(prev => {
+          // Create new merchant entry
+          const newMerchant = {
+            id: data.viewer_id,
+            name: data.viewer_name,
+            timestamp: data.timestamp
+          }
+          
+          // Update merchants list
+          const updated = [...prev]
+          const existingIndex = updated.findIndex(m => m.id === newMerchant.id)
+          
+          if (existingIndex >= 0) {
+            // Update existing merchant timestamp
+            updated[existingIndex] = newMerchant
+          } else {
+            // Add new merchant
+            updated.push(newMerchant)
+          }
+          
+          return updated
+        })
+        
+        // Update request details view count if available
+        setRequestDetails(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            view_count: data.view_count || prev.view_count
+          }
+        })
+      }
+    }
+    
+    const handleOfferNotification = (data: any) => {
+      if (data.type === 'offer_notification') {
+        console.log("New offer received:", data.offer)
+        
+        const offerData = data.offer
+        const offerIdString = offerData.id.toString()
+        
+        if (!declinedOffers.has(offerIdString)) {
+          setRequestDetails(prev => {
+            if (!prev) return prev
+            
+            const existingOffers = prev.offers || []
+            const offerExists = existingOffers.some(o => o.id.toString() === offerIdString)
+            
+            if (offerExists) return prev
+            
+            return {
+              ...prev,
+              offers: [offerData, ...existingOffers],
+              offer_count: (prev.offer_count || 0) + 1
+            }
+          })
+          
+          toast.success(`New offer from ${offerData.merchant_name}!`)
+        }
+      }
+    }
+    
+    const handleOfferStatusUpdate = (data: any) => {
+      if (data.type === 'offer_status_update') {
+        console.log("Offer status updated:", data)
+        
+        const { offer_id, status } = data
+        
+        setRequestDetails(prev => {
+          if (!prev || !prev.offers) return prev
+          
+          return {
+            ...prev,
+            offers: prev.offers.map(offer => 
+              offer.id.toString() === offer_id.toString() 
+                ? { ...offer, status } 
+                : offer
+            )
+          }
+        })
+        
+        toast.info(`Offer status updated to ${status}`)
+      }
+    }
+    
+    const handleRequestStatusUpdate = (data: any) => {
+      if (data.type === 'request_status_update') {
+        console.log("Request status updated:", data)
+        
+        setRequestDetails(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            status: data.status
+          }
+        })
+        
+        if (data.status === 'CANCELLED' || data.status === 'COMPLETED') {
+          toast.info(`Request has been ${data.status.toLowerCase()}`)
+          setTimeout(() => {
+            router.push('/dashboard/requests')
+          }, 2000)
+        }
+      }
+    }
+    
+    // Register message handlers
+    requestWs.addMessageHandler('request_details', handleRequestDetails)
+    requestWs.addMessageHandler('request_viewed', handleRequestView)
+    requestWs.addMessageHandler('request_view_notification', handleRequestView)
+    requestWs.addMessageHandler('offer_notification', handleOfferNotification)
+    requestWs.addMessageHandler('offer_status_update', handleOfferStatusUpdate)
+    requestWs.addMessageHandler('request_status_update', handleRequestStatusUpdate)
+    
+    // Fetch request details
+    fetchRequestDetails()
+    
+    // Cleanup
+    return () => {
+      requestWs.removeMessageHandler('request_details', handleRequestDetails)
+      requestWs.removeMessageHandler('request_viewed', handleRequestView)
+      requestWs.removeMessageHandler('request_view_notification', handleRequestView)
+      requestWs.removeMessageHandler('offer_notification', handleOfferNotification)
+      requestWs.removeMessageHandler('offer_status_update', handleOfferStatusUpdate)
+      requestWs.removeMessageHandler('request_status_update', handleRequestStatusUpdate)
+    }
+  }, [isRequestConnected, requestWs, params.id, router, declinedOffers])
+  
+  const handleAcceptOffer = async (offerId: string) => {
+    if (!requestWs || !requestWs.isConnected()) {
+      toast.error("Connection lost. Please refresh the page.")
+      return
+    }
+    
+    setSelectedOffer(offerId)
+    
+    try {
+      requestWs.sendMessage({
+        type: 'update_offer_status',
+        offer_id: offerId,
+        status: 'ACCEPTED'
+      })
+      
+      toast.success("Offer accepted! The merchant will be notified.")
+    } catch (error) {
+      console.error("Error accepting offer:", error)
+      toast.error("Failed to accept offer. Please try again.")
+    } finally {
+      setTimeout(() => setSelectedOffer(null), 1000)
+    }
+  }
+  
+  const handleDeclineOffer = (offerId: string) => {
+    if (!requestWs || !requestWs.isConnected()) {
+      toast.error("Connection lost. Please refresh the page.")
+      return
+    }
+    
+    try {
+      requestWs.sendMessage({
+        type: 'update_offer_status',
+        offer_id: offerId,
+        status: 'DECLINED'
+      })
+      
+      toast.success("Offer declined.")
+    } catch (error) {
+      console.error("Error declining offer:", error)
+      toast.error("Failed to decline offer. Please try again.")
+    }
+  }
+  
+  const handleCancelRequest = () => {
+    if (!requestWs || !requestWs.isConnected() || !params.id) {
+      toast.error("Connection lost. Please refresh the page.")
+      return
+    }
+    
+    try {
+      requestWs.sendMessage({
+        type: 'update_request_status',
+        request_id: params.id,
+        status: 'CANCELLED'
+      })
+      
+      toast.success("Request cancelled successfully.")
+      setTimeout(() => {
+        router.push('/dashboard/requests')
+      }, 2000)
+    } catch (error) {
+      console.error("Error cancelling request:", error)
+      toast.error("Failed to cancel request. Please try again.")
+    }
+  }
+  
+  const handleSendMessage = () => {
+    if (!message.trim() || !currentMerchant) {
+      toast.error("Please enter a message.")
+      return
+    }
+    
+    // Implement message sending logic here
+    toast.success("Message sent successfully!")
+    setShowMessageModal(false)
+    setMessage("")
+  }
+  
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-uniOrange" />
       </div>
-    );
+    )
   }
-
+  
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
-        <p className="text-red-500 mb-4">{error}</p>
-        <Button onClick={() => router.back()}>Go Back</Button>
+        <XCircle className="h-12 w-12 text-red-500 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Error Loading Request</h2>
+        <p className="text-gray-600 dark:text-gray-300">{error}</p>
+        <Button 
+          className="mt-4"
+          onClick={() => router.push('/dashboard/requests')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Requests
+        </Button>
       </div>
-    );
+    )
   }
-
+  
   if (!requestDetails) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
-        <p className="text-gray-500 mb-4">Request not found</p>
-        <Button onClick={() => router.back()}>Go Back</Button>
-      </div>
-    );
-  }
-
-  const handleAcceptOffer = async (offerId: string) => {
-    setSelectedOffer(offerId)
-    
-    try {
-      toast.loading("Processing your acceptance... ⚡️")
-      acceptOffer(requestDetails.id, offerId)
-      
-      // Navigate after successful acceptance
-      router.push(`/dashboard/requests/${requestDetails.id}/accepted`)
-    } catch (error) {
-      toast.error("Failed to accept offer")
-      setSelectedOffer(null)
-    }
-  }
-
-  const handleSendMessage = async () => {
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      toast.success("Message sent! 📨")
-      setShowMessageModal(false)
-      setMessage("")
-    } catch (error) {
-      toast.error("Failed to send message")
-    }
-  }
-
-  return (
-    <div className="container max-w-4xl py-8">
-      <div className="flex items-center mb-8">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.back()}
-          className="mr-4"
+        <Store className="h-12 w-12 text-gray-400 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Request Not Found</h2>
+        <p className="text-gray-600 dark:text-gray-300">The request you're looking for doesn't exist or you don't have permission to view it.</p>
+        <Button 
+          className="mt-4"
+          onClick={() => router.push('/dashboard/requests')}
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Requests
+        </Button>
+      </div>
+    )
+  }
+  
+  return (
+    <div className="container max-w-5xl mx-auto py-8 px-4">
+      <div className="flex items-center mb-6">
+        <Button 
+          variant="ghost" 
+          className="mr-4"
+          onClick={() => router.push('/dashboard/requests')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
         </Button>
         <h1 className="text-2xl font-bold">Request Details</h1>
+        
+        {isOwner && requestDetails.status === 'PENDING' && (
+          <Button 
+            variant="outline" 
+            className="ml-auto text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+            onClick={handleCancelRequest}
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            Cancel Request
+          </Button>
+        )}
       </div>
-
+      
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid gap-6"
+        className="space-y-6"
       >
-        {/* Request Info */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">{requestDetails.title}</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">
-            {requestDetails.description}
-          </p>
-          
-          <div className="flex items-center gap-4 text-sm text-gray-500">
-            <div className="flex items-center">
-              <Clock className="h-4 w-4 mr-1" />
-              {formatDate(requestDetails.created_at)}
+        {/* Request Status Banner */}
+        <div className={`p-4 rounded-lg ${
+          requestDetails.status === 'PENDING' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200' :
+          requestDetails.status === 'ONGOING' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200' :
+          requestDetails.status === 'COMPLETED' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' :
+          'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+        }`}>
+          <div className="flex items-center">
+            <div className="mr-3">
+              {requestDetails.status === 'PENDING' ? <Clock className="h-5 w-5" /> :
+               requestDetails.status === 'ONGOING' ? <Loader2 className="h-5 w-5" /> :
+               requestDetails.status === 'COMPLETED' ? <CheckCircle2 className="h-5 w-5" /> :
+               <XCircle className="h-5 w-5" />}
             </div>
-            <div className="flex items-center">
-              <Eye className="h-4 w-4 mr-1" />
-              {requestViews[params.id] || 0} views
-            </div>
-            <div className="flex items-center">
-              <Store className="h-4 w-4 mr-1" />
-              {requestDetails.offer_count} offers
+            <div>
+              <p className="font-medium">
+                Status: {requestDetails.status.charAt(0) + requestDetails.status.slice(1).toLowerCase()}
+              </p>
+              <p className="text-sm opacity-80">
+                {requestDetails.status === 'PENDING' ? 'Waiting for offers from merchants' :
+                 requestDetails.status === 'ONGOING' ? 'An offer has been accepted' :
+                 requestDetails.status === 'COMPLETED' ? 'This request has been completed' :
+                 'This request has been cancelled'}
+              </p>
             </div>
           </div>
         </div>
-
+        
+        {/* Request Details Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+          <h2 className="text-xl font-bold mb-2">{requestDetails.title}</h2>
+          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mb-4">
+            <span className="inline-flex items-center mr-4">
+              <Clock className="h-4 w-4 mr-1" />
+              {formatDate(requestDetails.created_at)}
+            </span>
+            <span className="inline-flex items-center mr-4">
+              <Eye className="h-4 w-4 mr-1" />
+              {requestDetails.view_count} views
+            </span>
+            {requestDetails.category_name && (
+              <span className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
+                {requestDetails.category_name}
+              </span>
+            )}
+          </div>
+          
+          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-6">
+            {requestDetails.description}
+          </p>
+          
+          {/* Active Viewers */}
+          {viewingMerchants.length > 0 && (
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-sm font-medium mb-2 flex items-center">
+                <Eye className="h-4 w-4 mr-1 text-green-500" />
+                Currently Viewing
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {viewingMerchants.map(merchant => (
+                  <div 
+                    key={merchant.id}
+                    className="flex items-center bg-gray-50 dark:bg-gray-700 px-3 py-1 rounded-full text-sm"
+                  >
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    {merchant.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        
         {/* Offers Section */}
         {requestDetails.offers && requestDetails.offers.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-            <h3 className="text-lg font-semibold mb-4">Offers</h3>
+            <h3 className="text-lg font-semibold mb-4">Offers ({requestDetails.offers.length})</h3>
             <div className="space-y-4">
               {requestDetails.offers.map((offer) => (
                 <motion.div
@@ -247,9 +490,57 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                       ${offer.price}
                     </p>
                   </div>
-                  <p className="text-gray-600 dark:text-gray-300">
+                  <p className="text-gray-600 dark:text-gray-300 mb-3">
                     {offer.description}
                   </p>
+                  
+                  {/* Offer Status Badge */}
+                  {offer.status !== 'PENDING' && (
+                    <div className={`inline-block px-2 py-1 rounded text-xs mb-3 ${
+                      offer.status === 'ACCEPTED' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' :
+                      'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                    }`}>
+                      {offer.status === 'ACCEPTED' ? 'Accepted' : 'Declined'}
+                    </div>
+                  )}
+                  
+                  {isOwner && offer.status === 'PENDING' && requestDetails.status === 'PENDING' && (
+                    <div className="flex justify-end space-x-2 mt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setCurrentMerchant(offer.merchant_id)
+                          setShowMessageModal(true)
+                        }}
+                      >
+                        <MessageSquareIcon className="h-3 w-3 mr-1" />
+                        Message
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                        onClick={() => handleDeclineOffer(offer.id)}
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Decline
+                      </Button>
+                      <Button 
+                        className="bg-uniOrange hover:bg-uniOrange-600 text-white"
+                        size="sm"
+                        onClick={() => handleAcceptOffer(offer.id)}
+                        disabled={selectedOffer === offer.id}
+                      >
+                        {selectedOffer === offer.id ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                        )}
+                        Accept Offer
+                      </Button>
+                    </div>
+                  )}
                 </motion.div>
               ))}
             </div>
@@ -263,7 +554,12 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
             <div className="space-y-2">
               {requestDetails.views.map((view) => (
                 <div key={view.id} className="flex justify-between items-center">
-                  <p>{view.merchant_name}</p>
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-2">
+                      {view.merchant_name.charAt(0)}
+                    </div>
+                    <p>{view.merchant_name}</p>
+                  </div>
                   <p className="text-sm text-gray-500">
                     {formatDate(view.viewed_at)}
                   </p>
