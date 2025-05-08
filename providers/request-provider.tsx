@@ -1,10 +1,11 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react'
+import { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { toast } from 'sonner'
 import { RequestWebSocketManager } from '@/utils/request-socket'
 import { usePathname } from 'next/navigation'
+import { useWebSocket } from '@/providers/websocket-provider'
 
 interface Request {
   id: string
@@ -63,8 +64,7 @@ const RequestContext = createContext<RequestContextType>({
 
 export function RequestProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const wsRef = useRef<RequestWebSocketManager>(RequestWebSocketManager.getInstance())
-  const [isConnected, setIsConnected] = useState(false)
+  const { requestWs, isRequestConnected } = useWebSocket()
   const [currentRequest, setCurrentRequest] = useState<Request | null>(null)
   const [requestViews, setRequestViews] = useState<{ [key: string]: number }>({})
   const [pendingOffers, setPendingOffers] = useState<Array<Offer>>([])
@@ -72,34 +72,20 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const requestCallbacks = useRef<{ [key: string]: (request: Request) => void }>({})
 
-  // Initialize WebSocket connection
   useEffect(() => {
-    if (!user?.id) return;
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
+    if (!user?.id || !isRequestConnected || !requestWs) return
 
-    console.log('Initializing Request WebSocket connection...');
+    // Add request handlers here
+    const handleNewRequest = (data: any) => {
+      setPendingRequests(prev => [...prev, data.request]);
+    }
 
-    const ws = wsRef.current;
-    ws.cleanup();
-    ws.updateToken(token);
-    ws.setPersistentConnection(true);
-
-    // Add handlers for request-specific events
-    ws.addMessageHandler('new_request', handleNewRequest);
-    ws.addMessageHandler('request_view', handleRequestView);
-    ws.addMessageHandler('new_offer', handleNewOffer);
-    ws.addMessageHandler('offer_status_update', handleOfferStatusUpdate);
-    ws.addMessageHandler('request_status_update', handleRequestStatusUpdate);
-    ws.addMessageHandler('pending_requests', handlePendingRequests);
-
-    // Connect
-    ws.connect();
-
+    requestWs.addMessageHandler('new_request', handleNewRequest)
+    
     return () => {
-      ws.cleanup();
-    };
-  }, [user?.id]);
+      requestWs.removeMessageHandler('new_request', handleNewRequest)
+    }
+  }, [user?.id, isRequestConnected])
 
   // Handle request views
   useEffect(() => {
@@ -126,8 +112,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    wsRef.current.addMessageHandler('request_view', handleRequestView)
-    return () => wsRef.current.removeMessageHandler('request_view')
+    requestWs.addMessageHandler('request_view', handleRequestView)
+    return () => requestWs.removeMessageHandler('request_view')
   }, [currentRequest])
 
   // Handle new offers
@@ -162,8 +148,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    wsRef.current.addMessageHandler('new_offer', handleNewOffer)
-    return () => wsRef.current.removeMessageHandler('new_offer')
+    requestWs.addMessageHandler('new_offer', handleNewOffer)
+    return () => requestWs.removeMessageHandler('new_offer')
   }, [currentRequest])
 
   // Handle offer acceptance
@@ -177,8 +163,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    wsRef.current.addMessageHandler('offer_accepted', handleOfferAccepted)
-    return () => wsRef.current.removeMessageHandler('offer_accepted')
+    requestWs.addMessageHandler('offer_accepted', handleOfferAccepted)
+    return () => requestWs.removeMessageHandler('offer_accepted')
   }, [user])
 
   // Handle pending requests message
@@ -190,14 +176,51 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    wsRef.current.addMessageHandler('pending_requests', handlePendingRequests);
-    return () => wsRef.current.removeMessageHandler('pending_requests');
+    requestWs.addMessageHandler('pending_requests', handlePendingRequests);
+    return () => requestWs.removeMessageHandler('pending_requests');
+  }, []);
+
+  // Add handler functions
+  const handleRequestView = useCallback((data: any) => {
+    setRequestViews(prev => ({
+      ...prev,
+      [data.request_id]: data.view_count
+    }));
+  }, []);
+
+  const handleNewOffer = useCallback((data: any) => {
+    setPendingOffers(prev => [...prev, data.offer]);
+    toast.success('New offer received! 💰');
+  }, []);
+
+  const handleOfferStatusUpdate = useCallback((data: any) => {
+    setPendingOffers(prev => 
+      prev.map(offer => 
+        offer.id === data.offer_id 
+          ? { ...offer, status: data.status }
+          : offer
+      )
+    );
+  }, []);
+
+  const handleRequestStatusUpdate = useCallback((data: any) => {
+    setPendingRequests(prev => 
+      prev.map(request => 
+        request.id === data.request_id 
+          ? { ...request, status: data.status }
+          : request
+      )
+    );
+  }, []);
+
+  const handlePendingRequests = useCallback((data: any) => {
+    setPendingRequests(data.requests);
   }, []);
 
   // Provider methods
   const createRequest = (requestData: any): Promise<Request> => {
     return new Promise((resolve, reject) => {
-      if (!wsRef.current.isConnected()) {
+      if (!requestWs.isConnected()) {
         reject(new Error('WebSocket not connected'))
         return
       }
@@ -221,8 +244,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
             if (request) {
               hasResolved = true
               resolve(request)
-              wsRef.current.removeMessageHandler('request_created', handleMessage)
-              wsRef.current.removeMessageHandler('new_request', handleMessage)
+              requestWs.removeMessageHandler('request_created', handleMessage)
+              requestWs.removeMessageHandler('new_request', handleMessage)
             }
           }
           
@@ -231,12 +254,12 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
             console.log('Full request data received:', data.request)
             hasResolved = true
             resolve(data.request)
-            wsRef.current.removeMessageHandler('request_created', handleMessage)
-            wsRef.current.removeMessageHandler('new_request', handleMessage)
+            requestWs.removeMessageHandler('request_created', handleMessage)
+            requestWs.removeMessageHandler('new_request', handleMessage)
           }
         }
 
-        wsRef.current.send('create_request', {
+        requestWs.send('create_request', {
           type: 'create_request',
           request_data: {
             title: requestData.title,
@@ -246,8 +269,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
         })
 
         // Add handlers for both message types
-        wsRef.current.addMessageHandler('request_created', handleMessage)
-        wsRef.current.addMessageHandler('new_request', handleMessage)
+        requestWs.addMessageHandler('request_created', handleMessage)
+        requestWs.addMessageHandler('new_request', handleMessage)
 
       } catch (error) {
         console.error('Error sending request:', error)
@@ -264,14 +287,14 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Still send the view_request message to track views
-    wsRef.current.send('view_request', {
+    requestWs.send('view_request', {
       type: 'view_request',
       request_id: requestId
     });
   }
 
   const makeOffer = (requestId: string, offerData: any) => {
-    wsRef.current.send('make_offer', {
+    requestWs.send('make_offer', {
       type: 'make_offer',
       request_id: requestId,
       ...offerData
@@ -279,7 +302,7 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   }
 
   const acceptOffer = (requestId: string, offerId: string) => {
-    wsRef.current.send('accept_offer', {
+    requestWs.send('accept_offer', {
       type: 'accept_offer',
       request_id: requestId,
       offer_id: offerId
@@ -306,8 +329,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
 
   // Update the context value to include getRequestDetails
   const contextValue = useMemo(() => ({
-    wsInstance: wsRef.current,
-    isConnected,
+    wsInstance: requestWs,
+    isConnected: isRequestConnected,
     createRequest,
     viewRequest,
     makeOffer,
@@ -317,16 +340,16 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
     pendingOffers,
     pendingRequests,
     getRequestDetails
-  }), [isConnected, currentRequest, requestViews, pendingOffers, pendingRequests])
+  }), [isRequestConnected, currentRequest, requestViews, pendingOffers, pendingRequests])
 
   // Show connection status in UI
   useEffect(() => {
-    if (isConnected) {
+    if (isRequestConnected) {
       toast.success("Connected to server successfully!", {
         duration: 3000
       })
     }
-  }, [isConnected])
+  }, [isRequestConnected])
 
   return (
     <RequestContext.Provider value={contextValue}>

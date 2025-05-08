@@ -5,6 +5,7 @@ import { useAuth } from '@/providers/auth-provider'
 import { toast } from 'sonner'
 import { WebSocketManager } from '@/utils/websocket'
 import { usePathname as useNextPathname } from 'next/navigation'
+import { useWebSocket } from '@/providers/websocket-provider'
 
 interface Message {
   id: string
@@ -44,8 +45,7 @@ const MessagingContext = createContext<MessagingContextType>({
 
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const wsRef = useRef<WebSocketManager>(WebSocketManager.getInstance())
-  const [isConnected, setIsConnected] = useState(false)
+  const { messagingWs, isMessagingConnected } = useWebSocket()
   const [unreadCount, setUnreadCount] = useState(0)
   const [lastMessage, setLastMessage] = useState<Message | null>(null)
   const pathname = useNextPathname()
@@ -101,26 +101,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
   // Update WebSocket connection management
   useEffect(() => {
-    if (!user?.id) return;
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
+    if (!user?.id || !isMessagingConnected || !messagingWs) return;
 
-    const ws = wsRef.current;
-    ws.cleanup();
-    ws.updateToken(token);
-    ws.setPersistentConnection(true);
-
-    // Update connection status handlers
-    const handleConnect = () => {
-      console.log('WebSocket connected');
-      setIsConnected(true);
-    };
-
-    const handleDisconnect = () => {
-      console.log('WebSocket disconnected');
-      setIsConnected(false);
-    };
-    
     // Handle incoming merchants list
     const handleMerchantsList = (data: any) => {
       console.log('Received merchants list from WebSocket');
@@ -143,18 +125,14 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    ws.addMessageHandler('connection_established', handleConnect);
-    ws.addMessageHandler('online_merchants', handleMerchantsList);
-    ws.addMessageHandler('conversations_list', handleConversationsList);
-    ws.onDisconnect(handleDisconnect);
-    ws.connect();
+    messagingWs.addMessageHandler('online_merchants', handleMerchantsList);
+    messagingWs.addMessageHandler('conversations_list', handleConversationsList);
 
     return () => {
-      ws.removeMessageHandler('connection_established', handleConnect);
-      ws.removeMessageHandler('online_merchants', handleMerchantsList);
-      ws.removeMessageHandler('conversations_list', handleConversationsList);
+      messagingWs.removeMessageHandler('online_merchants', handleMerchantsList);
+      messagingWs.removeMessageHandler('conversations_list', handleConversationsList);
     };
-  }, [user?.id]);
+  }, [user?.id, isMessagingConnected]);
 
   // Store new messages when offline
   const storeOfflineMessage = (conversationId: string, content: string) => {
@@ -169,11 +147,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
-    if (!token || !user) return
+    if (!user?.id || !isMessagingConnected || !messagingWs) return
 
-    wsRef.current.updateToken(token)
-    
     const handleNewMessage = (data: any) => {
       const newMessage = data.message;
       console.log('New message received:', newMessage);
@@ -221,12 +196,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       }
     }
     
-    wsRef.current.addMessageHandler('new_message', handleNewMessage)
+    messagingWs.addMessageHandler('new_message', handleNewMessage)
     
     return () => {
-      wsRef.current.removeMessageHandler('new_message', handleNewMessage)
+      messagingWs.removeMessageHandler('new_message', handleNewMessage)
     }
-  }, [pathname, user])
+  }, [pathname, user?.id, isMessagingConnected])
   
   // Mark all messages as read
   const markAllRead = () => {
@@ -234,8 +209,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value = useMemo(() => ({
-    wsInstance: wsRef.current,
-    isConnected,
+    wsInstance: messagingWs,
+    isConnected: isMessagingConnected,
     unreadCount,
     lastMessage,
     markAllRead,
@@ -245,7 +220,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     cachedConversations,
     lastFetchTime
   }), [
-    isConnected, 
+    isMessagingConnected, 
     unreadCount, 
     lastMessage, 
     storedConversations,

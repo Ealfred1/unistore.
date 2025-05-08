@@ -24,20 +24,44 @@ import { toast } from "sonner"
 import { useRequest } from '@/providers/request-provider'
 import { useRequestDetails } from '@/hooks/useRequestDetails'
 
+interface RequestDetails {
+  id: string;
+  title: string;
+  description: string;
+  category_name: string;
+  status: string;
+  created_at: string;
+  view_count: number;
+  offer_count: number;
+  offers?: Array<{
+    id: string;
+    merchant_name: string;
+    price: number;
+    description: string;
+    status: string;
+    created_at: string;
+  }>;
+  views?: Array<{
+    id: string;
+    merchant_name: string;
+    viewed_at: string;
+  }>;
+}
+
 export default function RequestDetailsPage({ params }: { params: { id: string } }) {
-  const unwrappedParams = React.use(params as any);
-  const requestId = unwrappedParams.id;
-  
   const router = useRouter()
   const { 
-    viewRequest, 
-    acceptOffer, 
+    wsInstance, 
+    isConnected,
+    viewRequest,
     requestViews,
-    pendingOffers
+    pendingOffers,
+    acceptOffer
   } = useRequest()
 
-  // Use the hook to get request details
-  const { request: currentRequest, loading: isLoading, error } = useRequestDetails(Number(requestId));
+  const [requestDetails, setRequestDetails] = useState<RequestDetails | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null)
   const [showMessageModal, setShowMessageModal] = useState(false)
@@ -53,11 +77,36 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   }
 
   useEffect(() => {
-    if (requestId && currentRequest) {
-      // Only track view if we have the request
-      viewRequest(requestId);
-    }
-  }, [requestId, currentRequest, viewRequest]);
+    if (!isConnected || !wsInstance) return;
+
+    // Add handlers for this specific request
+    const handleRequestDetails = (data: any) => {
+      if (data.request) {
+        setRequestDetails(data.request);
+        setIsLoading(false);
+      }
+    };
+
+    const handleError = (data: any) => {
+      setError(data.message);
+      setIsLoading(false);
+    };
+
+    // Add WebSocket handlers
+    wsInstance.addMessageHandler('request_details', handleRequestDetails);
+    wsInstance.addMessageHandler('error', handleError);
+
+    // Request the details
+    wsInstance.send('get_request_details', { request_id: params.id });
+
+    // Track view
+    viewRequest(params.id);
+
+    return () => {
+      wsInstance.removeMessageHandler('request_details');
+      wsInstance.removeMessageHandler('error');
+    };
+  }, [isConnected, wsInstance, params.id, viewRequest]);
 
   // Listen for new offers
   useEffect(() => {
@@ -82,43 +131,26 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-uniOrange" />
-          <p className="text-gray-500">Loading request details...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-uniOrange" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center space-y-4">
-          <p className="text-gray-500">Error: {error}</p>
-          <Button 
-            variant="ghost"
-            onClick={() => router.push('/dashboard/requests')}
-          >
-            Back to Requests
-          </Button>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <p className="text-red-500 mb-4">{error}</p>
+        <Button onClick={() => router.back()}>Go Back</Button>
       </div>
     );
   }
 
-  if (!currentRequest) {
+  if (!requestDetails) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center space-y-4">
-          <p className="text-gray-500">Request not found</p>
-          <Button 
-            variant="ghost"
-            onClick={() => router.push('/dashboard/requests')}
-          >
-            Back to Requests
-          </Button>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <p className="text-gray-500 mb-4">Request not found</p>
+        <Button onClick={() => router.back()}>Go Back</Button>
       </div>
     );
   }
@@ -128,10 +160,10 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     
     try {
       toast.loading("Processing your acceptance... ⚡️")
-      acceptOffer(currentRequest.id, offerId)
+      acceptOffer(requestDetails.id, offerId)
       
       // Navigate after successful acceptance
-      router.push(`/dashboard/requests/${currentRequest.id}/accepted`)
+      router.push(`/dashboard/requests/${requestDetails.id}/accepted`)
     } catch (error) {
       toast.error("Failed to accept offer")
       setSelectedOffer(null)
@@ -151,116 +183,96 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   }
 
   return (
-    <div className="lg:container max-w-4xl py-8">
+    <div className="container max-w-4xl py-8">
       <div className="flex items-center mb-8">
         <Button
           variant="ghost"
           size="icon"
-          className="mr-2"
           onClick={() => router.back()}
+          className="mr-4"
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">Request Details 📋</h1>
+        <h1 className="text-2xl font-bold">Request Details</h1>
       </div>
 
-      <div className="grid gap-6">
-        {currentRequest && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">{currentRequest.title}</h2>
-                <div className="flex items-center mt-2 text-sm text-gray-500">
-                  <Clock className="h-4 w-4 mr-1" />
-                  {formatDate(currentRequest.created_at)}
-                  <span className="mx-2">•</span>
-                  <Eye className="h-4 w-4 mr-1" />
-                  {requestViews[currentRequest.id] || 0} views
-                </div>
-              </div>
-              <span className="px-3 py-1 bg-uniOrange/10 text-uniOrange rounded-full text-sm font-medium">
-                {currentRequest.category_name}
-              </span>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid gap-6"
+      >
+        {/* Request Info */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">{requestDetails.title}</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            {requestDetails.description}
+          </p>
+          
+          <div className="flex items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center">
+              <Clock className="h-4 w-4 mr-1" />
+              {formatDate(requestDetails.created_at)}
             </div>
-
-            <p className="mt-4 text-gray-600 dark:text-gray-300">
-              {currentRequest.description}
-            </p>
-          </motion.div>
-        )}
+            <div className="flex items-center">
+              <Eye className="h-4 w-4 mr-1" />
+              {requestViews[params.id] || 0} views
+            </div>
+            <div className="flex items-center">
+              <Store className="h-4 w-4 mr-1" />
+              {requestDetails.offer_count} offers
+            </div>
+          </div>
+        </div>
 
         {/* Offers Section */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold flex items-center">
-            <MessageSquare className="h-5 w-5 mr-2 text-uniOrange" />
-            Offers ({pendingOffers.length})
-          </h3>
-
-          <AnimatePresence>
-            {pendingOffers.map((offer) => (
-              <motion.div
-                key={offer.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
-              >
-                {/* Offer details */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center">
-                    <Image
-                      src={offer.merchant.image}
-                      alt={offer.merchant.name}
-                      width={40}
-                      height={40}
-                      className="rounded-full"
-                    />
-                    <div className="ml-3">
-                      <h4 className="font-semibold">{offer.merchant.name}</h4>
-                      {offer.merchant.verified && (
-                        <BadgeCheck className="h-4 w-4 ml-1 text-uniOrange" />
-                      )}
+        {requestDetails.offers && requestDetails.offers.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+            <h3 className="text-lg font-semibold mb-4">Offers</h3>
+            <div className="space-y-4">
+              {requestDetails.offers.map((offer) => (
+                <motion.div
+                  key={offer.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="border rounded-lg p-4"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium">{offer.merchant_name}</p>
+                      <p className="text-sm text-gray-500">
+                        {formatDate(offer.created_at)}
+                      </p>
                     </div>
+                    <p className="text-lg font-bold text-uniOrange">
+                      ${offer.price}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold text-uniOrange">
-                      ₦{offer.price.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {formatDate(offer.createdAt)}
-                    </div>
-                  </div>
-                </div>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    {offer.description}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
 
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  {offer.description}
-                </p>
-
-                <div className="flex justify-end space-x-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedOffer(null)}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Decline
-                  </Button>
-                  <Button
-                    className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-                    onClick={() => handleAcceptOffer(offer.id)}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Accept Offer
-                  </Button>
+        {/* Views Section */}
+        {requestDetails.views && requestDetails.views.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+            <h3 className="text-lg font-semibold mb-4">Recent Views</h3>
+            <div className="space-y-2">
+              {requestDetails.views.map((view) => (
+                <div key={view.id} className="flex justify-between items-center">
+                  <p>{view.merchant_name}</p>
+                  <p className="text-sm text-gray-500">
+                    {formatDate(view.viewed_at)}
+                  </p>
                 </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </motion.div>
 
       <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
         <DialogContent>

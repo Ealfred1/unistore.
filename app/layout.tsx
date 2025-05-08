@@ -9,6 +9,7 @@ import { UniversityProvider } from "@/providers/university-provider"
 import { Toaster } from 'sonner'
 import { MessagingProvider } from '@/providers/messaging-provider'
 import { RequestProvider } from '@/providers/request-provider'
+import { WebSocketProvider } from '@/providers/websocket-provider'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -27,19 +28,21 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-        <RequestProvider>
+          <WebSocketProvider>
             <MessagingProvider>
-              <UniversityProvider>
-                <ProductProvider>
-                  {children}
-                </ProductProvider>
-              </UniversityProvider>
+              <RequestProvider>
+                <UniversityProvider>
+                  <ProductProvider>
+                    {children}
+                  </ProductProvider>
+                </UniversityProvider>
+              </RequestProvider>
             </MessagingProvider>
-        </RequestProvider>
+          </WebSocketProvider>
           <Toaster position="bottom-right" richColors />
-          </AuthProvider>
+        </AuthProvider>
       </body>
     </html>
-  )
+  ) 
 }
 
