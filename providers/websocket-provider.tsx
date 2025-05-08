@@ -154,6 +154,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   // Initialize connections when user is available
   useEffect(() => {
     if (user?.id) {
+      // Reset connection state when user changes
       setConnectionsEstablished(false);
       connectWebSockets();
     }

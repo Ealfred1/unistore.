@@ -129,6 +129,7 @@ export class RequestWebSocketManager {
           this.socket.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data);
+              console.log("okay...", data)
               if (data.type !== 'pong') {
                 console.log('Request WebSocket received:', data);
               }

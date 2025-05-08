@@ -1,28 +1,21 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import React from "react"
+import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 import { 
   ArrowLeft,
   Eye,
   Clock,
-  MessageSquare,
   CheckCircle2,
   XCircle,
-  Store,
-  BadgeCheck,
-  Star,
-  SendHorizonal,
   Loader2,
-  MessageSquare as MessageSquareIcon
+  MessageSquare as MessageSquareIcon,
+  SendHorizonal
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
-import { useRequest } from '@/providers/request-provider'
 import { useAuth } from '@/providers/auth-provider'
 import { useWebSocket } from '@/providers/websocket-provider'
 import { useStartConversation } from '@/utils/start-conversation'
@@ -58,7 +51,6 @@ interface RequestDetails {
 interface ViewingMerchant {
   id: string;
   name: string;
-  timestamp: string;
 }
 
 export default function RequestDetailsPage({ params }: { params: { id: string } }) {
@@ -66,19 +58,16 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   const { user } = useAuth()
   const { requestWs, isRequestConnected } = useWebSocket()
   const { startChatWithMerchant, isLoading: isMessageLoading } = useStartConversation()
-  const { getRequestDetails, trackRequestView, acceptOffer, declineOffer, cancelRequest } = useRequest()
   
   const [requestDetails, setRequestDetails] = useState<RequestDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [viewingMerchants, setViewingMerchants] = useState<ViewingMerchant[]>([])
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null)
   const [showMessageModal, setShowMessageModal] = useState(false)
-  const [message, setMessage] = useState("")
   const [currentMerchant, setCurrentMerchant] = useState<string | null>(null)
-  const [isOwner, setIsOwner] = useState(false)
-  const [declinedOffers] = useState<Set<string>>(new Set())
+  const [message, setMessage] = useState("")
   
+  // Format date helper function
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return new Intl.DateTimeFormat('en-US', {
@@ -90,141 +79,122 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
       hour12: true
     }).format(date)
   }
-
+  
+  // Handle WebSocket messages
+  const handleWebSocketMessage = (event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data)
+      console.log("Request WebSocket received:", data)
+      
+      if (data.type === 'request_details' && data.request) {
+        setRequestDetails(data.request)
+        setIsLoading(false)
+      }
+      
+      if (data.type === 'request_view_notification' && data.request_id === parseInt(params.id)) {
+        console.log("View notification received:", data)
+        // Add to viewing merchants
+        const newViewer = {
+          id: data.viewer_id,
+          name: data.viewer_name
+        }
+        
+        setViewingMerchants(prev => {
+          // Check if merchant is already in the list
+          if (prev.some(m => m.id === newViewer.id)) {
+            return prev
+          }
+          return [...prev, newViewer]
+        })
+      }
+      
+      if (data.type === 'offer_notification' && data.offer && 
+          data.offer.request_id === parseInt(params.id)) {
+        console.log("New offer notification received:", data)
+        // Refresh request details to get the new offer
+        if (requestWs) {
+          requestWs.send(JSON.stringify({
+            type: 'get_request_details',
+            request_id: params.id
+          }))
+        }
+      }
+      
+      if (data.type === 'offer_status_update' && 
+          data.request_id === parseInt(params.id)) {
+        console.log("Offer status update received:", data)
+        // Refresh request details to get the updated offer
+        if (requestWs) {
+          requestWs.send(JSON.stringify({
+            type: 'get_request_details',
+            request_id: params.id
+          }))
+        }
+      }
+      
+      if (data.type === 'request_status_update' && 
+          data.request_id === parseInt(params.id)) {
+        console.log("Request status update received:", data)
+        // Refresh request details to get the updated status
+        if (requestWs) {
+          requestWs.send(JSON.stringify({
+            type: 'get_request_details',
+            request_id: params.id
+          }))
+        }
+      }
+    } catch (error) {
+      console.error("Error handling WebSocket message:", error)
+    }
+  }
+  
   useEffect(() => {
     console.log(`Fetching request details for ID: ${params.id}`)
     
     if (isRequestConnected && requestWs) {
-      // Use the request provider methods instead of direct WebSocket calls
-      getRequestDetails(params.id)
-        .then(data => {
-          if (data) {
-            setRequestDetails(data)
-            setIsLoading(false)
-            setIsOwner(data.is_owner)
-          } else {
-            setError("Request not found")
-            setIsLoading(false)
-          }
-        })
-        .catch(err => {
-          console.error("Error fetching request details:", err)
-          toast.error("Failed to load request details")
-        })
+      // Get request details
+      requestWs.send(JSON.stringify({
+        type: 'get_request_details',
+        request_id: params.id
+      }))
       
       // Track view if user is not the owner
       if (user?.id && requestDetails?.user_id !== user.id) {
-        trackRequestView(params.id)
-      }
-      
-      // Set up event handlers for WebSocket events
-      const handleWebSocketMessage = (event: any) => {
-        const data = JSON.parse(event.data)
-        console.log("WebSocket message received:", data)
-        
-        if (data.type === 'request_details' && data.request) {
-          setRequestDetails(data.request)
-          setIsLoading(false)
-        }
-        
-        if (data.type === 'request_viewed' && data.request_id === parseInt(params.id)) {
-          // Add to viewing merchants
-          const newViewer = {
-            id: data.viewer_id,
-            name: data.viewer_name,
-            timestamp: data.timestamp
-          }
-          
-          setViewingMerchants(prev => {
-            // Check if merchant is already in the list
-            if (prev.some(m => m.id === newViewer.id)) {
-              return prev
-            }
-            return [...prev, newViewer]
-          })
-          
-          // Update request details view count if available
-          setRequestDetails(prev => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              view_count: data.view_count || prev.view_count
-            }
-          })
-        }
-        
-        if (data.type === 'new_offer' && data.request_id === parseInt(params.id)) {
-          // Update request details with new offer
-          setRequestDetails(prev => {
-            if (!prev) return prev
-            
-            const newOffer = {
-              id: data.offer.id,
-              merchant_id: data.offer.merchant_id,
-              merchant_name: data.offer.merchant_name,
-              price: data.offer.price,
-              description: data.offer.description,
-              status: data.offer.status,
-              created_at: data.offer.created_at
-            }
-            
-            const offers = prev.offers ? [...prev.offers, newOffer] : [newOffer]
-            
-            return {
-              ...prev,
-              offers,
-              offer_count: offers.length
-            }
-          })
-          
-          toast.success("New offer received!")
-        }
-        
-        if (data.type === 'offer_status_updated' && data.request_id === parseInt(params.id)) {
-          // Update offer status
-          setRequestDetails(prev => {
-            if (!prev || !prev.offers) return prev
-            
-            const updatedOffers = prev.offers.map(offer => 
-              offer.id === data.offer_id 
-                ? { ...offer, status: data.status }
-                : offer
-            )
-            
-            return {
-              ...prev,
-              offers: updatedOffers,
-              status: data.request_status || prev.status
-            }
-          })
-          
-          if (data.status === 'ACCEPTED') {
-            toast.success('Offer accepted successfully!')
-          } else if (data.status === 'DECLINED') {
-            toast.info('Offer declined')
-          }
-        }
+        requestWs.send(JSON.stringify({
+          type: 'track_request_view',
+          request_id: params.id
+        }))
       }
       
       // Add event listener for WebSocket messages
-      if (requestWs.socket) {
-        requestWs.socket.addEventListener('message', handleWebSocketMessage)
+      const socket = requestWs.getSocket()
+      if (socket) {
+        socket.addEventListener('message', handleWebSocketMessage)
       }
       
+      // Cleanup function
       return () => {
-        // Remove event listener when component unmounts
-        if (requestWs.socket) {
-          requestWs.socket.removeEventListener('message', handleWebSocketMessage)
+        if (socket) {
+          socket.removeEventListener('message', handleWebSocketMessage)
         }
       }
     }
-  }, [isRequestConnected, params.id, requestWs, user?.id, requestDetails?.user_id])
+  }, [isRequestConnected, params.id, requestWs, user?.id])
   
+  // Handle accept offer
   const handleAcceptOffer = async (offerId: string) => {
     try {
       setSelectedOffer(offerId)
-      await acceptOffer(params.id, offerId)
-      toast.success("Offer accepted successfully!")
+      
+      if (requestWs) {
+        requestWs.send(JSON.stringify({
+          type: 'update_offer_status',
+          offer_id: offerId,
+          status: 'ACCEPTED'
+        }))
+        
+        toast.success("Offer accepted successfully!")
+      }
     } catch (error) {
       console.error("Error accepting offer:", error)
       toast.error("Failed to accept offer")
@@ -233,39 +203,55 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     }
   }
   
+  // Handle decline offer
   const handleDeclineOffer = async (offerId: string) => {
     try {
-      await declineOffer(params.id, offerId)
-      toast.success("Offer declined")
+      if (requestWs) {
+        requestWs.send(JSON.stringify({
+          type: 'update_offer_status',
+          offer_id: offerId,
+          status: 'DECLINED'
+        }))
+        
+        toast.success("Offer declined")
+      }
     } catch (error) {
       console.error("Error declining offer:", error)
       toast.error("Failed to decline offer")
     }
   }
   
+  // Handle cancel request
   const handleCancelRequest = async () => {
     try {
-      await cancelRequest(params.id)
-      toast.success("Request cancelled successfully")
-      router.push('/dashboard/requests')
+      if (requestWs) {
+        requestWs.send(JSON.stringify({
+          type: 'update_request_status',
+          request_id: params.id,
+          status: 'CANCELLED'
+        }))
+        
+        toast.success("Request cancelled successfully")
+        router.push('/dashboard/requests')
+      }
     } catch (error) {
       console.error("Error cancelling request:", error)
       toast.error("Failed to cancel request")
-    }  
+    }
   }
   
+  // Handle send message
   const handleSendMessage = async () => {
-    if (!currentMerchant || !message.trim()) {
-      toast.error('Please enter a message')
-      return
-    }
+    if (!currentMerchant || !message.trim()) return
     
     try {
       await startChatWithMerchant(currentMerchant, message)
       setShowMessageModal(false)
-      setMessage('')
+      setMessage("")
+      toast.success("Message sent successfully")
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error("Error sending message:", error)
+      toast.error("Failed to send message")
     }
   }
   
@@ -277,29 +263,10 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     )
   }
   
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <XCircle className="h-12 w-12 text-red-500 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Error Loading Request</h2>
-        <p className="text-gray-600 dark:text-gray-300">{error}</p>
-        <Button 
-          className="mt-4"
-          onClick={() => router.push('/dashboard/requests')}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Requests
-        </Button>
-      </div>   
-    )
-  }
-  
   if (!requestDetails) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
-        <Store className="h-12 w-12 text-gray-400 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Request Not Found</h2>
-        <p className="text-gray-600 dark:text-gray-300">The request you're looking for doesn't exist or you don't have permission to view it.</p>
+        <p className="text-lg text-gray-600 dark:text-gray-400">Request not found or you don't have permission to view it.</p>
         <Button 
           className="mt-4"
           onClick={() => router.push('/dashboard/requests')}
@@ -311,26 +278,27 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     )
   }
   
+  const isOwner = requestDetails.is_owner
+
   return (
-    <div className="container max-w-5xl mx-auto py-8 px-4">
-      <div className="flex items-center mb-6">
+    <div className="container max-w-5xl py-8">
+      <div className="flex justify-between items-center mb-6">
         <Button 
           variant="ghost" 
-          className="mr-4"
           onClick={() => router.push('/dashboard/requests')}
+          className="gap-1"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          <ArrowLeft className="h-4 w-4" />
+          Back to Requests
         </Button>
-        <h1 className="text-2xl font-bold">Request Details</h1>
         
         {isOwner && requestDetails.status === 'PENDING' && (
           <Button 
-            variant="outline" 
-            className="ml-auto text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+            variant="destructive"
+            size="sm"
             onClick={handleCancelRequest}
           >
-            <XCircle className="h-4 w-4 mr-2" />
+            <XCircle className="h-4 w-4 mr-1" />
             Cancel Request
           </Button>
         )}
