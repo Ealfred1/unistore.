@@ -15,6 +15,8 @@ export class WebSocketManager {
   private connectionTimeout: NodeJS.Timeout | null = null;
   private backoffDelay = 1000; // Start with 1 second delay
   private maxBackoffDelay = 30000; // Max 30 seconds between retries
+  private connectionPromise: Promise<void> | null = null;
+  private connectionEstablished = false;
 
   private constructor() {}
 
@@ -41,97 +43,142 @@ export class WebSocketManager {
     this.disconnectHandler = handler;
   }
 
-  connect() {
-    if (this.socket?.readyState === WebSocket.OPEN || this.isConnecting) {
-      return;
+  async connect(): Promise<void> {
+    // If already connected, return immediately
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connected');
+      return Promise.resolve();
     }
 
-    if (!this.token) return;
-    this.isConnecting = true;
+    // If there's an ongoing connection attempt, wait for it
+    if (this.connectionPromise && this.isConnecting) {
+      console.log('Waiting for existing connection attempt...');
+      return this.connectionPromise;
+    }
+
+    if (!this.token) {
+      console.error('No token available for connection');
+      return Promise.reject(new Error('No token available'));
+    }
 
     try {
-      const protocol = process.env.NODE_ENV === 'development' ? 'ws' : 'wss';
-      const baseUrl = process.env.NEXT_PUBLIC_WS_URL || 'unistore-v2.onrender.com';
-      const wsUrl = `${protocol}://${baseUrl.replace(/^https?:\/\/|^wss?:\/\//, '')}/ws/messaging/?token=${this.token}`;
+      this.isConnecting = true;
+      this.connectionPromise = new Promise<void>((resolve, reject) => {
+        console.log('Initiating WebSocket connection...');
 
-      this.socket = new WebSocket(wsUrl);
+        const protocol = process.env.NODE_ENV === 'development' ? 'ws' : 'wss';
+        const baseUrl = process.env.NEXT_PUBLIC_WS_URL || 'unistore-v2.onrender.com';
+        const wsUrl = `${protocol}://${baseUrl.replace(/^https?:\/\/|^wss?:\/\//, '')}/ws/messaging/?token=${this.token}`;
 
-      // Clear any existing timeouts
-      if (this.connectionTimeout) {
-        clearTimeout(this.connectionTimeout);
-      }
-      if (this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-      }
-
-      this.socket.onopen = () => {
-        console.log('WebSocket connection established');
-        this.isConnecting = false;
-        this.reconnectAttempts = 0;
-        this.backoffDelay = 1000; // Reset backoff delay on successful connection
-        this.startHeartbeat();
-        this.flushMessageQueue(); // Send any queued messages
-        this.send('ping', {}); // Initial ping
-      };
-
-      this.socket.onclose = (event) => {
-        console.log(`WebSocket closed with code ${event.code}`);
-        this.isConnecting = false;
-        this.disconnectHandler?.();
+        console.log('Connecting to:', wsUrl);
         
-        if (this.persistentConnection && this.reconnectAttempts < this.maxReconnectAttempts) {
-          console.log(`Attempting reconnect ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
-          this.reconnectTimeout = setTimeout(() => {
-            this.reconnectAttempts++;
-            this.connect();
-          }, this.backoffDelay);
-          
-          // Exponential backoff with max delay
-          this.backoffDelay = Math.min(this.backoffDelay * 2, this.maxBackoffDelay);
-        }
-      };
+        // Clean up existing connection if any
+        this.cleanup();
 
-      // Increase timeout for initial connection
-      this.connectionTimeout = setTimeout(() => {
-        if (this.socket?.readyState !== WebSocket.OPEN) {
-          console.log('Connection timeout, closing socket');
-          this.socket?.close();
+        this.socket = new WebSocket(wsUrl);
+
+        // Set connection timeout
+        this.connectionTimeout = setTimeout(() => {
+          if (!this.connectionEstablished) {
+            console.log('Connection attempt timed out');
+            this.socket?.close();
+            reject(new Error('Connection timeout'));
+            this.isConnecting = false;
+          }
+        }, 15000); // 15 second timeout
+
+        this.socket.onopen = () => {
+          console.log('WebSocket connection established');
+          this.connectionEstablished = true;
           this.isConnecting = false;
           this.reconnectAttempts = 0;
-        }
-      }, 10000);
-
-      this.socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type !== 'pong') { // Don't log heartbeat responses
-            console.log('WebSocket received message:', data);
+          this.backoffDelay = 1000; // Reset backoff delay
+          
+          if (this.connectionTimeout) {
+            clearTimeout(this.connectionTimeout);
           }
-          const handlers = this.messageHandlers.get(data.type);
-          if (handlers) {
-            handlers.forEach(handler => handler(data));
+          
+          this.startHeartbeat();
+          this.flushMessageQueue(); // Send any queued messages
+          this.send('ping', {}); // Initial ping
+          resolve();
+        };
+
+        this.socket.onclose = (event) => {
+          console.log(`WebSocket closed with code ${event.code}`);
+          if (!this.connectionEstablished) {
+            reject(new Error(`Connection closed with code ${event.code}`));
           }
-        } catch (error) {
-          console.error('Error processing message:', error);
-        }
-      };
+          this.handleClose(event);
+        };
 
-      this.socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
+        this.socket.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          if (!this.connectionEstablished) {
+            reject(error);
+          }
+        };
 
+        this.socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type !== 'pong') { // Don't log heartbeat responses
+              console.log('WebSocket received message:', data);
+            }
+            const handlers = this.messageHandlers.get(data.type);
+            if (handlers) {
+              handlers.forEach(handler => handler(data));
+            }
+          } catch (error) {
+            console.error('Error processing message:', error);
+          }
+        };
+      });
+
+      return await this.connectionPromise;
     } catch (error) {
       console.error('WebSocket connection error:', error);
       this.isConnecting = false;
       this.disconnectHandler?.();
-      
-      if (this.persistentConnection && this.reconnectAttempts < this.maxReconnectAttempts) {
-        this.reconnectTimeout = setTimeout(() => {
-          this.reconnectAttempts++;
-          this.connect();
-        }, this.backoffDelay);
-      }
+      throw error;
+    } finally {
+      this.connectionPromise = null;
     }
+  }
+
+  private handleClose(event: CloseEvent) {
+    this.connectionEstablished = false;
+    this.isConnecting = false;
+    this.disconnectHandler?.();
+    
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+    }
+    
+    if (this.persistentConnection && 
+        event.code === 1006 && 
+        this.reconnectAttempts < this.maxReconnectAttempts) {
+      console.log(`Scheduling reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+      this.handleReconnect();
+    }
+  }
+
+  private handleReconnect() {
+    const backoffDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), this.maxBackoffDelay);
+    console.log(`Attempting reconnect in ${backoffDelay}ms`);
+    
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+    
+    this.reconnectTimeout = setTimeout(async () => {
+      this.reconnectAttempts++;
+      try {
+        await this.connect();
+      } catch (error) {
+        console.error('Reconnection attempt failed:', error);
+      }
+    }, backoffDelay);
   }
 
   private startHeartbeat() {
@@ -142,6 +189,8 @@ export class WebSocketManager {
     this.heartbeatInterval = setInterval(() => {
       if (this.socket?.readyState === WebSocket.OPEN) {
         this.send('ping', {});
+      } else {
+        clearInterval(this.heartbeatInterval);
       }
     }, 30000);
   }
@@ -158,7 +207,9 @@ export class WebSocketManager {
   send(action: string, data: any) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       this.messageQueue.push({ action, data });
-      this.connect();
+      this.connect().catch(err => {
+        console.error('Failed to connect when sending message:', err);
+      });
       return;
     }
 
@@ -194,7 +245,7 @@ export class WebSocketManager {
     }
   }
 
-  disconnect() {
+  cleanup() {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
     }
@@ -209,12 +260,13 @@ export class WebSocketManager {
       this.socket = null;
     }
     this.isConnecting = false;
+    this.connectionEstablished = false;
     this.reconnectAttempts = 0;
     this.messageQueue = [];
   }
 
-  cleanup() {
-    this.disconnect();
+  disconnect() {
+    this.cleanup();
     this.messageHandlers.clear();
   }
 
