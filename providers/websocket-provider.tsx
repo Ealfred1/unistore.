@@ -11,15 +11,13 @@ interface WebSocketContextType {
   requestWs: RequestWebSocketManager | null
   isMessagingConnected: boolean
   isRequestConnected: boolean
-  reconnect: () => Promise<void>
 }
 
 const WebSocketContext = createContext<WebSocketContextType>({
   messagingWs: null,
   requestWs: null,
   isMessagingConnected: false,
-  isRequestConnected: false,
-  reconnect: async () => {}
+  isRequestConnected: false
 })
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
@@ -29,20 +27,20 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const [isMessagingConnected, setIsMessagingConnected] = useState(false)
   const [isRequestConnected, setIsRequestConnected] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
-  const [connectionAttempted, setConnectionAttempted] = useState(false)
-  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [connectionsEstablished, setConnectionsEstablished] = useState(false)
 
   // Sequential connection manager
   const connectWebSockets = async () => {
-    if (isConnecting) return
+    // Don't attempt to connect if already connecting or if connections are established
+    if (isConnecting || connectionsEstablished) return
     
+    // Don't connect if both sockets are already connected
     if (isMessagingConnected && isRequestConnected) {
-      console.log('Both WebSockets already connected, skipping connection attempt')
+      setConnectionsEstablished(true)
       return
     }
     
     setIsConnecting(true)
-    setConnectionError(null)
 
     try {
       const token = localStorage.getItem("access_token")
@@ -50,19 +48,24 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No token or user available')
       }
 
+      // First, connect messaging WebSocket if not already connected
       if (!isMessagingConnected) {
         console.log('Initializing Messaging WebSocket connection...')
+        messagingWsRef.current.cleanup()
         messagingWsRef.current.updateToken(token)
         messagingWsRef.current.setPersistentConnection(true)
         
+        messagingWsRef.current.onDisconnect(() => {
+          setIsMessagingConnected(false)
+          setConnectionsEstablished(false)
+          console.log('Messaging WebSocket disconnected')
+        })
+
+        // Wait for messaging connection
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Messaging connection timeout')), 15000)
           
-          messagingWsRef.current.onDisconnect(() => {
-            setIsMessagingConnected(false)
-            console.log('Messaging WebSocket disconnected')
-          })
-
+          // Check if connection is already established
           if (messagingWsRef.current.isConnected()) {
             console.log('Messaging WebSocket already connected')
             clearTimeout(timeout)
@@ -79,11 +82,17 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
           }
 
           messagingWsRef.current.socket?.addEventListener('open', handleOpen)
-          messagingWsRef.current.connect().catch(err => {
-            console.error('Error connecting messaging WebSocket:', err)
-            clearTimeout(timeout)
-            reject(err)
-          })
+          
+          // Use the Promise-based connect method
+          messagingWsRef.current.connect()
+            .then(() => {
+              handleOpen()
+            })
+            .catch(error => {
+              console.error('Messaging connection error:', error)
+              clearTimeout(timeout)
+              reject(error)
+            })
 
           return () => {
             messagingWsRef.current.socket?.removeEventListener('open', handleOpen)
@@ -91,21 +100,25 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         })
       }
 
-      console.log('Messaging connection established or already active')
+      console.log('Messaging connection established, initializing Request WebSocket...')
 
+      // After messaging is connected, connect request WebSocket if not already connected
       if (!isRequestConnected) {
-        console.log('Initializing Request WebSocket...')
+        requestWsRef.current.cleanup()
         requestWsRef.current.updateToken(token)
         requestWsRef.current.setPersistentConnection(true)
 
+        requestWsRef.current.onDisconnect(() => {
+          setIsRequestConnected(false)
+          setConnectionsEstablished(false)
+          console.log('Request WebSocket disconnected')
+        })
+
+        // Wait for request connection
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Request connection timeout')), 15000)
 
-          requestWsRef.current.onDisconnect(() => {
-            setIsRequestConnected(false)
-            console.log('Request WebSocket disconnected')
-          })
-
+          // Check if connection is already established
           if (requestWsRef.current.isConnected()) {
             console.log('Request WebSocket already connected')
             clearTimeout(timeout)
@@ -122,11 +135,17 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
           }
 
           requestWsRef.current.socket?.addEventListener('open', handleOpen)
-          requestWsRef.current.connect().catch(err => {
-            console.error('Error connecting request WebSocket:', err)
-            clearTimeout(timeout)
-            reject(err)
-          })
+          
+          // Use the Promise-based connect method
+          requestWsRef.current.connect()
+            .then(() => {
+              handleOpen()
+            })
+            .catch(error => {
+              console.error('Request connection error:', error)
+              clearTimeout(timeout)
+              reject(error)
+            })
 
           return () => {
             requestWsRef.current.socket?.removeEventListener('open', handleOpen)
@@ -134,65 +153,65 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         })
       }
 
-      console.log('All WebSocket connections established successfully')
-      setConnectionAttempted(true)
+      // Mark connections as established when both are connected
+      if (isMessagingConnected && isRequestConnected) {
+        setConnectionsEstablished(true)
+        console.log('All WebSocket connections established successfully')
+      }
 
     } catch (error) {
       console.error('Error connecting WebSockets:', error)
-      setConnectionError(error instanceof Error ? error.message : 'Unknown connection error')
-      
-      if (!isMessagingConnected && !isRequestConnected) {
+      // Don't throw error if messaging is connected but request failed
+      if (!isMessagingConnected) {
         toast.error('Failed to establish WebSocket connections')
+      } else {
+        console.log('Messaging connected but Request connection failed, will retry...')
+        // Retry request connection after delay
+        setTimeout(() => {
+          if (!isRequestConnected && !isConnecting) {
+            console.log('Retrying Request WebSocket connection...')
+            setConnectionsEstablished(false)
+            connectWebSockets()
+          }
+        }, 5000)
       }
     } finally {
       setIsConnecting(false)
     }
   }
 
-  const reconnect = async () => {
-    console.log('Forcing WebSocket reconnection...')
-    
-    messagingWsRef.current.cleanup()
-    requestWsRef.current.cleanup()
-    
-    setIsMessagingConnected(false)
-    setIsRequestConnected(false)
-    setConnectionAttempted(false)
-    
-    await connectWebSockets()
-  }
-
+  // Initialize connections when user is available
   useEffect(() => {
-    if (user?.id && !connectionAttempted && !isConnecting) {
+    if (user?.id) {
+      setConnectionsEstablished(false)
       connectWebSockets()
     }
     
     return () => {
       messagingWsRef.current.cleanup()
       requestWsRef.current.cleanup()
+      setConnectionsEstablished(false)
     }
-  }, [user?.id, connectionAttempted, isConnecting])
+  }, [user?.id])
 
+  // Reconnection handler - only runs if connections are not established
   useEffect(() => {
     const reconnectInterval = setInterval(() => {
-      if (user?.id && connectionAttempted && !isConnecting) {
-        if ((isMessagingConnected === false || isRequestConnected === false)) {
-          console.log('Connection lost, attempting reconnection...')
-          connectWebSockets()
-        }
+      if (user?.id && (!isMessagingConnected || !isRequestConnected) && !isConnecting && !connectionsEstablished) {
+        console.log('Checking connections and reconnecting if needed...')
+        connectWebSockets()
       }
-    }, 30000)
+    }, 10000)
 
     return () => clearInterval(reconnectInterval)
-  }, [user?.id, isMessagingConnected, isRequestConnected, isConnecting, connectionAttempted])
+  }, [user?.id, isMessagingConnected, isRequestConnected, isConnecting, connectionsEstablished])
 
   return (
     <WebSocketContext.Provider value={{
       messagingWs: messagingWsRef.current,
       requestWs: requestWsRef.current,
       isMessagingConnected,
-      isRequestConnected,
-      reconnect
+      isRequestConnected
     }}>
       {children}
     </WebSocketContext.Provider>
