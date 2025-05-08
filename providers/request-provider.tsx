@@ -286,10 +286,15 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
       setCurrentRequest(request);
     }
 
-    // Still send the view_request message to track views
-    requestWs.send('view_request', {
-      type: 'view_request',
-      request_id: requestId
+    // Generate a session ID for this view
+    const sessionId = Math.random().toString(36).substring(2, 15);
+
+    // Send the track_request_view message to track views
+    console.log('Sending track_request_view for request:', requestId);
+    requestWs.send('track_request_view', {
+      type: 'track_request_view',
+      request_id: requestId,
+      session_id: sessionId
     });
   }
 
