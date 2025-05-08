@@ -74,14 +74,14 @@ export default function ProductCard({ product, onFavoriteToggle }: ProductCardPr
     >
       <div className="relative h-full flex flex-col">
         {/* Premium product indicator */}
-        {price && parseFloat(price) > 500 && (
+        {price && (
           <div className="absolute top-3 left-3 z-10">
             <motion.div 
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-medium"
             >
-              <Sparkles className="w-3 h-3" /> Premium
+              <Sparkles className="w-3 h-3" />
             </motion.div>
           </div>
         )}
