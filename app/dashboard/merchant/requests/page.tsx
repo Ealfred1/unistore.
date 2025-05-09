@@ -35,11 +35,18 @@ export default function MerchantRequestsPage() {
   const [offeredRequests, setOfferedRequests] = useState<Set<string>>(new Set())
   const [showAcceptedModal, setShowAcceptedModal] = useState(false)
   const [acceptedRequestDetails, setAcceptedRequestDetails] = useState<any>(null)
+  const [startConversation, setStartConversation] = useState<any>(null)
   
   // Get real-time requests from the request provider
   const { pendingRequests, isConnected, wsInstance } = useRequest()
   const router = useRouter()
-  const { startChatWithMerchant } = useStartConversation()
+
+  // Initialize startConversation hook after component mounts
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") : null;
+    const { startChatWithMerchant } = useStartConversation();
+    setStartConversation(() => startChatWithMerchant);
+  }, []);
 
   const categories = [
     "📚 Textbooks",
@@ -137,8 +144,13 @@ export default function MerchantRequestsPage() {
 
   // Function to start chat with user
   const handleStartChat = async (userId: string) => {
+    if (!startConversation) {
+      toast.error("Chat functionality not available");
+      return;
+    }
+
     try {
-      await startChatWithMerchant(userId, "Hi! I'm contacting you regarding the accepted offer.");
+      await startConversation(userId, "Hi! I'm contacting you regarding the accepted offer.");
       setShowAcceptedModal(false);
     } catch (error) {
       toast.error("Failed to start conversation");

@@ -1,18 +1,31 @@
 import { useMessaging } from '@/hooks/useMessaging';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
 export const useStartConversation = () => {
   const router = useRouter();
-  const { startConversation } = useMessaging(localStorage.getItem("access_token") || "");
+  const [token, setToken] = useState<string>("");
+  const { startConversation } = useMessaging(token);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Only access localStorage on the client side
+    if (typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem("access_token") || "";
+      setToken(storedToken);
+    }
+  }, []);
 
   const startChatWithMerchant = async (merchantId: string, initialMessage?: string) => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
       
       console.log('Starting chat with merchant:', merchantId); // Debug log
       
