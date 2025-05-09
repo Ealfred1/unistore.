@@ -20,6 +20,24 @@ import { toast } from "sonner"
 import { useRequest } from '@/providers/request-provider'
 import { formatDistanceToNow } from 'date-fns'
 
+interface RequestDetails {
+  id: string;
+  title: string;
+  description: string;
+  user_id: string;
+  user_name: string;
+  university_id: string;
+  university_name: string;
+  category_id: string | null;
+  category_name: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  status: string;
+  created_at: string;
+  view_count: number;
+  offers?: Array<any>;
+}
+
 export default function MerchantRequestDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { 
@@ -30,7 +48,7 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
     isConnected
   } = useRequest()
 
-  const [requestDetails, setRequestDetails] = useState<any | null>(null)
+  const [requestDetails, setRequestDetails] = useState<RequestDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showOfferModal, setShowOfferModal] = useState(false)
@@ -42,29 +60,79 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
 
   // Track if we've sent the view request
   const viewSent = useRef(false)
+  const detailsLoaded = useRef(false)
 
-  // Find the request in pendingRequests
+  // Initialize request details and send view
   useEffect(() => {
-    if (pendingRequests.length > 0) {
-      const request = pendingRequests.find(r => r.id.toString() === params.id);
-      
-      if (request) {
-        console.log('Found request in pendingRequests:', request);
-        setRequestDetails(request);
-        setIsLoading(false);
+    const initializeRequest = async () => {
+      if (!isConnected || !wsInstance || detailsLoaded.current) return;
+
+      try {
+        // Find request in pending requests
+        const request = pendingRequests.find(r => r.id.toString() === params.id);
         
-        // Send view request only once when details are loaded
-        if (!viewSent.current && isConnected && wsInstance) {
-          console.log('Sending view request for:', params.id);
-          viewRequest(params.id);
-          viewSent.current = true;
+        if (request) {
+          console.log('Found and initializing request:', request);
+          setRequestDetails(request as RequestDetails);
+          setIsLoading(false);
+          detailsLoaded.current = true;
+
+          // Send view request immediately when connected
+          if (!viewSent.current) {
+            console.log('Sending initial view request for:', params.id);
+            viewRequest(params.id);
+            viewSent.current = true;
+          }
+        } else {
+          console.log('Request not found in pending requests');
+          setError("Request not found");
+          setIsLoading(false);
         }
-      } else {
-        setError("Request not found");
+      } catch (err) {
+        console.error('Error initializing request:', err);
+        setError("Failed to load request details");
         setIsLoading(false);
       }
-    }
-  }, [pendingRequests, params.id, viewRequest, isConnected, wsInstance]);
+    };
+
+    initializeRequest();
+  }, [isConnected, wsInstance, params.id, pendingRequests, viewRequest]);
+
+  // Handle WebSocket events for views and offers
+  useEffect(() => {
+    if (!wsInstance || !requestDetails) return;
+
+    const handleRequestView = (data: any) => {
+      if (data.request_id === params.id) {
+        console.log('Received view update:', data);
+        setRequestDetails(prev => prev ? {
+          ...prev,
+          view_count: data.view_count
+        } : null);
+      }
+    };
+
+    const handleNewOffer = (data: any) => {
+      if (data.request_id === params.id) {
+        console.log('Received new offer:', data);
+        setRequestDetails(prev => prev ? {
+          ...prev,
+          offers: [...(prev.offers || []), data.offer]
+        } : null);
+
+        toast.success("New offer received! 💰");
+      }
+    };
+
+    // Add event listeners
+    wsInstance.addMessageHandler('request_view_notification', handleRequestView);
+    wsInstance.addMessageHandler('offer_notification', handleNewOffer);
+
+    return () => {
+      wsInstance.removeMessageHandler('request_view_notification', handleRequestView);
+      wsInstance.removeMessageHandler('offer_notification', handleNewOffer);
+    };
+  }, [wsInstance, params.id, requestDetails]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -80,15 +148,12 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
     setIsSubmitting(true);
 
     try {
+      if (!wsInstance || !isConnected) {
+        throw new Error('WebSocket not connected');
+      }
+
       console.log('Making offer for request:', params.id);
-      console.log('Offer data:', {
-        offer_data: {
-          price: parseFloat(offerForm.price),
-          description: offerForm.description
-        }
-      });
       
-      // Use the makeOffer function from the provider
       makeOffer(params.id, {
         offer_data: {
           price: parseFloat(offerForm.price),
@@ -100,13 +165,13 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
       setShowOfferModal(false);
       setOfferForm({ price: "", description: "" });
       
-      // Navigate back to requests page after successful offer
+      // Navigate back after success
       setTimeout(() => {
         router.push('/dashboard/merchant/requests');
       }, 1500);
     } catch (error) {
-      toast.error("Failed to send offer");
       console.error("Error making offer:", error);
+      toast.error("Failed to send offer");
     } finally {
       setIsSubmitting(false);
     }

@@ -89,6 +89,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
 
   // Handle request views
   useEffect(() => {
+    if (!requestWs) return;
+
     const handleRequestView = (data: any) => {
       const { request_id, views_count } = data
       setRequestViews(prev => ({
@@ -112,45 +114,45 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    requestWs.addMessageHandler('request_view', handleRequestView)
-    return () => requestWs.removeMessageHandler('request_view')
+    requestWs.addMessageHandler('request_view_notification', handleRequestView)
+    return () => {
+      if (requestWs) {
+        requestWs.removeMessageHandler('request_view_notification', handleRequestView)
+      }
+    }
   }, [currentRequest])
 
   // Handle new offers
   useEffect(() => {
+    if (!requestWs) return;
+
     const handleNewOffer = (data: any) => {
       const { offer, request_id } = data
       setPendingOffers(prev => [...prev, offer])
 
-      // Show toast if it's the user's request
-      if (currentRequest?.id === request_id) {
-        toast(
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-uniOrange/10 flex items-center justify-center">
-              💰
-            </div>
-            <div>
-              <p className="font-medium">New Offer!</p>
-              <p className="text-sm text-gray-600">
-                {offer.merchant.name} made an offer of ₦{offer.price.toLocaleString()}
-              </p>
-            </div>
-          </div>,
-          {
-            action: {
-              label: "View",
-              onClick: () => {
-                window.location.href = `/dashboard/requests/${request_id}`
-              }
-            }
-          }
-        )
-      }
+      // Show toast notification
+      toast(
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-uniOrange/10 flex items-center justify-center">
+            💰
+          </div>
+          <div>
+            <p className="font-medium">New Offer!</p>
+            <p className="text-sm text-gray-600">
+              New offer received for your request
+            </p>
+          </div>
+        </div>
+      )
     }
 
-    requestWs.addMessageHandler('new_offer', handleNewOffer)
-    return () => requestWs.removeMessageHandler('new_offer')
-  }, [currentRequest])
+    requestWs.addMessageHandler('offer_notification', handleNewOffer)
+    return () => {
+      if (requestWs) {
+        requestWs.removeMessageHandler('offer_notification', handleNewOffer)
+      }
+    }
+  }, [])
 
   // Handle offer acceptance
   useEffect(() => {
@@ -280,6 +282,11 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   }
 
   const viewRequest = (requestId: string) => {
+    if (!requestWs) {
+      console.error('WebSocket not connected');
+      return;
+    }
+
     // First try to find the request in pending requests
     const request = pendingRequests.find(r => r.id.toString() === requestId);
     if (request) {
