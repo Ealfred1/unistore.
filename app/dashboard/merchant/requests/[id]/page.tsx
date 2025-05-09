@@ -21,21 +21,38 @@ import { useRequest } from '@/providers/request-provider'
 import { formatDistanceToNow } from 'date-fns'
 
 interface RequestDetails {
-  id: string;
+  id: number;
   title: string;
   description: string;
-  user_id: string;
+  user_id: number;
   user_name: string;
-  university_id: string;
+  university_id: number;
   university_name: string;
-  category_id: string | null;
+  category_id: number | null;
   category_name: string | null;
   budget_min: number | null;
   budget_max: number | null;
   status: string;
   created_at: string;
   view_count: number;
-  offers?: Array<any>;
+  offer_count: number;
+  is_owner: boolean;
+  is_merchant: boolean;
+  offers?: Array<{
+    id: number;
+    merchant_id: number;
+    merchant_name: string;
+    price: number;
+    description: string;
+    status: string;
+    created_at: string;
+  }>;
+  views?: Array<{
+    id: number;
+    merchant_id: number;
+    merchant_name: string;
+    viewed_at: string;
+  }>;
 }
 
 export default function MerchantRequestDetailPage({ params }: { params: { id: string } }) {
@@ -68,19 +85,30 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
       if (!isConnected || !wsInstance || detailsLoaded.current) return;
 
       try {
-        // Find request in pending requests
-        const request = pendingRequests.find(r => r.id.toString() === params.id);
+        // Convert params.id to number for comparison
+        const requestId = parseInt(params.id);
+        const request = pendingRequests.find(r => r.id === requestId);
         
         if (request) {
           console.log('Found and initializing request:', request);
-          setRequestDetails(request as RequestDetails);
+          // Make sure all required fields are present
+          const requestDetails: RequestDetails = {
+            ...request,
+            view_count: request.view_count || 0,
+            offer_count: request.offer_count || 0,
+            is_owner: false,
+            is_merchant: true,
+            offers: request.offers || [],
+          };
+          
+          setRequestDetails(requestDetails);
           setIsLoading(false);
           detailsLoaded.current = true;
 
           // Send view request immediately when connected
           if (!viewSent.current) {
-            console.log('Sending initial view request for:', params.id);
-            viewRequest(params.id);
+            console.log('Sending initial view request for:', requestId);
+            viewRequest(requestId.toString());
             viewSent.current = true;
           }
         } else {
