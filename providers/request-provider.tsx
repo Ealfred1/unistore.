@@ -7,6 +7,14 @@ import { RequestWebSocketManager } from '@/utils/request-socket'
 import { usePathname } from 'next/navigation'
 import { useWebSocket } from '@/providers/websocket-provider'
 
+interface User {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  user_type: string
+}
+
 interface Request {
   id: string
   title: string
@@ -32,6 +40,13 @@ interface Offer {
   price: number
   description: string
   created_at: string
+  status: string
+  request_user?: {
+    id: string
+    name: string
+    email: string
+    phone?: string
+  }
 }
 
 interface RequestContextType {
@@ -156,21 +171,29 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
 
   // Handle offer acceptance
   useEffect(() => {
+    if (!requestWs) return;
+
     const handleOfferAccepted = (data: any) => {
-      const { request_id, offer_id } = data
+      const { request_id, offer_id, status, request_user } = data
       
       // Update UI or show notification based on user role
-      if (user?.role === 'merchant') {
+      if (user?.user_type === 'MERCHANT') {
         toast.success("Your offer was accepted! 🎉")
       }
     }
 
     requestWs.addMessageHandler('offer_accepted', handleOfferAccepted)
-    return () => requestWs.removeMessageHandler('offer_accepted')
-  }, [user])
+    return () => {
+      if (requestWs) {
+        requestWs.removeMessageHandler('offer_accepted')
+      }
+    }
+  }, [user, requestWs])
 
   // Handle pending requests message
   useEffect(() => {
+    if (!requestWs) return;
+
     const handlePendingRequests = (data: any) => {
       if (data.type === 'pending_requests' && Array.isArray(data.requests)) {
         console.log('Received pending requests:', data.requests);
@@ -179,8 +202,12 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
     };
 
     requestWs.addMessageHandler('pending_requests', handlePendingRequests);
-    return () => requestWs.removeMessageHandler('pending_requests');
-  }, []);
+    return () => {
+      if (requestWs) {
+        requestWs.removeMessageHandler('pending_requests');
+      }
+    }
+  }, [requestWs]);
 
   // Add handler functions
   const handleRequestView = useCallback((data: any) => {
@@ -222,7 +249,7 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   // Provider methods
   const createRequest = (requestData: any): Promise<Request> => {
     return new Promise((resolve, reject) => {
-      if (!requestWs.isConnected()) {
+      if (!requestWs || !requestWs.isConnected()) {
         reject(new Error('WebSocket not connected'))
         return
       }
@@ -246,8 +273,10 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
             if (request) {
               hasResolved = true
               resolve(request)
-              requestWs.removeMessageHandler('request_created', handleMessage)
-              requestWs.removeMessageHandler('new_request', handleMessage)
+              if (requestWs) {
+                requestWs.removeMessageHandler('request_created', handleMessage)
+                requestWs.removeMessageHandler('new_request', handleMessage)
+              }
             }
           }
           
@@ -256,23 +285,27 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
             console.log('Full request data received:', data.request)
             hasResolved = true
             resolve(data.request)
-            requestWs.removeMessageHandler('request_created', handleMessage)
-            requestWs.removeMessageHandler('new_request', handleMessage)
+            if (requestWs) {
+              requestWs.removeMessageHandler('request_created', handleMessage)
+              requestWs.removeMessageHandler('new_request', handleMessage)
+            }
           }
         }
 
-        requestWs.send('create_request', {
-          type: 'create_request',
-          request_data: {
-            title: requestData.title,
-            description: requestData.description,
-            category_id: requestData.category_id
-          }
-        })
+        if (requestWs) {
+          requestWs.send('create_request', {
+            type: 'create_request',
+            request_data: {
+              title: requestData.title,
+              description: requestData.description,
+              category_id: requestData.category_id
+            }
+          })
 
-        // Add handlers for both message types
-        requestWs.addMessageHandler('request_created', handleMessage)
-        requestWs.addMessageHandler('new_request', handleMessage)
+          // Add handlers for both message types
+          requestWs.addMessageHandler('request_created', handleMessage)
+          requestWs.addMessageHandler('new_request', handleMessage)
+        }
 
       } catch (error) {
         console.error('Error sending request:', error)
@@ -306,6 +339,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   }
 
   const makeOffer = (requestId: string, offerData: any) => {
+    if (!requestWs) return;
+    
     requestWs.send('create_offer', {
       type: 'create_offer',
       request_id: requestId,
@@ -314,6 +349,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
   }
 
   const acceptOffer = (requestId: string, offerId: string) => {
+    if (!requestWs) return;
+    
     requestWs.send('accept_offer', {
       type: 'accept_offer',
       request_id: requestId,

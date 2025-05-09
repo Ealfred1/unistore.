@@ -14,7 +14,10 @@ import {
   BookOpen,
   Users,
   Eye,
-  Sparkles
+  Sparkles,
+  Phone,
+  Mail,
+  Copy
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
@@ -22,16 +25,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner"
 import { useRequest } from "@/providers/request-provider"
 import { useRouter } from "next/navigation"
+import { useStartConversation } from "@/utils/start-conversation"
 
 export default function MerchantRequestsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [filteredRequests, setFilteredRequests] = useState<any[]>([])
+  const [offeredRequests, setOfferedRequests] = useState<Set<string>>(new Set())
+  const [showAcceptedModal, setShowAcceptedModal] = useState(false)
+  const [acceptedRequestDetails, setAcceptedRequestDetails] = useState<any>(null)
   
   // Get real-time requests from the request provider
-  const { pendingRequests, isConnected } = useRequest()
+  const { pendingRequests, isConnected, wsInstance } = useRequest()
   const router = useRouter()
+  const { startChatWithMerchant } = useStartConversation()
 
   const categories = [
     "📚 Textbooks",
@@ -96,6 +104,52 @@ export default function MerchantRequestsPage() {
     
     setFilteredRequests(formattedRequests)
   }, [pendingRequests, searchQuery, selectedCategory, formatRequestData])
+
+  useEffect(() => {
+    if (!wsInstance) return;
+
+    const handleOfferStatusUpdate = (data: any) => {
+      if (data.type === 'offer_status_update' && data.status === 'ACCEPTED') {
+        // Show modal with user details
+        setAcceptedRequestDetails({
+          requestId: data.request_id,
+          offerId: data.offer_id,
+          timestamp: data.timestamp,
+          user: data.request_user // This comes from our backend changes
+        });
+        setShowAcceptedModal(true);
+      }
+    };
+
+    wsInstance.addMessageHandler('offer_status_update', handleOfferStatusUpdate);
+    return () => wsInstance.removeMessageHandler('offer_status_update', handleOfferStatusUpdate);
+  }, [wsInstance]);
+
+  // Function to copy text to clipboard
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard!");
+    } catch (err) {
+      toast.error("Failed to copy text");
+    }
+  };
+
+  // Function to start chat with user
+  const handleStartChat = async (userId: string) => {
+    try {
+      await startChatWithMerchant(userId, "Hi! I'm contacting you regarding the accepted offer.");
+      setShowAcceptedModal(false);
+    } catch (error) {
+      toast.error("Failed to start conversation");
+    }
+  };
+
+  // Function to handle making an offer
+  const handleMakeOffer = (requestId: string) => {
+    setOfferedRequests(prev => new Set([...prev, requestId]));
+    router.push(`/dashboard/merchant/requests/${requestId}`);
+  };
 
   // Replace handleMakeOffer with handleViewRequest
   const handleViewRequest = (requestId: string) => {
@@ -296,12 +350,24 @@ export default function MerchantRequestsPage() {
                   <Button
                     className="bg-uniOrange hover:bg-uniOrange-600 text-white"
                     onClick={(e) => {
-                      e.stopPropagation(); // Prevent card click
-                      handleViewRequest(request.id);
+                      e.stopPropagation();
+                      offeredRequests.has(request.id) 
+                        ? handleViewRequest(request.id)
+                        : handleMakeOffer(request.id);
                     }}
+                    disabled={request.status !== 'PENDING'}
                   >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Details
+                    {offeredRequests.has(request.id) ? (
+                      <>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Offer
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquarePlus className="h-4 w-4 mr-2" />
+                        Make Offer
+                      </>
+                    )}
                   </Button>
                 </div>
               </motion.div>
@@ -321,6 +387,62 @@ export default function MerchantRequestsPage() {
           </p>
         </div>
       )}
+
+      {/* Accepted Offer Modal */}
+      <Dialog open={showAcceptedModal} onOpenChange={setShowAcceptedModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Offer Accepted! 🎉</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Great news! Your offer has been accepted. You can now contact the student to proceed with the request.
+            </p>
+            
+            {acceptedRequestDetails?.user && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm">{acceptedRequestDetails.user.email}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyToClipboard(acceptedRequestDetails.user.email)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {acceptedRequestDetails.user.phone && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">{acceptedRequestDetails.user.phone}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(acceptedRequestDetails.user.phone)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                <Button
+                  className="w-full bg-uniOrange hover:bg-uniOrange-600 text-white"
+                  onClick={() => handleStartChat(acceptedRequestDetails.user.id)}
+                >
+                  <MessageSquarePlus className="h-4 w-4 mr-2" />
+                  Start Conversation
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 
