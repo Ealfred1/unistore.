@@ -467,8 +467,18 @@ export default function MerchantRequestsPage() {
             <DialogTitle>Offer Accepted! 🎉</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-uniOrange/10 flex items-center justify-center">
+                <Store className="h-6 w-6 text-uniOrange" />
+              </div>
+              <div>
+                <h3 className="font-medium">{acceptedRequestDetails?.user?.name}</h3>
+                <p className="text-sm text-gray-500">{acceptedRequestDetails?.user?.university}</p>
+              </div>
+            </div>
+            
             <p className="text-sm text-gray-500">
-              Great news! Your offer has been accepted. You can now start a conversation with the student to proceed with the request.
+              Great news! Your offer has been accepted. You can now contact the student using the following details:
             </p>
             
             {acceptedRequestDetails?.user && (
