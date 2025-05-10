@@ -110,12 +110,27 @@ export default function MerchantRequestsPage() {
 
     const handleOfferStatusUpdate = (data: any) => {
       if (data.type === 'offer_status_update' && data.status === 'ACCEPTED') {
+        // Update the request status in the list
+        setFilteredRequests(prev => prev.map(request => {
+          if (request.id === data.request_id) {
+            return {
+              ...request,
+              status: 'ONGOING',
+              accepted_offer: {
+                id: data.offer_id,
+                merchant_id: data.merchant_id
+              }
+            };
+          }
+          return request;
+        }));
+
         // Show modal with user details
         setAcceptedRequestDetails({
           requestId: data.request_id,
           offerId: data.offer_id,
           timestamp: data.timestamp,
-          user: data.request_user // This comes from our backend changes
+          user: data.request_user
         });
         setShowAcceptedModal(true);
       }
@@ -164,6 +179,16 @@ export default function MerchantRequestsPage() {
       minute: '2-digit'
     })
   }
+
+  // Function to check if merchant has made an offer on a request
+  const hasOfferedOnRequest = (requestId: string) => {
+    return offeredRequests.has(requestId);
+  };
+
+  // Function to check if merchant's offer was accepted
+  const isOfferAccepted = (request: any) => {
+    return request.status === 'ONGOING' && request.accepted_offer;
+  };
 
   // Render loading skeleton
   const renderSkeleton = () => (
@@ -297,7 +322,9 @@ export default function MerchantRequestsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="group bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 hover:border-uniOrange/50 transition-all cursor-pointer"
+                className={`group bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 hover:border-uniOrange/50 transition-all cursor-pointer ${
+                  hasOfferedOnRequest(request.id) ? 'opacity-75' : ''
+                }`}
                 onClick={() => handleViewRequest(request.id)}
               >
                 <div className="flex items-start justify-between mb-4">
@@ -347,28 +374,45 @@ export default function MerchantRequestsPage() {
                     <Clock className="h-4 w-4 mr-1" />
                     {formatDate(request.createdAt)}
                   </div>
-                  <Button
-                    className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      offeredRequests.has(request.id) 
-                        ? handleViewRequest(request.id)
-                        : handleMakeOffer(request.id);
-                    }}
-                    disabled={request.status !== 'PENDING'}
-                  >
-                    {offeredRequests.has(request.id) ? (
-                      <>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Offer
-                      </>
-                    ) : (
-                      <>
+                  <div className="flex items-center gap-2">
+                    {isOfferAccepted(request) ? (
+                      <Button
+                        className="bg-uniOrange hover:bg-uniOrange-600 text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartChat(request.user_id);
+                        }}
+                      >
                         <MessageSquarePlus className="h-4 w-4 mr-2" />
-                        Make Offer
-                      </>
+                        Message Student
+                      </Button>
+                    ) : (
+                      <Button
+                        className={`bg-uniOrange hover:bg-uniOrange-600 text-white ${
+                          hasOfferedOnRequest(request.id) ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!hasOfferedOnRequest(request.id)) {
+                            handleMakeOffer(request.id);
+                          }
+                        }}
+                        disabled={hasOfferedOnRequest(request.id) || request.status !== 'PENDING'}
+                      >
+                        {hasOfferedOnRequest(request.id) ? (
+                          <>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Offer
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquarePlus className="h-4 w-4 mr-2" />
+                            Make Offer
+                          </>
+                        )}
+                      </Button>
                     )}
-                  </Button>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -396,7 +440,7 @@ export default function MerchantRequestsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-500">
-              Great news! Your offer has been accepted. You can now contact the student to proceed with the request.
+              Great news! Your offer has been accepted. You can now start a conversation with the student to proceed with the request.
             </p>
             
             {acceptedRequestDetails?.user && (

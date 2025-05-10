@@ -54,6 +54,12 @@ interface ViewingMerchant {
   name: string;
 }
 
+interface User {
+  id: string;
+  user_type: string;
+  // ... other user properties
+}
+
 export default function RequestDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { user } = useAuth()
@@ -163,7 +169,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
       const handleOfferStatusUpdate = (data: any) => {
         if (data.type === 'offer_status_updated' && data.request_id === parseInt(params.id)) {
           console.log("Offer status updated:", data)
-          // Update offer status
+          // Update offer status immediately
           setRequestDetails(prev => {
             if (prev && prev.offers) {
               const updatedOffers = prev.offers.map(offer => {
@@ -173,17 +179,27 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                     status: data.status
                   }
                 }
+                // If this offer was accepted, decline all other pending offers
+                if (data.status === 'ACCEPTED' && offer.status === 'PENDING') {
+                  return {
+                    ...offer,
+                    status: 'DECLINED'
+                  }
+                }
                 return offer
               })
               
               return {
                 ...prev,
                 offers: updatedOffers,
-                status: data.request_status || prev.status
+                status: data.status === 'ACCEPTED' ? 'ONGOING' : prev.status
               }
             }
             return prev
           })
+          
+          // Clear selected offer after status update
+          setSelectedOffer(null)
         }
       }
       
@@ -219,7 +235,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
         })
         
         // Track view if user is a merchant
-        if (user?.role === 'MERCHANT') {
+        if (user?.user_type === 'MERCHANT') {
           viewRequest(params.id)
         }
       } catch (error) {
@@ -255,7 +271,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
       
       fetchDetails()
     }
-  }, [params.id, isRequestConnected, requestWs, user?.role, viewRequest])
+  }, [params.id, isRequestConnected, requestWs, user?.user_type, viewRequest])
   
   // Handle accept offer
   const handleAcceptOffer = async (offerId: string) => {
@@ -496,41 +512,50 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                     </div>
                   )}
                   
-                  {requestDetails.is_owner && offer.status === 'PENDING' && (
+                  {requestDetails.is_owner && (
                     <div className="mt-3 flex items-center space-x-2">
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setCurrentMerchant(offer.merchant_id)
-                          setShowMessageModal(true)
-                        }}
-                      >
-                        <MessageSquareIcon className="h-3 w-3 mr-1" />
-                        Message
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                        onClick={() => handleDeclineOffer(offer.id)}
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Decline
-                      </Button>
-                      <Button 
-                        className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-                        size="sm"
-                        onClick={() => handleAcceptOffer(offer.id)}
-                        disabled={selectedOffer === offer.id}
-                      >
-                        {selectedOffer === offer.id ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                        )}
-                        Accept Offer
-                      </Button>
+                      {/* Only show message button for accepted offers */}
+                      {offer.status === 'ACCEPTED' && (
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCurrentMerchant(offer.merchant_id)
+                            setShowMessageModal(true)
+                          }}
+                        >
+                          <MessageSquareIcon className="h-3 w-3 mr-1" />
+                          Message
+                        </Button>
+                      )}
+                      
+                      {/* Only show accept/decline buttons for pending offers */}
+                      {offer.status === 'PENDING' && (
+                        <>
+                          <Button 
+                            variant="outline"
+                            size="sm"
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                            onClick={() => handleDeclineOffer(offer.id)}
+                          >
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Decline
+                          </Button>
+                          <Button 
+                            className="bg-uniOrange hover:bg-uniOrange-600 text-white"
+                            size="sm"
+                            onClick={() => handleAcceptOffer(offer.id)}
+                            disabled={selectedOffer === offer.id}
+                          >
+                            {selectedOffer === offer.id ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                            )}
+                            Accept Offer
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 </motion.div>
