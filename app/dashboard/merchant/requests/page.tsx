@@ -24,7 +24,7 @@ import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { useRequest } from "@/providers/request-provider"
-import { useRouter } from "next/navigation"
+import { useRouter } from "next/navigation" 
 import { useStartConversation } from "@/utils/start-conversation"
 
 export default function MerchantRequestsPage() {
@@ -35,6 +35,8 @@ export default function MerchantRequestsPage() {
   const [offeredRequests, setOfferedRequests] = useState<Set<string>>(new Set())
   const [showAcceptedModal, setShowAcceptedModal] = useState(false)
   const [acceptedRequestDetails, setAcceptedRequestDetails] = useState<any>(null)
+  const [showCancelledModal, setShowCancelledModal] = useState(false)
+  const [cancelledRequestDetails, setCancelledRequestDetails] = useState<any>(null)
   
   // Get real-time requests from the request provider
   const { pendingRequests, isConnected, wsInstance } = useRequest()
@@ -87,29 +89,43 @@ export default function MerchantRequestsPage() {
 
   useEffect(() => {
     // Format and filter requests when pendingRequests changes
-    let formattedRequests = pendingRequests.map(formatRequestData)
+    let formattedRequests = pendingRequests
+      .filter((request, index, self) => 
+        // Remove duplicates based on request ID
+        index === self.findIndex(r => r.id === request.id)
+      )
+      .filter(request => request.status !== 'CANCELLED') // Filter out cancelled requests
+      .map(formatRequestData);
     
-    // Apply search
+    // Apply search and category filters
     if (searchQuery) {
       formattedRequests = formattedRequests.filter(request => 
         request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         request.description.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      );
     }
     
-    // Apply category filter
     if (selectedCategory) {
-      formattedRequests = formattedRequests.filter(request => request.category === selectedCategory)
+      formattedRequests = formattedRequests.filter(request => request.category === selectedCategory);
     }
     
-    setFilteredRequests(formattedRequests)
-  }, [pendingRequests, searchQuery, selectedCategory, formatRequestData])
+    setFilteredRequests(formattedRequests);
+  }, [pendingRequests, searchQuery, selectedCategory, formatRequestData]);
 
   useEffect(() => {
     if (!wsInstance) return;
 
     const handleOfferStatusUpdate = (data: any) => {
       if (data.type === 'offer_status_update' && data.status === 'ACCEPTED') {
+        // Show modal with user details for the merchant who made the offer
+        setAcceptedRequestDetails({
+          requestId: data.request_id,
+          offerId: data.offer_id,
+          timestamp: data.timestamp,
+          user: data.request_user // This now contains user contact details
+        });
+        setShowAcceptedModal(true);
+        
         // Update the request status in the list
         setFilteredRequests(prev => prev.map(request => {
           if (request.id === data.request_id) {
@@ -124,20 +140,32 @@ export default function MerchantRequestsPage() {
           }
           return request;
         }));
-
-        // Show modal with user details
-        setAcceptedRequestDetails({
-          requestId: data.request_id,
-          offerId: data.offer_id,
-          timestamp: data.timestamp,
-          user: data.request_user
-        });
-        setShowAcceptedModal(true);
       }
     };
 
     wsInstance.addMessageHandler('offer_status_update', handleOfferStatusUpdate);
     return () => wsInstance.removeMessageHandler('offer_status_update', handleOfferStatusUpdate);
+  }, [wsInstance]);
+
+  useEffect(() => {
+    if (!wsInstance) return;
+
+    const handleRequestStatusUpdate = (data: any) => {
+      if (data.type === 'request_status_update' && data.status === 'CANCELLED') {
+        // Remove cancelled request from the list immediately
+        setFilteredRequests(prev => prev.filter(request => request.id !== data.request_id));
+        
+        // Show cancelled modal
+        setCancelledRequestDetails({
+          requestId: data.request_id,
+          timestamp: data.timestamp
+        });
+        setShowCancelledModal(true);
+      }
+    };
+
+    wsInstance.addMessageHandler('request_status_update', handleRequestStatusUpdate);
+    return () => wsInstance.removeMessageHandler('request_status_update', handleRequestStatusUpdate);
   }, [wsInstance]);
 
   // Function to copy text to clipboard
@@ -376,9 +404,9 @@ export default function MerchantRequestsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {isOfferAccepted(request) ? (
-                      <Button
-                        className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-                        onClick={(e) => {
+                  <Button
+                    className="bg-uniOrange hover:bg-uniOrange-600 text-white"
+                    onClick={(e) => {
                           e.stopPropagation();
                           handleStartChat(request.user_id);
                         }}
@@ -398,10 +426,10 @@ export default function MerchantRequestsPage() {
                           }
                         }}
                         disabled={hasOfferedOnRequest(request.id) || request.status !== 'PENDING'}
-                      >
+                  >
                         {hasOfferedOnRequest(request.id) ? (
                           <>
-                            <Eye className="h-4 w-4 mr-2" />
+                    <Eye className="h-4 w-4 mr-2" />
                             View Offer
                           </>
                         ) : (
@@ -410,7 +438,7 @@ export default function MerchantRequestsPage() {
                             Make Offer
                           </>
                         )}
-                      </Button>
+                  </Button>
                     )}
                   </div>
                 </div>
@@ -484,6 +512,26 @@ export default function MerchantRequestsPage() {
                 </Button>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancelled Request Modal */}
+      <Dialog open={showCancelledModal} onOpenChange={setShowCancelledModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Cancelled</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              This request has been cancelled by the student and is no longer available.
+            </p>
+            <Button
+              className="w-full"
+              onClick={() => setShowCancelledModal(false)}
+            >
+              Close
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

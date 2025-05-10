@@ -10,7 +10,10 @@ import {
   XCircle,
   Loader2,
   MessageSquare as MessageSquareIcon,
-  SendHorizonal
+  SendHorizonal,
+  Phone,
+  Mail,
+  Copy
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -40,6 +43,8 @@ interface RequestDetails {
     description: string;
     status: string;
     created_at: string;
+    merchant_email?: string;
+    merchant_phone?: string;
   }>;
   views?: Array<{
     id: string;
@@ -166,66 +171,83 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
       }
       
       // Set up message handler for offer status updates
-      const handleOfferStatusUpdate = (data: any) => {
-        if (data.type === 'offer_status_updated' && data.request_id === parseInt(params.id)) {
-          console.log("Offer status updated:", data)
-          // Update offer status immediately
-          setRequestDetails(prev => {
-            if (prev && prev.offers) {
-              const updatedOffers = prev.offers.map(offer => {
-                if (offer.id === data.offer_id) {
-                  return {
-                    ...offer,
-                    status: data.status
-                  }
+      const handleOfferStatusUpdate = async (data: any) => {
+        if (data.type === 'offer_status_update' && data.request_id === parseInt(params.id)) {
+          if (data.status === 'DECLINED') {
+            // Remove declined offer immediately
+            setRequestDetails(prev => {
+              if (prev && prev.offers) {
+                return {
+                  ...prev,
+                  offers: prev.offers.filter(offer => offer.id !== data.offer_id)
                 }
-                // If this offer was accepted, decline all other pending offers
-                if (data.status === 'ACCEPTED' && offer.status === 'PENDING') {
+              }
+              return prev
+            });
+          } else if (data.status === 'ACCEPTED') {
+            // Update offer status and add merchant contact info
+            setRequestDetails(prev => {
+              if (prev && prev.offers) {
+                const updatedOffers = prev.offers.map(offer => {
+                  if (offer.id === data.offer_id) {
+                    return {
+                      ...offer,
+                      status: 'ACCEPTED',
+                      merchant_email: data.merchant_email,
+                      merchant_phone: data.merchant_phone
+                    };
+                  }
+                  // Decline all other offers
                   return {
                     ...offer,
                     status: 'DECLINED'
-                  }
-                }
-                return offer
-              })
-              
-              return {
-                ...prev,
-                offers: updatedOffers,
-                status: data.status === 'ACCEPTED' ? 'ONGOING' : prev.status
+                  };
+                });
+                
+                return {
+                  ...prev,
+                  offers: updatedOffers,
+                  status: 'ONGOING'
+                };
               }
-            }
-            return prev
-          })
+              return prev;
+            });
+          }
           
-          // Clear selected offer after status update
-          setSelectedOffer(null)
+          // Clear loading state after 3 seconds
+          setTimeout(() => {
+            setSelectedOffer(null);
+          }, 3000);
         }
-      }
+      };
       
       // Set up message handler for request status updates
       const handleRequestStatusUpdate = (data: any) => {
-        if (data.type === 'request_status_updated' && data.request_id === parseInt(params.id)) {
-          console.log("Request status updated:", data)
-          // Update request status
+        if (data.type === 'request_status_update' && data.request_id === parseInt(params.id)) {
           setRequestDetails(prev => {
             if (prev) {
               return {
                 ...prev,
                 status: data.status
-              }
+              };
             }
-            return prev
-          })
+            return prev;
+          });
+
+          // If request is cancelled, show modal
+          if (data.status === 'CANCELLED') {
+            toast.error("This request has been cancelled by the student");
+            router.push('/dashboard/requests');
+          }
         }
-      }
+      };
       
       // Add message handlers
       requestWs.addMessageHandler('request_details', handleRequestDetails)
       requestWs.addMessageHandler('request_view_notification', handleViewNotification)
       requestWs.addMessageHandler('new_offer', handleNewOffer)
-      requestWs.addMessageHandler('offer_status_updated', handleOfferStatusUpdate)
-      requestWs.addMessageHandler('request_status_updated', handleRequestStatusUpdate)
+      requestWs.addMessageHandler('offer_status_update', handleOfferStatusUpdate)
+      requestWs.addMessageHandler('request_status_update', handleRequestStatusUpdate)
       
       // Request details
       try {
@@ -249,8 +271,8 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
         requestWs.removeMessageHandler('request_details', handleRequestDetails)
         requestWs.removeMessageHandler('request_view_notification', handleViewNotification)
         requestWs.removeMessageHandler('new_offer', handleNewOffer)
-        requestWs.removeMessageHandler('offer_status_updated', handleOfferStatusUpdate)
-        requestWs.removeMessageHandler('request_status_updated', handleRequestStatusUpdate)
+        requestWs.removeMessageHandler('offer_status_update', handleOfferStatusUpdate)
+        requestWs.removeMessageHandler('request_status_update', handleRequestStatusUpdate)
       }
     } else {
       // Fallback to API if WebSocket is not connected
@@ -271,7 +293,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
       
       fetchDetails()
     }
-  }, [params.id, isRequestConnected, requestWs, user?.user_type, viewRequest])
+  }, [params.id, isRequestConnected, requestWs, user?.user_type, viewRequest, router])
   
   // Handle accept offer
   const handleAcceptOffer = async (offerId: string) => {
@@ -283,6 +305,11 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     setSelectedOffer(offerId)
     
     try {
+      // Start a 3-second timer
+      setTimeout(() => {
+        setSelectedOffer(null)
+      }, 3000)
+
       requestWs.send('update_offer_status', {
         type: 'update_offer_status',
         offer_id: offerId,
@@ -303,11 +330,25 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     }
     
     try {
+      // Immediately remove the offer from UI
+      setRequestDetails(prev => {
+        if (prev && prev.offers) {
+          return {
+            ...prev,
+            offers: prev.offers.filter(offer => offer.id !== offerId)
+          }
+        }
+        return prev
+      })
+
+      // Send decline status to server
       requestWs.send('update_offer_status', {
         type: 'update_offer_status',
         offer_id: offerId,
         status: 'DECLINED'
       })
+
+      toast.success("Offer declined")
     } catch (error) {
       console.error("Error declining offer:", error)
       toast.error("Failed to decline offer")
@@ -499,9 +540,62 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                   </div>
                   
                   {offer.status === 'ACCEPTED' && (
-                    <div className="mt-3 flex items-center text-green-600 dark:text-green-400">
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      <span>Offer accepted</span>
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500" />
+                          <span>{offer.merchant_phone || 'No phone number'}</span>
+                        </div>
+                        {offer.merchant_phone && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(offer.merchant_phone)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-gray-500" />
+                          <span>{offer.merchant_email}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(offer.merchant_email)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        {offer.merchant_phone && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => window.location.href = `tel:${offer.merchant_phone}`}
+                          >
+                            <Phone className="h-4 w-4 mr-2" />
+                            Call
+                          </Button>
+                        )}
+                        
+                        <Button 
+                          className="flex-1 bg-uniOrange hover:bg-uniOrange-600 text-white"
+                          size="sm"
+                          onClick={() => {
+                            setCurrentMerchant(offer.merchant_id)
+                            setShowMessageModal(true)
+                          }}
+                        >
+                          <MessageSquareIcon className="h-4 w-4 mr-2" />
+                          Message
+                        </Button>
+                      </div>
                     </div>
                   )}
                   
@@ -514,46 +608,31 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                   
                   {requestDetails.is_owner && (
                     <div className="mt-3 flex items-center space-x-2">
-                      {/* Only show message button for accepted offers */}
-                      {offer.status === 'ACCEPTED' && (
-                        <Button 
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setCurrentMerchant(offer.merchant_id)
-                            setShowMessageModal(true)
-                          }}
-                        >
-                          <MessageSquareIcon className="h-3 w-3 mr-1" />
-                          Message
-                        </Button>
-                      )}
-                      
                       {/* Only show accept/decline buttons for pending offers */}
                       {offer.status === 'PENDING' && (
                         <>
-                          <Button 
-                            variant="outline"
-                            size="sm"
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                            onClick={() => handleDeclineOffer(offer.id)}
-                          >
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Decline
-                          </Button>
-                          <Button 
-                            className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-                            size="sm"
-                            onClick={() => handleAcceptOffer(offer.id)}
-                            disabled={selectedOffer === offer.id}
-                          >
-                            {selectedOffer === offer.id ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            ) : (
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                            )}
-                            Accept Offer
-                          </Button>
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                          onClick={() => handleDeclineOffer(offer.id)}
+                        >
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Decline
+                        </Button>
+                        <Button 
+                          className="bg-uniOrange hover:bg-uniOrange-600 text-white"
+                          size="sm"
+                          onClick={() => handleAcceptOffer(offer.id)}
+                          disabled={selectedOffer === offer.id}
+                        >
+                          {selectedOffer === offer.id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                          )}
+                          Accept Offer
+                        </Button>
                         </>
                       )}
                     </div>

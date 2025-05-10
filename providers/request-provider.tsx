@@ -274,8 +274,8 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
               hasResolved = true
               resolve(request)
               if (requestWs) {
-                requestWs.removeMessageHandler('request_created', handleMessage)
-                requestWs.removeMessageHandler('new_request', handleMessage)
+              requestWs.removeMessageHandler('request_created', handleMessage)
+              requestWs.removeMessageHandler('new_request', handleMessage)
               }
             }
           }
@@ -286,25 +286,25 @@ export function RequestProvider({ children }: { children: React.ReactNode }) {
             hasResolved = true
             resolve(data.request)
             if (requestWs) {
-              requestWs.removeMessageHandler('request_created', handleMessage)
-              requestWs.removeMessageHandler('new_request', handleMessage)
+            requestWs.removeMessageHandler('request_created', handleMessage)
+            requestWs.removeMessageHandler('new_request', handleMessage)
             }
           }
         }
 
         if (requestWs) {
-          requestWs.send('create_request', {
-            type: 'create_request',
-            request_data: {
-              title: requestData.title,
-              description: requestData.description,
-              category_id: requestData.category_id
-            }
-          })
+        requestWs.send('create_request', {
+          type: 'create_request',
+          request_data: {
+            title: requestData.title,
+            description: requestData.description,
+            category_id: requestData.category_id
+          }
+        })
 
-          // Add handlers for both message types
-          requestWs.addMessageHandler('request_created', handleMessage)
-          requestWs.addMessageHandler('new_request', handleMessage)
+        // Add handlers for both message types
+        requestWs.addMessageHandler('request_created', handleMessage)
+        requestWs.addMessageHandler('new_request', handleMessage)
         }
 
       } catch (error) {
