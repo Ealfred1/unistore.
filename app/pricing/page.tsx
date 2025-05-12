@@ -67,8 +67,8 @@ export default function PricingPage() {
     const fetchSubscriptionData = async () => {
       try {
         const [tiersRes, currentSubRes] = await Promise.all([
-          axiosInstance.get("/subscriptions"),
-          axiosInstance.get("/subscriptions/current")
+          axiosInstance.get("/api/subscriptions"),
+          axiosInstance.get("/api/subscriptions/current")
         ])
         
         // Enhance tiers with icons and features
@@ -95,10 +95,22 @@ export default function PricingPage() {
 
   const handleSubscribe = async (tierId: number) => {
     try {
-      const response = await axiosInstance.post(`/subscriptions/${tierId}/initiate-payment`)
-      window.location.href = response.data.payment_link
+      // Create a new subscription with the selected tier
+      const response = await axiosInstance.post(`/api/subscriptions/`, {
+        tier_id: tierId
+      })
+      
+      // If payment link is returned, redirect to it
+      if (response.data.payment_link) {
+        window.location.href = response.data.payment_link
+      } else {
+        // If no payment link (e.g. free tier), show success message
+        toast.success("Subscription updated successfully!")
+        // Refresh the page to show new subscription
+        window.location.reload()
+      }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to initiate payment")
+      toast.error(error.response?.data?.message || "Failed to update subscription")
     }
   }
 

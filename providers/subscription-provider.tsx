@@ -28,7 +28,17 @@ interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined)
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null)
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>({
+    offers_used: 0,
+    offer_limit: 20, // Free tier limit
+    offer_usage_percent: 0,
+    views_used: 0,
+    view_limit: 20, // Free tier limit
+    view_usage_percent: 0,
+    tier_name: "Free",
+    is_active: true,
+    end_date: ""
+  })
   const [showLimitModal, setShowLimitModal] = useState(false)
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [limitType, setLimitType] = useState<"views" | "offers" | null>(null)
@@ -41,9 +51,11 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     if (data.offer_usage_percent >= 100 || data.view_usage_percent >= 100) {
       setLimitType(data.offer_usage_percent >= 100 ? "offers" : "views")
       setShowLimitModal(true)
+      toast.error(`You have reached your ${limitType} limit for your current subscription tier`)
     } else if (data.offer_usage_percent >= 80 || data.view_usage_percent >= 80) {
       setLimitType(data.offer_usage_percent >= 80 ? "offers" : "views")
       setShowWarningModal(true)
+      toast.warning(`You are approaching your ${limitType} limit`)
     }
   }
 
@@ -60,6 +72,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         toast.error(data.error)
         setLimitType(data.error.includes("offer") ? "offers" : "views")
         setShowLimitModal(true)
+      } else if (data.type === "error") {
+        // Handle general subscription errors
+        toast.error(data.message)
+        if (data.message.includes("limit")) {
+          setLimitType(data.message.includes("offer") ? "offers" : "views")
+          setShowLimitModal(true)
+        }
       }
     }
 
@@ -91,7 +110,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
                 <Progress 
                   value={limitType === "offers" ? subscriptionData?.offer_usage_percent : subscriptionData?.view_usage_percent} 
                   className="h-2"
-                  indicatorClassName="bg-red-600"
+                  indicatorColor="bg-red-600"
                 />
                 <p className="text-sm text-right text-red-600">
                   {limitType === "offers" 
@@ -138,7 +157,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
                 <Progress 
                   value={limitType === "offers" ? subscriptionData?.offer_usage_percent : subscriptionData?.view_usage_percent} 
                   className="h-2"
-                  indicatorClassName="bg-yellow-600"
+                  indicatorColor="bg-yellow-600"
                 />
                 <p className="text-sm text-right text-yellow-600">
                   {limitType === "offers" 

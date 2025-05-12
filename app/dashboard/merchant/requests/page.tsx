@@ -17,17 +17,51 @@ import {
   Sparkles,
   Phone,
   Mail,
-  Copy
+  Copy,
+  AlertCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { useRequest } from "@/providers/request-provider"
 import { useRouter } from "next/navigation"
 import { useStartConversation } from "@/utils/start-conversation"
 import { useSubscription } from "@/providers/subscription-provider"
 import { Progress } from "@/components/ui/progress"
+
+// Add these functions at the top of the file
+async function makeOffer(requestId: string) {
+  const response = await fetch(`/api/requests/${requestId}/offer`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    }
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.message || "Failed to make offer")
+  }
+
+  return response.json()
+}
+
+async function trackRequestView(requestId: string) {
+  const response = await fetch(`/api/requests/${requestId}/view`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    }
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.message || "Failed to track request view")
+  }
+
+  return response.json()
+}
 
 export default function MerchantRequestsPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -39,6 +73,8 @@ export default function MerchantRequestsPage() {
   const [acceptedRequestDetails, setAcceptedRequestDetails] = useState<any>(null)
   const [showCancelledModal, setShowCancelledModal] = useState(false)
   const [cancelledRequestDetails, setCancelledRequestDetails] = useState<any>(null)
+  const [showLimitError, setShowLimitError] = useState(false)
+  const [limitType, setLimitType] = useState<"views" | "offers" | null>(null)
   
   // Get real-time requests from the request provider
   const { pendingRequests, isConnected, wsInstance } = useRequest()
@@ -192,15 +228,45 @@ export default function MerchantRequestsPage() {
   };
 
   // Function to handle making an offer
-  const handleMakeOffer = (requestId: string) => {
-    setOfferedRequests(prev => new Set([...prev, requestId]));
-    router.push(`/dashboard/merchant/requests/${requestId}`);
+  const handleMakeOffer = async (requestId: string) => {
+    try {
+      if (subscriptionData && subscriptionData.offers_used < subscriptionData.offer_limit) {
+        // Continue with making offer
+        await makeOffer(requestId);
+      } else {
+        setLimitType("offers");
+        setShowLimitError(true);
+        return;
+      }
+    } catch (error: any) {
+      if (error.message?.includes("limit")) {
+        setLimitType("offers");
+        setShowLimitError(true);
+      } else {
+        toast.error("Failed to make offer");
+      }
+    }
   };
 
   // Replace handleMakeOffer with handleViewRequest
-  const handleViewRequest = (requestId: string) => {
-    router.push(`/dashboard/merchant/requests/${requestId}`)
-  }
+  const handleViewRequest = async (requestId: string) => {
+    try {
+      if (subscriptionData && subscriptionData.views_used < subscriptionData.view_limit) {
+        await trackRequestView(requestId);
+      } else {
+        setLimitType("views");
+        setShowLimitError(true);
+        return;
+      }
+    } catch (error: any) {
+      if (error.message?.includes("limit")) {
+        setLimitType("views");
+        setShowLimitError(true);
+      } else {
+        toast.error("Failed to view request");
+      }
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -577,6 +643,46 @@ export default function MerchantRequestsPage() {
             >
               Close
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Limit Error Modal */}
+      <Dialog open={showLimitError} onOpenChange={setShowLimitError}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Subscription Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              You have reached your {limitType} limit for your current subscription tier.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Free tier users can:
+              - View up to 20 requests
+              - Make up to 20 offers
+              
+              You have used:
+              {limitType === "offers" 
+                ? `${subscriptionData?.offers_used} / ${subscriptionData?.offer_limit} offers`
+                : `${subscriptionData?.views_used} / ${subscriptionData?.view_limit} views`
+              }
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowLimitError(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                setShowLimitError(false)
+                router.push("/pricing")
+              }}>
+                Upgrade Subscription
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
