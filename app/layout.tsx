@@ -28,7 +28,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AuthProvider>
             <SubscriptionProvider>
               <WebSocketProvider>
@@ -43,9 +42,8 @@ export default function RootLayout({
                 </MessagingProvider>
               </WebSocketProvider>
             </SubscriptionProvider>
-          </AuthProvider>
           <Toaster position="bottom-right" richColors />
-        </ThemeProvider>
+          </AuthProvider>
       </body>
     </html>
   ) 
