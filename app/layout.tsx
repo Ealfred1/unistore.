@@ -10,6 +10,7 @@ import { Toaster } from 'sonner'
 import { MessagingProvider } from '@/providers/messaging-provider'
 import { RequestProvider } from '@/providers/request-provider'
 import { WebSocketProvider } from '@/providers/websocket-provider'
+import { SubscriptionProvider } from "@/providers/subscription-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -27,20 +28,24 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
-          <WebSocketProvider>
-            <MessagingProvider>
-              <RequestProvider>
-                <UniversityProvider>
-                  <ProductProvider>
-                    {children}
-                  </ProductProvider>
-                </UniversityProvider>
-              </RequestProvider>
-            </MessagingProvider>
-          </WebSocketProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <AuthProvider>
+            <SubscriptionProvider>
+              <WebSocketProvider>
+                <MessagingProvider>
+                  <RequestProvider>
+                    <UniversityProvider>
+                      <ProductProvider>
+                        {children}
+                      </ProductProvider>
+                    </UniversityProvider>
+                  </RequestProvider>
+                </MessagingProvider>
+              </WebSocketProvider>
+            </SubscriptionProvider>
+          </AuthProvider>
           <Toaster position="bottom-right" richColors />
-        </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   ) 

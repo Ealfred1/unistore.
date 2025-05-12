@@ -24,8 +24,10 @@ import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { useRequest } from "@/providers/request-provider"
-import { useRouter } from "next/navigation" 
+import { useRouter } from "next/navigation"
 import { useStartConversation } from "@/utils/start-conversation"
+import { useSubscription } from "@/providers/subscription-provider"
+import { Progress } from "@/components/ui/progress"
 
 export default function MerchantRequestsPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -42,6 +44,7 @@ export default function MerchantRequestsPage() {
   const { pendingRequests, isConnected, wsInstance } = useRequest()
   const router = useRouter()
   const { startChatWithMerchant } = useStartConversation()
+  const { subscriptionData } = useSubscription()
 
   const categories = [
     "📚 Textbooks",
@@ -257,7 +260,7 @@ export default function MerchantRequestsPage() {
         <h1 className="text-2xl font-bold mb-2">Student Requests 🎓</h1>
         <p className="text-gray-500">Help students find what they need!</p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -270,27 +273,59 @@ export default function MerchantRequestsPage() {
             </div>
           </div>
           
+          {/* Subscription Usage Stats */}
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Students</p>
-                <h3 className="text-2xl font-bold text-uniBlue">156</h3>
-              </div>
-              <div className="h-10 w-10 bg-uniBlue/10 rounded-full flex items-center justify-center">
-                <Users className="h-5 w-5 text-uniBlue" />
-              </div>
+            <div className="flex flex-col">
+              <p className="text-sm text-gray-500 mb-2">Views Usage</p>
+              <Progress 
+                value={subscriptionData?.view_usage_percent ?? 0} 
+                className="h-2 mb-1"
+                indicatorColor={
+                  typeof subscriptionData?.view_usage_percent === 'number' && 
+                  subscriptionData.view_usage_percent >= 80 
+                    ? "bg-yellow-600" 
+                    : undefined
+                }
+              />
+              <p className="text-xs text-right text-gray-500">
+                {subscriptionData?.views_used ?? 0} / {subscriptionData?.view_limit ?? 0}
+              </p>
             </div>
           </div>
-          
+
+          <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+            <div className="flex flex-col">
+              <p className="text-sm text-gray-500 mb-2">Offers Usage</p>
+              <Progress 
+                value={subscriptionData?.offer_usage_percent ?? 0} 
+                className="h-2 mb-1"
+                indicatorColor={
+                  typeof subscriptionData?.offer_usage_percent === 'number' && 
+                  subscriptionData.offer_usage_percent >= 80 
+                    ? "bg-yellow-600" 
+                    : undefined
+                }
+              />
+              <p className="text-xs text-right text-gray-500">
+                {subscriptionData?.offers_used ?? 0} / {subscriptionData?.offer_limit ?? 0}
+              </p>
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Your Offers</p>
-                <h3 className="text-2xl font-bold text-green-600">12</h3>
+                <p className="text-sm text-gray-500">Subscription</p>
+                <h3 className="text-lg font-bold text-uniBlue">{subscriptionData?.tier_name || "No Plan"}</h3>
               </div>
-              <div className="h-10 w-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                <MessageSquarePlus className="h-5 w-5 text-green-600" />
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/pricing")}
+                className="text-uniBlue hover:text-uniBlue/80"
+              >
+                Upgrade
+              </Button>
             </div>
           </div>
         </div>
@@ -547,4 +582,4 @@ export default function MerchantRequestsPage() {
       </Dialog>
     </div>
   )
-} 
+}
