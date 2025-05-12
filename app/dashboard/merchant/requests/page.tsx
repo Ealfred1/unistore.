@@ -356,8 +356,8 @@ export default function MerchantRequestsPage() {
               <p className="text-xs text-right text-gray-500">
                 {subscriptionData?.views_used ?? 0} / {subscriptionData?.view_limit ?? 0}
               </p>
-            </div>
-          </div>
+              </div>
+              </div>
 
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex flex-col">
@@ -377,7 +377,7 @@ export default function MerchantRequestsPage() {
               </p>
             </div>
           </div>
-
+          
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -688,4 +688,4 @@ export default function MerchantRequestsPage() {
       </Dialog>
     </div>
   )
-}
+} 

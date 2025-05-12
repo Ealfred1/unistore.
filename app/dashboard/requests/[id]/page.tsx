@@ -186,12 +186,12 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
             });
           } else if (data.status === 'ACCEPTED') {
             // Update offer status and add merchant contact info
-            setRequestDetails(prev => {
-              if (prev && prev.offers) {
-                const updatedOffers = prev.offers.map(offer => {
-                  if (offer.id === data.offer_id) {
-                    return {
-                      ...offer,
+          setRequestDetails(prev => {
+            if (prev && prev.offers) {
+              const updatedOffers = prev.offers.map(offer => {
+                if (offer.id === data.offer_id) {
+                  return {
+                    ...offer,
                       status: 'ACCEPTED',
                       merchant_email: data.merchant_email,
                       merchant_phone: data.merchant_phone
@@ -203,13 +203,13 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                     status: 'DECLINED'
                   };
                 });
-                
-                return {
-                  ...prev,
-                  offers: updatedOffers,
+              
+              return {
+                ...prev,
+                offers: updatedOffers,
                   status: 'ONGOING'
                 };
-              }
+            }
               return prev;
             });
           }
@@ -238,8 +238,8 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
           if (data.status === 'CANCELLED') {
             toast.error("This request has been cancelled by the student");
             router.push('/dashboard/requests');
-          }
         }
+      }
       };
       
       // Add message handlers
@@ -611,28 +611,28 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                       {/* Only show accept/decline buttons for pending offers */}
                       {offer.status === 'PENDING' && (
                         <>
-                        <Button 
-                          variant="outline"
-                          size="sm"
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                          onClick={() => handleDeclineOffer(offer.id)}
-                        >
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Decline
-                        </Button>
-                        <Button 
-                          className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-                          size="sm"
-                          onClick={() => handleAcceptOffer(offer.id)}
-                          disabled={selectedOffer === offer.id}
-                        >
-                          {selectedOffer === offer.id ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                          )}
-                          Accept Offer
-                        </Button>
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                        onClick={() => handleDeclineOffer(offer.id)}
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Decline
+                      </Button>
+                      <Button 
+                        className="bg-uniOrange hover:bg-uniOrange-600 text-white"
+                        size="sm"
+                        onClick={() => handleAcceptOffer(offer.id)}
+                        disabled={selectedOffer === offer.id}
+                      >
+                        {selectedOffer === offer.id ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                        )}
+                        Accept Offer
+                      </Button>
                         </>
                       )}
                     </div>
