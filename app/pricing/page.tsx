@@ -67,8 +67,8 @@ export default function PricingPage() {
     const fetchSubscriptionData = async () => {
       try {
         const [tiersRes, currentSubRes] = await Promise.all([
-          axiosInstance.get("/api/subscriptions"),
-          axiosInstance.get("/api/subscriptions/current")
+          axiosInstance.get("/subscriptions"),
+          axiosInstance.get("/subscriptions/current")
         ])
         
         // Get tiers from the paginated response
