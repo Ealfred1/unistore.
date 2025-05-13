@@ -67,21 +67,58 @@ export default function PricingPage() {
     const fetchSubscriptionData = async () => {
       try {
         const [tiersRes, currentSubRes] = await Promise.all([
-          axiosInstance.get("/subscriptions"),
-          axiosInstance.get("/subscriptions/current")
+          axiosInstance.get("/api/subscriptions"),
+          axiosInstance.get("/api/subscriptions/current")
         ])
         
+        // Get tiers from the paginated response
+        const tiersData = tiersRes.data.results || [];
+        
         // Enhance tiers with icons and features
-        const enhancedTiers = tiersRes.data.map((tier: Tier) => ({
+        const enhancedTiers = tiersData.map((tier: Tier) => ({
           ...tier,
-          icon: tier.name === "Basic" ? <Package className="w-6 h-6" /> :
+          icon: tier.name === "Basic" || tier.name === "Free" ? <Package className="w-6 h-6" /> :
                 tier.name === "Professional" ? <Zap className="w-6 h-6" /> :
                 <Crown className="w-6 h-6" />,
-          features: tierFeatures[tier.name as keyof typeof tierFeatures] || []
+          features: [
+            // Add standard features based on limits
+            `${tier.request_view_limit} Request Views`,
+            `${tier.offer_limit} Offer Submissions`,
+            // Add tier-specific features
+            ...(tier.name === "Basic" || tier.name === "Free" ? [
+              "Basic request viewing",
+              "Standard support",
+              "Basic analytics"
+            ] : tier.name === "Professional" ? [
+              "Priority request access",
+              "24/7 support",
+              "Advanced analytics",
+              "Featured merchant status"
+            ] : [
+              "Unlimited request views",
+              "Dedicated account manager",
+              "Real-time analytics",
+              "Priority placement",
+              "Custom integrations"
+            ])
+          ]
         }))
 
         setTiers(enhancedTiers)
-        setCurrentSub(currentSubRes.data)
+        
+        // Set current subscription if it exists
+        if (currentSubRes.data) {
+          const subData = currentSubRes.data;
+          setCurrentSub({
+            tier: subData.tier,
+            start_date: subData.start_date,
+            end_date: subData.end_date,
+            is_active: subData.is_active,
+            views_used: subData.views_used,
+            offers_used: subData.offers_used,
+            days_remaining: subData.usage_stats.days_remaining
+          })
+        }
       } catch (error: any) {
         console.error("Error fetching subscription data:", error)
         toast.error(error.response?.data?.message || "Failed to load subscription information")
@@ -231,14 +268,6 @@ export default function PricingPage() {
 
                 {/* Features */}
                 <ul className="space-y-4 mb-8">
-                  <li className="flex items-center gap-3 text-uniOrange font-medium">
-                    <Check className="w-5 h-5" />
-                    {tier.request_view_limit} Request Views
-                  </li>
-                  <li className="flex items-center gap-3 text-uniOrange font-medium">
-                    <Check className="w-5 h-5" />
-                    {tier.offer_limit} Offer Submissions
-                  </li>
                   {tier.features?.map((feature, index) => (
                     <li key={index} className="flex items-center gap-3">
                       <Check className="w-5 h-5 text-uniOrange" />
