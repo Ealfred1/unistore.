@@ -9,6 +9,15 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
 import axiosInstance from "@/lib/axios"
+import { useSearchParams, useRouter } from "next/navigation"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { XCircle, CheckCircle2 } from "lucide-react"
 
 interface Tier {
   id: number
@@ -60,8 +69,12 @@ export default function PricingPage() {
   const [tiers, setTiers] = useState<Tier[]>([])
   const [currentSub, setCurrentSub] = useState<CurrentSubscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancelled' | 'failed' | null>(null)
   const { theme } = useTheme()
   const { user } = useAuth()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const { scrollYProgress } = useScroll()
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -114,6 +127,25 @@ export default function PricingPage() {
       transition: { duration: 1, ease: "easeOut" }
     })
   }
+
+  useEffect(() => {
+    // Handle payment return status
+    const status = searchParams.get('status')
+    const tx_ref = searchParams.get('tx_ref')
+    
+    if (status && tx_ref) {
+      setPaymentStatus(status as 'success' | 'cancelled' | 'failed')
+      setShowStatusModal(true)
+      
+      // Clean up URL parameters after showing modal
+      const url = new URL(window.location.href)
+      url.searchParams.delete('status')
+      url.searchParams.delete('tx_ref')
+      url.searchParams.delete('return_url')
+      url.searchParams.delete('tier_id')
+      router.replace(url.pathname)
+    }
+  }, [searchParams, router])
 
   useEffect(() => {
     const fetchSubscriptionData = async () => {
@@ -184,23 +216,63 @@ export default function PricingPage() {
 
   const handleSubscribe = async (tierId: number) => {
     try {
-      // Create a new subscription with the selected tier
       const response = await axiosInstance.post(`/subscriptions/`, {
         tier_id: tierId
       })
       
-      // If payment link is returned, redirect to it
       if (response.data.payment_link) {
         window.location.href = response.data.payment_link
       } else {
-        // If no payment link (e.g. free tier), show success message
         toast.success("Subscription updated successfully!")
-        // Refresh the page to show new subscription
         window.location.reload()
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to update subscription")
     }
+  }
+
+  // Payment Status Modal
+  const PaymentStatusModal = () => {
+    const statusConfig = {
+      success: {
+        title: "Payment Successful",
+        description: "Your subscription has been activated successfully.",
+        icon: <CheckCircle2 className="w-12 h-12 text-green-500" />,
+        className: "bg-green-50 dark:bg-green-900/20"
+      },
+      cancelled: {
+        title: "Payment Cancelled",
+        description: "You've cancelled the payment process. You can try again whenever you're ready.",
+        icon: <XCircle className="w-12 h-12 text-yellow-500" />,
+        className: "bg-yellow-50 dark:bg-yellow-900/20"
+      },
+      failed: {
+        title: "Payment Failed",
+        description: "We couldn't process your payment. Please try again or contact support if the issue persists.",
+        icon: <AlertCircle className="w-12 h-12 text-red-500" />,
+        className: "bg-red-50 dark:bg-red-900/20"
+      }
+    }
+
+    const currentStatus = paymentStatus ? statusConfig[paymentStatus] : null
+
+    return (
+      <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+              {currentStatus?.icon}
+            </div>
+            <DialogTitle className="text-center text-xl font-semibold mt-4">
+              {currentStatus?.title}
+            </DialogTitle>
+            <DialogDescription className="text-center mt-2">
+              {currentStatus?.description}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   if (loading) {
@@ -218,6 +290,9 @@ export default function PricingPage() {
         className="fixed top-0 left-0 right-0 h-1 bg-uniOrange origin-left z-50"
         style={{ scaleX }}
       />
+
+      {/* Payment Status Modal */}
+      <PaymentStatusModal />
 
       <div className="container mx-auto max-w-[1200px]">
         {/* Header */}
