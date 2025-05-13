@@ -11,6 +11,10 @@ export class WebSocketManager {
   private token: string | null = null;
   private persistentConnection = false;
   private disconnectHandler: (() => void) | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private connectionTimeout: NodeJS.Timeout | null = null;
+  private backoffDelay = 1000; // Start with 1 second delay
+  private maxBackoffDelay = 30000; // Max 30 seconds between retries
 
   private constructor() {}
 
@@ -52,47 +56,57 @@ export class WebSocketManager {
 
       this.socket = new WebSocket(wsUrl);
 
+      // Clear any existing timeouts
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+      }
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+      }
+
       this.socket.onopen = () => {
+        console.log('WebSocket connection established');
         this.isConnecting = false;
         this.reconnectAttempts = 0;
-        // Send immediate ping to verify connection
-        this.send('ping', {});
+        this.backoffDelay = 1000; // Reset backoff delay on successful connection
+        this.startHeartbeat();
+        this.flushMessageQueue(); // Send any queued messages
+        this.send('ping', {}); // Initial ping
       };
 
-      this.socket.onclose = () => {
+      this.socket.onclose = (event) => {
+        console.log(`WebSocket closed with code ${event.code}`);
+        this.isConnecting = false;
         this.disconnectHandler?.();
-        if (this.persistentConnection) {
-          console.log('Persistent connection closed, attempting reconnect...');
-          setTimeout(() => this.connect(), 1000);
+        
+        if (this.persistentConnection && this.reconnectAttempts < this.maxReconnectAttempts) {
+          console.log(`Attempting reconnect ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+          this.reconnectTimeout = setTimeout(() => {
+            this.reconnectAttempts++;
+            this.connect();
+          }, this.backoffDelay);
+          
+          // Exponential backoff with max delay
+          this.backoffDelay = Math.min(this.backoffDelay * 2, this.maxBackoffDelay);
         }
       };
 
       // Increase timeout for initial connection
-      const connectionTimeout = setTimeout(() => {
+      this.connectionTimeout = setTimeout(() => {
         if (this.socket?.readyState !== WebSocket.OPEN) {
           console.log('Connection timeout, closing socket');
           this.socket?.close();
           this.isConnecting = false;
-          this.reconnectAttempts = 0; // Reset attempts on timeout
+          this.reconnectAttempts = 0;
         }
-      }, 10000); // 10 seconds timeout
-
-      // Add heartbeat mechanism
-      let heartbeat: NodeJS.Timeout;
-      const startHeartbeat = () => {
-        heartbeat = setInterval(() => {
-          if (this.socket?.readyState === WebSocket.OPEN) {
-            this.send('ping', {});
-          }
-        }, 30000); // Send ping every 30 seconds
-      };
-
-      startHeartbeat();
+      }, 10000);
 
       this.socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('WebSocket received message:', data); // Log every message received
+          if (data.type !== 'pong') { // Don't log heartbeat responses
+            console.log('WebSocket received message:', data);
+          }
           const handlers = this.messageHandlers.get(data.type);
           if (handlers) {
             handlers.forEach(handler => handler(data));
@@ -104,21 +118,45 @@ export class WebSocketManager {
 
       this.socket.onerror = (error) => {
         console.error('WebSocket error:', error);
-        // Don't close the socket here, let onclose handle it
       };
 
     } catch (error) {
       console.error('WebSocket connection error:', error);
+      this.isConnecting = false;
       this.disconnectHandler?.();
-      if (this.persistentConnection) {
-        setTimeout(() => this.connect(), 1000);
+      
+      if (this.persistentConnection && this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.reconnectTimeout = setTimeout(() => {
+          this.reconnectAttempts++;
+          this.connect();
+        }, this.backoffDelay);
+      }
+    }
+  }
+
+  private startHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.send('ping', {});
+      }
+    }, 30000);
+  }
+
+  private flushMessageQueue() {
+    while (this.messageQueue.length > 0) {
+      const message = this.messageQueue.shift();
+      if (message) {
+        this.send(message.action, message.data);
       }
     }
   }
 
   send(action: string, data: any) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      // Queue message if socket isn't ready
       this.messageQueue.push({ action, data });
       this.connect();
       return;
@@ -141,10 +179,8 @@ export class WebSocketManager {
 
   removeMessageHandler(type: string, handler?: (data: any) => void) {
     if (!handler) {
-      // If no specific handler provided, remove all handlers for this type
       this.messageHandlers.delete(type);
     } else {
-      // Remove specific handler
       const handlers = this.messageHandlers.get(type);
       if (handlers) {
         const index = handlers.indexOf(handler);
@@ -162,6 +198,12 @@ export class WebSocketManager {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
     }
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+    }
     if (this.socket) {
       this.socket.close();
       this.socket = null;
@@ -171,15 +213,8 @@ export class WebSocketManager {
     this.messageQueue = [];
   }
 
-  // Add cleanup method
   cleanup() {
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
-    }
-    this.isConnecting = false;
-    this.reconnectAttempts = 0;
-    this.messageQueue = [];
+    this.disconnect();
     this.messageHandlers.clear();
   }
 

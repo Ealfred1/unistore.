@@ -300,6 +300,8 @@ export function useMessaging(token: string) {
     sendMessage,
     markAsRead,
     startConversation,
-    isStartingConversation
+    isStartingConversation,
+    setConversations,
+    setOnlineMerchants
   };
 }

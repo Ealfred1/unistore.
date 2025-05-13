@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Search,
@@ -14,57 +14,73 @@ import {
   BookOpen,
   Users,
   Eye,
-  Sparkles
+  Sparkles,
+  Phone,
+  Mail,
+  Copy,
+  AlertCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { useRequest } from "@/providers/request-provider"
+import { useRouter } from "next/navigation"
+import { useStartConversation } from "@/utils/start-conversation"
+import { useSubscription } from "@/providers/subscription-provider"
+import { Progress } from "@/components/ui/progress"
 
-// Enhanced dummy data with more details
-const requests = [
-  {
-    id: "1",
-    title: "Looking for Chemistry 101 Textbook",
-    description: "Need the latest edition of Chemistry 101 by John Smith. Preferably in good condition.",
-    category: "📚 Textbooks",
-    createdAt: "2024-03-15T10:00:00Z",
-    urgency: "High",
-    views: 24,
-    offers: 3,
-    user: {
-      name: "John Doe",
-      image: "https://ui-avatars.com/api/?name=John+Doe",
-      university: "University of Lagos",
-      yearLevel: "2nd Year"
+// Add these functions at the top of the file
+async function makeOffer(requestId: string) {
+  const response = await fetch(`/api/requests/${requestId}/offer`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     }
-  },
-  {
-    id: "2",
-    title: "Need Scientific Calculator",
-    description: "Looking for a Texas Instruments TI-84 Plus calculator for my engineering classes.",
-    category: "💻 Electronics",
-    createdAt: "2024-03-15T09:30:00Z",
-    user: {
-      name: "Jane Smith",
-      image: "https://ui-avatars.com/api/?name=Jane+Smith",
-      university: "University of Lagos"
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.message || "Failed to make offer")
+  }
+
+  return response.json()
+}
+
+async function trackRequestView(requestId: string) {
+  const response = await fetch(`/api/requests/${requestId}/view`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     }
-  },
-  // Add more dummy requests...
-]
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.message || "Failed to track request view")
+  }
+
+  return response.json()
+}
 
 export default function MerchantRequestsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [selectedRequest, setSelectedRequest] = useState<any | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [offerForm, setOfferForm] = useState({
-    price: "",
-    description: ""
-  })
   const [isLoading, setIsLoading] = useState(true)
-  const [filteredRequests, setFilteredRequests] = useState(requests)
+  const [filteredRequests, setFilteredRequests] = useState<any[]>([])
+  const [offeredRequests, setOfferedRequests] = useState<Set<string>>(new Set())
+  const [showAcceptedModal, setShowAcceptedModal] = useState(false)
+  const [acceptedRequestDetails, setAcceptedRequestDetails] = useState<any>(null)
+  const [showCancelledModal, setShowCancelledModal] = useState(false)
+  const [cancelledRequestDetails, setCancelledRequestDetails] = useState<any>(null)
+  const [showLimitError, setShowLimitError] = useState(false)
+  const [limitType, setLimitType] = useState<"views" | "offers" | null>(null)
+  
+  // Get real-time requests from the request provider
+  const { pendingRequests, isConnected, wsInstance } = useRequest()
+  const router = useRouter()
+  const { startChatWithMerchant } = useStartConversation()
+  const { subscriptionData } = useSubscription()
 
   const categories = [
     "📚 Textbooks",
@@ -74,50 +90,183 @@ export default function MerchantRequestsPage() {
     "🔬 Lab Equipment"
   ]
 
-  useEffect(() => {
-    // Simulate loading data
-    const loadData = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setIsLoading(false)
+  // Map category names to emoji prefixes
+  const categoryEmojis: {[key: string]: string} = {
+    "Accessories": "👜",
+    "Textbooks": "📚",
+    "Electronics": "💻",
+    "Study Materials": "✏️",
+    "Art Supplies": "🎨",
+    "Lab Equipment": "🔬",
+    // Add more mappings as needed
+  }
+
+  // Format request data to match the UI structure
+  const formatRequestData = useCallback((request: any) => {
+    return {
+      id: request.id,
+      title: request.title,
+      description: request.description,
+      category: `${categoryEmojis[request.category_name] || '🔍'} ${request.category_name}`,
+      createdAt: request.created_at,
+      urgency: "Medium", // Default value as it's not in the API data
+      views: 0, // Default value
+      offers: 0, // Default value
+      user: {
+        name: request.user_name,
+        image: `https://ui-avatars.com/api/?name=${encodeURIComponent(request.user_name)}`,
+        university: request.university_name,
+        yearLevel: "Student" // Default value as it's not in the API data
+      }
     }
-    loadData()
   }, [])
 
   useEffect(() => {
-    let filtered = requests
+    // Set loading state based on connection and data availability
+    setIsLoading(!isConnected || pendingRequests.length === 0)
+  }, [isConnected, pendingRequests])
+
+  useEffect(() => {
+    // Format and filter requests when pendingRequests changes
+    let formattedRequests = pendingRequests
+      .filter((request, index, self) => 
+        // Remove duplicates based on request ID
+        index === self.findIndex(r => r.id === request.id)
+      )
+      .filter(request => request.status !== 'CANCELLED') // Filter out cancelled requests
+      .map(formatRequestData);
     
-    // Apply search
+    // Apply search and category filters
     if (searchQuery) {
-      filtered = filtered.filter(request => 
+      formattedRequests = formattedRequests.filter(request => 
         request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         request.description.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      );
     }
     
-    // Apply category filter
     if (selectedCategory) {
-      filtered = filtered.filter(request => request.category === selectedCategory)
+      formattedRequests = formattedRequests.filter(request => request.category === selectedCategory);
     }
     
-    setFilteredRequests(filtered)
-  }, [searchQuery, selectedCategory])
+    setFilteredRequests(formattedRequests);
+  }, [pendingRequests, searchQuery, selectedCategory, formatRequestData]);
 
-  const handleMakeOffer = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+  useEffect(() => {
+    if (!wsInstance) return;
 
+    const handleOfferStatusUpdate = (data: any) => {
+      if (data.type === 'offer_status_update' && data.status === 'ACCEPTED') {
+        // Show modal with user details for the merchant who made the offer
+        setAcceptedRequestDetails({
+          requestId: data.request_id,
+          offerId: data.offer_id,
+          timestamp: data.timestamp,
+          user: data.request_user // This now contains user contact details
+        });
+        setShowAcceptedModal(true);
+        
+        // Update the request status in the list
+        setFilteredRequests(prev => prev.map(request => {
+          if (request.id === data.request_id) {
+            return {
+              ...request,
+              status: 'ONGOING',
+              accepted_offer: {
+                id: data.offer_id,
+                merchant_id: data.merchant_id
+              }
+            };
+          }
+          return request;
+        }));
+      }
+    };
+
+    wsInstance.addMessageHandler('offer_status_update', handleOfferStatusUpdate);
+    return () => wsInstance.removeMessageHandler('offer_status_update', handleOfferStatusUpdate);
+  }, [wsInstance]);
+
+  useEffect(() => {
+    if (!wsInstance) return;
+
+    const handleRequestStatusUpdate = (data: any) => {
+      if (data.type === 'request_status_update' && data.status === 'CANCELLED') {
+        // Remove cancelled request from the list immediately
+        setFilteredRequests(prev => prev.filter(request => request.id !== data.request_id));
+        
+        // Show cancelled modal
+        setCancelledRequestDetails({
+          requestId: data.request_id,
+          timestamp: data.timestamp
+        });
+        setShowCancelledModal(true);
+      }
+    };
+
+    wsInstance.addMessageHandler('request_status_update', handleRequestStatusUpdate);
+    return () => wsInstance.removeMessageHandler('request_status_update', handleRequestStatusUpdate);
+  }, [wsInstance]);
+
+  // Function to copy text to clipboard
+  const copyToClipboard = async (text: string) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      toast.success("Offer sent successfully! 🎉")
-      setSelectedRequest(null)
-      setOfferForm({ price: "", description: "" })
-    } catch (error) {
-      toast.error("Failed to send offer")
-    } finally {
-      setIsSubmitting(false)
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard!");
+    } catch (err) {
+      toast.error("Failed to copy text");
     }
-  }
+  };
+
+  // Function to start chat with user
+  const handleStartChat = async (userId: string) => {
+    try {
+      await startChatWithMerchant(userId, "Hi! I'm contacting you regarding the accepted offer.");
+      setShowAcceptedModal(false);
+    } catch (error) {
+      toast.error("Failed to start conversation");
+    }
+  };
+
+  // Function to handle making an offer
+  const handleMakeOffer = async (requestId: string) => {
+    try {
+      if (subscriptionData && subscriptionData.offers_used < subscriptionData.offer_limit) {
+        // Continue with making offer
+        await makeOffer(requestId);
+      } else {
+        setLimitType("offers");
+        setShowLimitError(true);
+        return;
+      }
+    } catch (error: any) {
+      if (error.message?.includes("limit")) {
+        setLimitType("offers");
+        setShowLimitError(true);
+      } else {
+        toast.error("Failed to make offer");
+      }
+    }
+  };
+
+  // Replace handleMakeOffer with handleViewRequest
+  const handleViewRequest = async (requestId: string) => {
+    try {
+      if (subscriptionData && subscriptionData.views_used < subscriptionData.view_limit) {
+        await trackRequestView(requestId);
+      } else {
+        setLimitType("views");
+        setShowLimitError(true);
+        return;
+      }
+    } catch (error: any) {
+      if (error.message?.includes("limit")) {
+        setLimitType("views");
+        setShowLimitError(true);
+      } else {
+        toast.error("Failed to view request");
+      }
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -128,6 +277,48 @@ export default function MerchantRequestsPage() {
     })
   }
 
+  // Function to check if merchant has made an offer on a request
+  const hasOfferedOnRequest = (requestId: string) => {
+    return offeredRequests.has(requestId);
+  };
+
+  // Function to check if merchant's offer was accepted
+  const isOfferAccepted = (request: any) => {
+    return request.status === 'ONGOING' && request.accepted_offer;
+  };
+
+  // Render loading skeleton
+  const renderSkeleton = () => (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {[1, 2, 3, 4, 5, 6].map((item) => (
+        <div key={item} className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 animate-pulse">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center">
+              <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+              <div className="ml-3">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded mt-2"></div>
+              </div>
+            </div>
+            <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+          </div>
+          <div className="h-5 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+          <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+          <div className="h-4 w-2/3 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-8 w-28 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div className="lg:container py-8">
       {/* Enhanced Header with Stats */}
@@ -135,12 +326,12 @@ export default function MerchantRequestsPage() {
         <h1 className="text-2xl font-bold mb-2">Student Requests 🎓</h1>
         <p className="text-gray-500">Help students find what they need!</p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Active Requests</p>
-                <h3 className="text-2xl font-bold text-uniOrange">24</h3>
+                <h3 className="text-2xl font-bold text-uniOrange">{pendingRequests.length}</h3>
               </div>
               <div className="h-10 w-10 bg-uniOrange/10 rounded-full flex items-center justify-center">
                 <BookOpen className="h-5 w-5 text-uniOrange" />
@@ -148,27 +339,59 @@ export default function MerchantRequestsPage() {
             </div>
           </div>
           
+          {/* Subscription Usage Stats */}
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Students</p>
-                <h3 className="text-2xl font-bold text-uniBlue">156</h3>
+            <div className="flex flex-col">
+              <p className="text-sm text-gray-500 mb-2">Views Usage</p>
+              <Progress 
+                value={subscriptionData?.view_usage_percent ?? 0} 
+                className="h-2 mb-1"
+                indicatorColor={
+                  typeof subscriptionData?.view_usage_percent === 'number' && 
+                  subscriptionData.view_usage_percent >= 80 
+                    ? "bg-yellow-600" 
+                    : undefined
+                }
+              />
+              <p className="text-xs text-right text-gray-500">
+                {subscriptionData?.views_used ?? 0} / {subscriptionData?.view_limit ?? 0}
+              </p>
               </div>
-              <div className="h-10 w-10 bg-uniBlue/10 rounded-full flex items-center justify-center">
-                <Users className="h-5 w-5 text-uniBlue" />
               </div>
+
+          <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+            <div className="flex flex-col">
+              <p className="text-sm text-gray-500 mb-2">Offers Usage</p>
+              <Progress 
+                value={subscriptionData?.offer_usage_percent ?? 0} 
+                className="h-2 mb-1"
+                indicatorColor={
+                  typeof subscriptionData?.offer_usage_percent === 'number' && 
+                  subscriptionData.offer_usage_percent >= 80 
+                    ? "bg-yellow-600" 
+                    : undefined
+                }
+              />
+              <p className="text-xs text-right text-gray-500">
+                {subscriptionData?.offers_used ?? 0} / {subscriptionData?.offer_limit ?? 0}
+              </p>
             </div>
           </div>
           
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Your Offers</p>
-                <h3 className="text-2xl font-bold text-green-600">12</h3>
+                <p className="text-sm text-gray-500">Subscription</p>
+                <h3 className="text-lg font-bold text-uniBlue">{subscriptionData?.tier_name || "No Plan"}</h3>
               </div>
-              <div className="h-10 w-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                <MessageSquarePlus className="h-5 w-5 text-green-600" />
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/pricing")}
+                className="text-uniBlue hover:text-uniBlue/80"
+              >
+                Upgrade
+              </Button>
             </div>
           </div>
         </div>
@@ -206,142 +429,261 @@ export default function MerchantRequestsPage() {
         </div>
       </div>
 
+      {/* Connection Status */}
+      {!isConnected && (
+        <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <div className="flex items-center">
+            <Loader2 className="h-5 w-5 text-yellow-500 animate-spin mr-2" />
+            <p className="text-yellow-700 dark:text-yellow-400">Connecting to server...</p>
+          </div>
+        </div>
+      )}
+
       {/* Enhanced Request Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <AnimatePresence>
-          {filteredRequests.map((request) => (
-            <motion.div
-              key={request.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="group bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 hover:border-uniOrange/50 transition-all"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center">
-                  <div className="relative h-10 w-10 rounded-full overflow-hidden">
-                    <Image
-                      src={request.user.image}
-                      alt={request.user.name}
-                      fill
-                      className="object-cover"
-                    />
+      {isLoading ? (
+        renderSkeleton()
+      ) : filteredRequests.length > 0 ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <AnimatePresence>
+            {filteredRequests.map((request) => (
+              <motion.div
+                key={request.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className={`group bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 hover:border-uniOrange/50 transition-all cursor-pointer ${
+                  hasOfferedOnRequest(request.id) ? 'opacity-75' : ''
+                }`}
+                onClick={() => handleViewRequest(request.id)}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center">
+                    <div className="relative h-10 w-10 rounded-full overflow-hidden">
+                      <Image
+                        src={request.user.image}
+                        alt={request.user.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="font-medium">{request.user.name}</h3>
+                      <p className="text-sm text-gray-500">{request.user.university}</p>
+                    </div>
                   </div>
-                  <div className="ml-3">
-                    <h3 className="font-medium">{request.user.name}</h3>
-                    <p className="text-sm text-gray-500">{request.user.yearLevel}</p>
+                  <span className="px-3 py-1 bg-uniOrange/10 text-uniOrange rounded-full text-sm">
+                    {request.category}
+                  </span>
+                </div>
+
+                <h2 className="text-lg font-semibold mb-2 group-hover:text-uniOrange transition-colors">
+                  {request.title}
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
+                  {request.description}
+                </p>
+
+                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                  <div className="flex items-center">
+                    <Eye className="h-4 w-4 mr-1" />
+                    {request.views} views
+                  </div>
+                  <div className="flex items-center">
+                    <MessageSquarePlus className="h-4 w-4 mr-1" />
+                    {request.offers} offers
+                  </div>
+                  <div className="flex items-center">
+                    <Sparkles className="h-4 w-4 mr-1" />
+                    {request.urgency} priority
                   </div>
                 </div>
-                <span className="px-3 py-1 bg-uniOrange/10 text-uniOrange rounded-full text-sm">
-                  {request.category}
-                </span>
-              </div>
 
-              <h2 className="text-lg font-semibold mb-2 group-hover:text-uniOrange transition-colors">
-                {request.title}
-              </h2>
-              <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
-                {request.description}
-              </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Clock className="h-4 w-4 mr-1" />
+                    {formatDate(request.createdAt)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isOfferAccepted(request) ? (
+                  <Button
+                    className="bg-uniOrange hover:bg-uniOrange-600 text-white"
+                    onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartChat(request.user_id);
+                        }}
+                      >
+                        <MessageSquarePlus className="h-4 w-4 mr-2" />
+                        Message Student
+                      </Button>
+                    ) : (
+                      <Button
+                        className={`bg-uniOrange hover:bg-uniOrange-600 text-white ${
+                          hasOfferedOnRequest(request.id) ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!hasOfferedOnRequest(request.id)) {
+                            handleMakeOffer(request.id);
+                          }
+                        }}
+                        disabled={hasOfferedOnRequest(request.id) || request.status !== 'PENDING'}
+                  >
+                        {hasOfferedOnRequest(request.id) ? (
+                          <>
+                    <Eye className="h-4 w-4 mr-2" />
+                            View Offer
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquarePlus className="h-4 w-4 mr-2" />
+                            Make Offer
+                          </>
+                        )}
+                  </Button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+            <Search className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">No requests found</h3>
+          <p className="text-gray-500 max-w-md mx-auto">
+            {searchQuery || selectedCategory 
+              ? "Try adjusting your search or filters to find what you're looking for."
+              : "There are no active student requests at the moment. Check back later!"}
+          </p>
+        </div>
+      )}
 
-              <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                <div className="flex items-center">
-                  <Eye className="h-4 w-4 mr-1" />
-                  {request.views} views
-                </div>
-                <div className="flex items-center">
-                  <MessageSquarePlus className="h-4 w-4 mr-1" />
-                  {request.offers} offers
-                </div>
-                <div className="flex items-center">
-                  <Sparkles className="h-4 w-4 mr-1" />
-                  {request.urgency} priority
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center text-sm text-gray-500">
-                  <Clock className="h-4 w-4 mr-1" />
-                  {formatDate(request.createdAt)}
-                </div>
-                <Button
-                  className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-                  onClick={() => setSelectedRequest(request)}
-                >
-                  <MessageSquarePlus className="h-4 w-4 mr-2" />
-                  Make Offer
-                </Button>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* Make Offer Dialog */}
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+      {/* Accepted Offer Modal */}
+      <Dialog open={showAcceptedModal} onOpenChange={setShowAcceptedModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Make an Offer 💫</DialogTitle>
+            <DialogTitle>Offer Accepted! 🎉</DialogTitle>
           </DialogHeader>
-          
-          <form onSubmit={handleMakeOffer} className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Your Price</label>
-              <div className="relative mt-1">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <span className="text-gray-500">₦</span>
-                </div>
-                <input
-                  type="number"
-                  required
-                  value={offerForm.price}
-                  onChange={(e) => setOfferForm(prev => ({ ...prev, price: e.target.value }))}
-                  className="pl-8 w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-uniOrange focus:border-transparent"
-                  placeholder="0.00"
-                />
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-uniOrange/10 flex items-center justify-center">
+                <Store className="h-6 w-6 text-uniOrange" />
+              </div>
+              <div>
+                <h3 className="font-medium">{acceptedRequestDetails?.user?.name}</h3>
+                <p className="text-sm text-gray-500">{acceptedRequestDetails?.user?.university}</p>
               </div>
             </div>
+            
+            <p className="text-sm text-gray-500">
+              Great news! Your offer has been accepted. You can now contact the student using the following details:
+            </p>
+            
+            {acceptedRequestDetails?.user && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm">{acceptedRequestDetails.user.email}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyToClipboard(acceptedRequestDetails.user.email)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
 
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <textarea
-                required
-                value={offerForm.description}
-                onChange={(e) => setOfferForm(prev => ({ ...prev, description: e.target.value }))}
-                rows={4}
-                className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-uniOrange focus:border-transparent"
-                placeholder="Describe your offer and any additional details..."
-              />
-            </div>
+                {acceptedRequestDetails.user.phone && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">{acceptedRequestDetails.user.phone}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(acceptedRequestDetails.user.phone)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
 
-            <div className="flex justify-end space-x-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setSelectedRequest(null)}
-              >
-                <X className="h-4 w-4 mr-2" />
+                <Button
+                  className="w-full bg-uniOrange hover:bg-uniOrange-600 text-white"
+                  onClick={() => handleStartChat(acceptedRequestDetails.user.id)}
+                >
+                  <MessageSquarePlus className="h-4 w-4 mr-2" />
+                  Start Conversation
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancelled Request Modal */}
+      <Dialog open={showCancelledModal} onOpenChange={setShowCancelledModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Cancelled</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              This request has been cancelled by the student and is no longer available.
+            </p>
+            <Button
+              className="w-full"
+              onClick={() => setShowCancelledModal(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Limit Error Modal */}
+      <Dialog open={showLimitError} onOpenChange={setShowLimitError}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Subscription Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              You have reached your {limitType} limit for your current subscription tier.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Free tier users can:
+              - View up to 20 requests
+              - Make up to 20 offers
+              
+              You have used:
+              {limitType === "offers" 
+                ? `${subscriptionData?.offers_used} / ${subscriptionData?.offer_limit} offers`
+                : `${subscriptionData?.views_used} / ${subscriptionData?.view_limit} views`
+              }
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowLimitError(false)}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <SendHorizonal className="h-4 w-4 mr-2" />
-                    Send Offer
-                  </>
-                )}
+              <Button onClick={() => {
+                setShowLimitError(false)
+                router.push("/pricing")
+              }}>
+                Upgrade Subscription
               </Button>
             </div>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

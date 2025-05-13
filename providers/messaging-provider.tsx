@@ -5,6 +5,7 @@ import { useAuth } from '@/providers/auth-provider'
 import { toast } from 'sonner'
 import { WebSocketManager } from '@/utils/websocket'
 import { usePathname as useNextPathname } from 'next/navigation'
+import { useWebSocket } from '@/providers/websocket-provider'
 
 interface Message {
   id: string
@@ -24,6 +25,9 @@ interface MessagingContextType {
   markAllRead: () => void
   storedConversations: any[]
   storeOfflineMessage: (conversationId: string, content: string) => void
+  cachedMerchants: any[]
+  cachedConversations: any[]
+  lastFetchTime: number | null
 }
 
 const MessagingContext = createContext<MessagingContextType>({
@@ -33,18 +37,23 @@ const MessagingContext = createContext<MessagingContextType>({
   lastMessage: null,
   markAllRead: () => {},
   storedConversations: [],
-  storeOfflineMessage: () => {}
+  storeOfflineMessage: () => {},
+  cachedMerchants: [],
+  cachedConversations: [],
+  lastFetchTime: null
 })
 
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const wsRef = useRef<WebSocketManager>(WebSocketManager.getInstance())
-  const [isConnected, setIsConnected] = useState(false)
+  const { messagingWs, isMessagingConnected } = useWebSocket()
   const [unreadCount, setUnreadCount] = useState(0)
   const [lastMessage, setLastMessage] = useState<Message | null>(null)
   const pathname = useNextPathname()
   const [storedConversations, setStoredConversations] = useState<any[]>([])
   const pendingMessagesRef = useRef<{[key: string]: any[]}>({})
+  const [cachedMerchants, setCachedMerchants] = useState<any[]>([])
+  const [cachedConversations, setCachedConversations] = useState<any[]>([])
+  const [lastFetchTime, setLastFetchTime] = useState<number | null>(null)
 
   // Load stored conversations on mount
   useEffect(() => {
@@ -55,6 +64,31 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.error('Failed to parse stored conversations:', e)
       }
+    }
+    
+    // Load cached merchants and conversations
+    const cachedMerchantsData = localStorage.getItem('cached_merchants')
+    const cachedConversationsData = localStorage.getItem('cached_conversations')
+    const cachedFetchTime = localStorage.getItem('last_fetch_time')
+    
+    if (cachedMerchantsData) {
+      try {
+        setCachedMerchants(JSON.parse(cachedMerchantsData))
+      } catch (e) {
+        console.error('Failed to parse cached merchants:', e)
+      }
+    }
+    
+    if (cachedConversationsData) {
+      try {
+        setCachedConversations(JSON.parse(cachedConversationsData))
+      } catch (e) {
+        console.error('Failed to parse cached conversations:', e)
+      }
+    }
+    
+    if (cachedFetchTime) {
+      setLastFetchTime(parseInt(cachedFetchTime))
     }
   }, [])
 
@@ -67,34 +101,38 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
   // Update WebSocket connection management
   useEffect(() => {
-    if (!user?.id) return;
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
+    if (!user?.id || !isMessagingConnected || !messagingWs) return;
 
-    const ws = wsRef.current;
-    ws.cleanup();
-    ws.updateToken(token);
-    ws.setPersistentConnection(true);
-
-    // Update connection status handlers
-    const handleConnect = () => {
-      console.log('WebSocket connected');
-      setIsConnected(true);
+    // Handle incoming merchants list
+    const handleMerchantsList = (data: any) => {
+      console.log('Received merchants list from WebSocket');
+      if (data && data.merchants) {
+        setCachedMerchants(data.merchants);
+        localStorage.setItem('cached_merchants', JSON.stringify(data.merchants));
+        setLastFetchTime(Date.now());
+        localStorage.setItem('last_fetch_time', Date.now().toString());
+      }
+    };
+    
+    // Handle incoming conversations list
+    const handleConversationsList = (data: any) => {
+      console.log('Received conversations list from WebSocket');
+      if (data && data.conversations) {
+        setCachedConversations(data.conversations);
+        localStorage.setItem('cached_conversations', JSON.stringify(data.conversations));
+        setLastFetchTime(Date.now());
+        localStorage.setItem('last_fetch_time', Date.now().toString());
+      }
     };
 
-    const handleDisconnect = () => {
-      console.log('WebSocket disconnected');
-      setIsConnected(false);
-    };
-
-    ws.addMessageHandler('connection_established', handleConnect);
-    ws.onDisconnect(handleDisconnect);
-    ws.connect();
+    messagingWs.addMessageHandler('online_merchants', handleMerchantsList);
+    messagingWs.addMessageHandler('conversations_list', handleConversationsList);
 
     return () => {
-      ws.removeMessageHandler('connection_established', handleConnect);
+      messagingWs.removeMessageHandler('online_merchants', handleMerchantsList);
+      messagingWs.removeMessageHandler('conversations_list', handleConversationsList);
     };
-  }, [user?.id]);
+  }, [user?.id, isMessagingConnected]);
 
   // Store new messages when offline
   const storeOfflineMessage = (conversationId: string, content: string) => {
@@ -109,11 +147,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
-    if (!token || !user) return
+    if (!user?.id || !isMessagingConnected || !messagingWs) return
 
-    wsRef.current.updateToken(token)
-    
     const handleNewMessage = (data: any) => {
       const newMessage = data.message;
       console.log('New message received:', newMessage);
@@ -145,43 +180,57 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
             action: {
               label: "View",
               onClick: () => {
-                window.location.href = `/dashboard/messages?conversation=${newMessage.conversation_id}`;
+                window.location.href = `/dashboard/messages?conversation=${newMessage.conversation_id}`
               }
             }
           }
-        );
+        )
       }
-
-      // Update unread count for messages not from current user
-      if (String(newMessage.sender_id) !== String(user.id)) {
-        setUnreadCount(prev => prev + 1);
-        setLastMessage(newMessage);
+      
+      // Update last message
+      setLastMessage(newMessage)
+      
+      // Update unread count
+      if (newMessage.sender_id !== user.id && !newMessage.is_read) {
+        setUnreadCount(prev => prev + 1)
       }
     }
-
-    wsRef.current.addMessageHandler('new_message', handleNewMessage)
-
+    
+    messagingWs.addMessageHandler('new_message', handleNewMessage)
+    
     return () => {
-      wsRef.current.removeMessageHandler('new_message', handleNewMessage)
+      messagingWs.removeMessageHandler('new_message', handleNewMessage)
     }
-  }, [user, pathname]);
-
+  }, [pathname, user?.id, isMessagingConnected])
+  
+  // Mark all messages as read
   const markAllRead = () => {
     setUnreadCount(0)
   }
 
-  const contextValue = useMemo(() => ({
-    wsInstance: wsRef.current,
-    isConnected,
+  const value = useMemo(() => ({
+    wsInstance: messagingWs,
+    isConnected: isMessagingConnected,
     unreadCount,
     lastMessage,
     markAllRead,
     storedConversations,
-    storeOfflineMessage
-  }), [isConnected, unreadCount, lastMessage, storedConversations]);
+    storeOfflineMessage,
+    cachedMerchants,
+    cachedConversations,
+    lastFetchTime
+  }), [
+    isMessagingConnected, 
+    unreadCount, 
+    lastMessage, 
+    storedConversations,
+    cachedMerchants,
+    cachedConversations,
+    lastFetchTime
+  ])
 
   return (
-    <MessagingContext.Provider value={contextValue}>
+    <MessagingContext.Provider value={value}>
       {children}
     </MessagingContext.Provider>
   )
