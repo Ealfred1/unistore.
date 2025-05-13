@@ -212,30 +212,30 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 py-16 px-4 relative">
+    <div className="min-h-screen bg-white dark:bg-gray-900 py-12 px-2 sm:px-4 relative">
       {/* Progress bar */}
       <motion.div
         className="fixed top-0 left-0 right-0 h-1 bg-uniOrange origin-left z-50"
         style={{ scaleX }}
       />
 
-      <div className="container mx-auto max-w-7xl">
+      <div className="container mx-auto max-w-[1200px]">
         {/* Header */}
         <motion.div
           variants={headerVariants}
           initial="hidden"
           animate="visible"
-          className="text-center mb-16"
+          className="text-center mb-8 sm:mb-12 lg:mb-16 px-2"
         >
           <motion.h1 
-            className="text-5xl font-bold mb-6 text-gray-900 dark:text-white"
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 text-gray-900 dark:text-white"
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 200 }}
           >
             Choose Your Plan
           </motion.h1>
           <motion.p 
-            className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto"
+            className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -250,7 +250,7 @@ export default function PricingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 100 }}
-            className="mb-16 bg-gray-50 dark:bg-gray-800 rounded-lg p-8 border border-gray-100 dark:border-gray-700"
+            className="mb-8 sm:mb-12 lg:mb-16 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 sm:p-6 lg:p-8 border border-gray-100 dark:border-gray-700 mx-2"
           >
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -322,7 +322,7 @@ export default function PricingPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mx-2"
         >
           {tiers.map((tier, index) => (
             <motion.div
@@ -333,7 +333,7 @@ export default function PricingPage() {
                 transition: { type: "spring", stiffness: 400 }
               }}
               className={`
-                relative bg-white dark:bg-gray-800 rounded-lg p-8
+                relative bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 lg:p-8
                 border-2 transition-colors duration-300
                 ${currentSub?.tier.id === tier.id 
                   ? 'border-uniOrange' 
@@ -348,12 +348,12 @@ export default function PricingPage() {
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ type: "spring", stiffness: 200 }}
                 >
-                  <div className="bg-uniOrange px-4 py-1 rounded-full text-sm font-medium text-white flex items-center gap-2">
+                  <div className="bg-uniOrange px-3 py-1 rounded-full text-sm font-medium text-white flex items-center gap-1.5">
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                     >
-                      <Star className="w-4 h-4" />
+                      <Star className="w-3.5 h-3.5" />
                     </motion.div>
                     Current Plan
                   </div>
@@ -362,32 +362,32 @@ export default function PricingPage() {
 
               {/* Tier Header */}
               <motion.div 
-                className="flex items-start gap-4 mb-6"
+                className="flex items-start gap-3 mb-4 sm:mb-6"
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: index * 0.1 }}
               >
                 <motion.div 
-                  className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  className="p-2.5 bg-gray-50 dark:bg-gray-700 rounded-lg"
                   whileHover={{ rotate: 5 }}
                   transition={{ type: "spring", stiffness: 200 }}
                 >
                   {tier.icon}
                 </motion.div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">{tier.name}</h3>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{tier.name}</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{tier.description}</p>
                 </div>
               </motion.div>
 
               {/* Price */}
               <motion.div 
-                className="flex items-baseline mb-8"
+                className="flex items-baseline mb-6 sm:mb-8"
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: index * 0.1 + 0.2 }}
               >
-                <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
                   ₦{parseInt(tier.price).toLocaleString()}
                 </span>
                 <span className="ml-2 text-gray-500 dark:text-gray-400">/month</span>
@@ -395,7 +395,7 @@ export default function PricingPage() {
 
               {/* Features */}
               <motion.ul 
-                className="space-y-4 mb-8"
+                className="space-y-3 sm:space-y-4 mb-6 sm:mb-8"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -404,24 +404,24 @@ export default function PricingPage() {
                   <motion.li 
                     key={featureIndex}
                     variants={itemVariants}
-                    className="flex items-center gap-3"
+                    className="flex items-center gap-2.5"
                   >
                     <motion.div 
                       className="flex-shrink-0"
                       whileHover={{ scale: 1.2 }}
                       transition={{ type: "spring", stiffness: 400 }}
                     >
-                      <Check className="w-5 h-5 text-uniOrange" />
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5 text-uniOrange" />
                     </motion.div>
-                    <span className="text-gray-700 dark:text-gray-300">{feature}</span>
+                    <span className="text-sm sm:text-base text-gray-700 dark:text-gray-300">{feature}</span>
                   </motion.li>
                 ))}
               </motion.ul>
 
               {/* Subscribe Button */}
               <motion.div
-                whileHover={!currentSub?.tier.id === tier.id ? { scale: 1.05 } : {}}
-                whileTap={!currentSub?.tier.id === tier.id ? { scale: 0.95 } : {}}
+                whileHover={currentSub?.tier.id !== tier.id ? { scale: 1.05 } : undefined}
+                whileTap={currentSub?.tier.id !== tier.id ? { scale: 0.95 } : undefined}
               >
                 <Button
                   onClick={() => handleSubscribe(tier.id)}
