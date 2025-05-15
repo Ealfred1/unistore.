@@ -248,24 +248,9 @@ export default function MerchantRequestsPage() {
     }
   };
 
-  // Replace handleMakeOffer with handleViewRequest
-  const handleViewRequest = async (requestId: string) => {
-    try {
-      if (subscriptionData && subscriptionData.views_used < subscriptionData.view_limit) {
-        await trackRequestView(requestId);
-      } else {
-        setLimitType("views");
-        setShowLimitError(true);
-        return;
-      }
-    } catch (error: any) {
-      if (error.message?.includes("limit")) {
-        setLimitType("views");
-        setShowLimitError(true);
-      } else {
-        toast.error("Failed to view request");
-      }
-    }
+  // Just navigate to the request details page
+  const handleViewRequest = (requestId: string) => {
+    router.push(`/dashboard/merchant/requests/${requestId}`);
   };
 
   const formatDate = (dateString: string) => {

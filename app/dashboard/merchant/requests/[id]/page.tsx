@@ -20,6 +20,31 @@ import { toast } from "sonner"
 import { useRequest } from '@/providers/request-provider'
 import { formatDistanceToNow } from 'date-fns'
 
+interface Request {
+  id: number;
+  title: string;
+  description: string;
+  user_id: number;
+  user_name: string;
+  university_id: number;
+  university_name: string;
+  category_id: number | null;
+  category_name: string | null;
+  status: string;
+  created_at: string;
+  view_count?: number;
+  offer_count?: number;
+  offers?: Array<{
+    id: number;
+    merchant_id: number;
+    merchant_name: string;
+    price: number;
+    description: string;
+    status: string;
+    created_at: string;
+  }>;
+}
+
 interface RequestDetails {
   id: number;
   title: string;
@@ -86,28 +111,41 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
 
       try {
         // Convert params.id to number for comparison
-        const requestId = parseInt(params.id);
-        const request = pendingRequests.find(r => r.id === requestId);
+        const requestId = parseInt(params.id, 10);
+        const request = pendingRequests.find(r => r.id === requestId) as Request | undefined;
         
         if (request) {
           console.log('Found and initializing request:', request);
+          
           // Make sure all required fields are present
           const requestDetails: RequestDetails = {
-            ...request,
+            id: request.id,
+            title: request.title,
+            description: request.description,
+            user_id: request.user_id,
+            user_name: request.user_name,
+            university_id: request.university_id,
+            university_name: request.university_name,
+            category_id: request.category_id,
+            category_name: request.category_name,
+            budget_min: null, // These will be updated when we get full details
+            budget_max: null,
+            status: request.status,
+            created_at: request.created_at,
             view_count: request.view_count || 0,
             offer_count: request.offer_count || 0,
             is_owner: false,
             is_merchant: true,
-            offers: request.offers || [],
+            offers: request.offers || []
           };
           
           setRequestDetails(requestDetails);
           setIsLoading(false);
           detailsLoaded.current = true;
 
-          // Send view request immediately when connected
+          // Send view request through WebSocket when connected
           if (!viewSent.current) {
-            console.log('Sending initial view request for:', requestId);
+            console.log('Sending view request for:', requestId);
             viewRequest(requestId.toString());
             viewSent.current = true;
           }
@@ -126,12 +164,12 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
     initializeRequest();
   }, [isConnected, wsInstance, params.id, pendingRequests, viewRequest]);
 
-  // Handle WebSocket events for views and offers
+  // Handle WebSocket events for views and offers 
   useEffect(() => {
     if (!wsInstance || !requestDetails) return;
 
     const handleRequestView = (data: any) => {
-      if (data.request_id === params.id) {
+      if (data.request_id.toString() === params.id) {
         console.log('Received view update:', data);
         setRequestDetails(prev => prev ? {
           ...prev,
@@ -141,7 +179,7 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
     };
 
     const handleNewOffer = (data: any) => {
-      if (data.request_id === params.id) {
+      if (data.request_id.toString() === params.id) {
         console.log('Received new offer:', data);
         setRequestDetails(prev => prev ? {
           ...prev,
@@ -193,7 +231,7 @@ export default function MerchantRequestDetailPage({ params }: { params: { id: st
       setShowOfferModal(false);
       setOfferForm({ price: "", description: "" });
       
-      // Navigate back after success
+      // Navigate back after success 
       setTimeout(() => {
         router.push('/dashboard/merchant/requests');
       }, 1500);
