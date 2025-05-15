@@ -248,7 +248,7 @@ export default function MerchantRequestsPage() {
     }
   };
 
-  // Just navigate to the request details page
+  // Just navigate to the request details page 
   const handleViewRequest = (requestId: string) => {
     router.push(`/dashboard/merchant/requests/${requestId}`);
   };
