@@ -8,37 +8,32 @@ import { Button } from "@/components/ui/button"
 import { AlertCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-interface SubscriptionData {
-  offers_used: number
+export interface SubscriptionData {
+  end_date: string
+  is_active: boolean
   offer_limit: number
   offer_usage_percent: number
-  views_used: number
+  offers_used: number
+  tier_name: string
   view_limit: number
   view_usage_percent: number
-  tier_name: string
-  is_active: boolean
-  end_date: string
+  views_used: number
+  days_remaining?: number
+  hours_remaining?: number
 }
 
 interface SubscriptionContextType {
   subscriptionData: SubscriptionData | null
-  updateSubscriptionData: (data: SubscriptionData) => void
+  setSubscriptionData: (data: SubscriptionData) => void
 }
 
-const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined)
+const SubscriptionContext = createContext<SubscriptionContextType>({
+  subscriptionData: null,
+  setSubscriptionData: () => {},
+})
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>({
-    offers_used: 0,
-    offer_limit: 20, // Free tier limit
-    offer_usage_percent: 0,
-    views_used: 0,
-    view_limit: 20, // Free tier limit
-    view_usage_percent: 0,
-    tier_name: "Free",
-    is_active: true,
-    end_date: ""
-  })
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null)
   const [showLimitModal, setShowLimitModal] = useState(false)
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [limitType, setLimitType] = useState<"views" | "offers" | null>(null)
@@ -86,7 +81,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   }, [])
 
   return (
-    <SubscriptionContext.Provider value={{ subscriptionData, updateSubscriptionData }}>
+    <SubscriptionContext.Provider value={{ subscriptionData, setSubscriptionData }}>
       {children}
 
       {/* Limit Reached Modal */}
@@ -186,9 +181,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   )
 }
 
-export const useSubscription = () => {
+export function useSubscription() {
   const context = useContext(SubscriptionContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useSubscription must be used within a SubscriptionProvider")
   }
   return context

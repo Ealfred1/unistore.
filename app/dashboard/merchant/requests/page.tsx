@@ -63,6 +63,23 @@ async function trackRequestView(requestId: string) {
   return response.json()
 }
 
+const formatTimeRemaining = (days: number, hours: number) => {
+  if (days > 0) {
+    return `${days} day${days !== 1 ? 's' : ''} remaining`;
+  }
+  return `${hours} hour${hours !== 1 ? 's' : ''} remaining`;
+};
+
+// Add this helper function at the top
+const getRemainingTime = (endDate: string) => {
+  const end = new Date(endDate);
+  const now = new Date();
+  const diffTime = end.getTime() - now.getTime();
+  const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  return { days, hours };
+};
+
 export default function MerchantRequestsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -80,7 +97,7 @@ export default function MerchantRequestsPage() {
   const { pendingRequests, isConnected, wsInstance } = useRequest()
   const router = useRouter()
   const { startChatWithMerchant } = useStartConversation()
-  const { subscriptionData } = useSubscription()
+  const { subscriptionData, setSubscriptionData } = useSubscription()
 
   const categories = [
     "📚 Textbooks",
@@ -206,6 +223,52 @@ export default function MerchantRequestsPage() {
     wsInstance.addMessageHandler('request_status_update', handleRequestStatusUpdate);
     return () => wsInstance.removeMessageHandler('request_status_update', handleRequestStatusUpdate);
   }, [wsInstance]);
+
+  useEffect(() => {
+    if (!wsInstance) return;
+
+    const handleSubscriptionUpdate = (data: any) => {
+      if (data.type === 'subscription.usage') {
+        // Calculate remaining time
+        const { days, hours } = getRemainingTime(data.data.end_date);
+        
+        // Update subscription data with remaining time
+        setSubscriptionData({
+          ...data.data,
+          days_remaining: days,
+          hours_remaining: hours
+        });
+        
+        // Show warning toast if present
+        if (data.warning) {
+          toast.warning(data.warning);
+        }
+      } else if (data.type === 'subscription.expired') {
+        // Show expired notification
+        toast.error(data.message, {
+          duration: 0, // Keep until user dismisses
+          action: {
+            label: "Renew Now",
+            onClick: () => router.push("/pricing")
+          }
+        });
+      } else if (data.type === 'subscription.limit_reached') {
+        // Show limit reached error
+        setLimitType(data.error.toLowerCase().includes('view') ? 'views' : 'offers');
+        setShowLimitError(true);
+      }
+    };
+
+    wsInstance.addMessageHandler('subscription.usage', handleSubscriptionUpdate);
+    wsInstance.addMessageHandler('subscription.expired', handleSubscriptionUpdate);
+    wsInstance.addMessageHandler('subscription.limit_reached', handleSubscriptionUpdate);
+
+    return () => {
+      wsInstance.removeMessageHandler('subscription.usage', handleSubscriptionUpdate);
+      wsInstance.removeMessageHandler('subscription.expired', handleSubscriptionUpdate);
+      wsInstance.removeMessageHandler('subscription.limit_reached', handleSubscriptionUpdate);
+    };
+  }, [wsInstance, router]);
 
   // Function to copy text to clipboard
   const copyToClipboard = async (text: string) => {
@@ -334,15 +397,17 @@ export default function MerchantRequestsPage() {
                 indicatorColor={
                   typeof subscriptionData?.view_usage_percent === 'number' && 
                   subscriptionData.view_usage_percent >= 80 
-                    ? "bg-yellow-600" 
+                    ? subscriptionData.view_usage_percent >= 90
+                      ? "bg-red-600"
+                      : "bg-yellow-600"
                     : undefined
                 }
               />
               <p className="text-xs text-right text-gray-500">
                 {subscriptionData?.views_used ?? 0} / {subscriptionData?.view_limit ?? 0}
               </p>
-              </div>
-              </div>
+            </div>
+          </div>
 
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex flex-col">
@@ -353,7 +418,9 @@ export default function MerchantRequestsPage() {
                 indicatorColor={
                   typeof subscriptionData?.offer_usage_percent === 'number' && 
                   subscriptionData.offer_usage_percent >= 80 
-                    ? "bg-yellow-600" 
+                    ? subscriptionData.offer_usage_percent >= 90
+                      ? "bg-red-600"
+                      : "bg-yellow-600"
                     : undefined
                 }
               />
@@ -367,15 +434,33 @@ export default function MerchantRequestsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Subscription</p>
-                <h3 className="text-lg font-bold text-uniBlue">{subscriptionData?.tier_name || "No Plan"}</h3>
+                <h3 className="text-lg font-bold text-uniBlue">
+                  {subscriptionData?.tier_name || "No Plan"}
+                </h3>
+                {subscriptionData?.end_date && (
+                  <p className="text-xs text-gray-500">
+                    {formatTimeRemaining(
+                      getRemainingTime(subscriptionData.end_date).days,
+                      getRemainingTime(subscriptionData.end_date).hours
+                    )}
+                  </p>
+                )}
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => router.push("/pricing")}
-                className="text-uniBlue hover:text-uniBlue/80"
+                className={`text-uniBlue hover:text-uniBlue/80 ${
+                  subscriptionData?.end_date && 
+                  getRemainingTime(subscriptionData.end_date).days <= 3 
+                    ? "animate-pulse" 
+                    : ""
+                }`}
               >
-                Upgrade
+                {subscriptionData?.end_date && 
+                 getRemainingTime(subscriptionData.end_date).days <= 3 
+                  ? "Renew Now" 
+                  : "Upgrade"}
               </Button>
             </div>
           </div>
@@ -413,7 +498,7 @@ export default function MerchantRequestsPage() {
           </div>
         </div>
       </div>
-
+  
       {/* Connection Status */}
       {!isConnected && (
         <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">

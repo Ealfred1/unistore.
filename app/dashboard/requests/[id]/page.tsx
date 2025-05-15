@@ -23,6 +23,11 @@ import { useAuth } from '@/providers/auth-provider'
 import { useWebSocket } from '@/providers/websocket-provider'
 import { useStartConversation } from '@/utils/start-conversation'
 import { useRequest } from '@/providers/request-provider'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardHeader, CardContent } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface RequestDetails {
   id: string;
@@ -420,16 +425,56 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
   const isCompleted = requestDetails.status === 'COMPLETED'
   const isCancelled = requestDetails.status === 'CANCELLED'
   
+  // Add helper functions
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(word => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  }
+
+  const getStatusConfig = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'PENDING':
+        return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200', icon: Clock };
+      case 'ONGOING':
+        return { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200', icon: MessageSquareIcon };
+      case 'COMPLETED':
+        return { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200', icon: CheckCircle2 };
+      default:
+        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-200', icon: XCircle };
+    }
+  }
+
+  // Add copy to clipboard function
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard!");
+    } catch (err) {
+      toast.error("Failed to copy text");
+    }
+  };
+  
   return (
     <div className="container max-w-5xl py-8">
-      <Button 
-        variant="ghost" 
-        className="mb-6"
-        onClick={() => router.push('/dashboard/requests')}
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Requests
-      </Button>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            onClick={() => router.push('/dashboard/requests')}
+            className="hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Requests
+          </Button>
+        </div>
+        <Badge variant="outline" className={getStatusConfig(requestDetails?.status || 'PENDING').color}>
+          {requestDetails?.status || 'PENDING'}
+        </Badge>
+      </div>
       
       <motion.div 
         className="space-y-6"
@@ -438,30 +483,29 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
         transition={{ duration: 0.3 }}
       >
         {/* Request Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-bold">{requestDetails.title}</h1>
-              <div className="flex items-center mt-2 text-sm text-gray-500">
-                <Clock className="h-4 w-4 mr-1" />
-                <span>Posted {formatDate(requestDetails.created_at)}</span>
-                
-                <span className="mx-2">•</span>
-                
-                <Eye className="h-4 w-4 mr-1" />
-                <span>{requestDetails.view_count} views</span>
-                
-                {requestDetails.category_name && (
-                  <>
-                    <span className="mx-2">•</span>
-                    <span>{requestDetails.category_name}</span>
-                  </>
-                )}
+        <Card>
+          <CardHeader className="space-y-4">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <h1 className="text-2xl font-bold">{requestDetails?.title}</h1>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Clock className="h-4 w-4" />
+                  <span>Posted {formatDate(requestDetails?.created_at || '')}</span>
+                  <span className="text-gray-300">•</span>
+                  <Eye className="h-4 w-4" />
+                  <span>{requestDetails?.view_count} views</span>
+                  {requestDetails?.category_name && (
+                    <>
+                      <span className="text-gray-300">•</span>
+                      <Badge variant="outline" className="bg-uniOrange/10 text-uniOrange">
+                        {requestDetails.category_name}
+                      </Badge>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {requestDetails.is_owner && requestDetails.status === 'PENDING' && (
+              
+              {requestDetails?.is_owner && requestDetails?.status === 'PENDING' && (
                 <Button 
                   variant="outline" 
                   className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
@@ -471,201 +515,199 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                   Cancel Request
                 </Button>
               )}
-              
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                isPending ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                isOngoing ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                isCompleted ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-              }`}>
-                {requestDetails.status}
-              </div>
             </div>
-          </div>
+          </CardHeader>
           
-          <div className="mt-4">
-            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-              {requestDetails.description}
-            </p>
-          </div>
-          
-          {viewingMerchants.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-sm text-gray-500 mb-2">Currently viewing:</p>
-              <div className="flex flex-wrap gap-2">
-                {viewingMerchants.map(merchant => (
-                  <div 
-                    key={merchant.id}
-                    className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm"
-                  >
-                    {merchant.name}
-                  </div>
-                ))}
-              </div>
+          <CardContent className="space-y-6">
+            <div className="prose dark:prose-invert max-w-none">
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                {requestDetails?.description}
+              </p>
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
         
         {/* Offers Section */}
-        {requestDetails.offers && requestDetails.offers.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-            <h3 className="text-lg font-semibold mb-4">Offers ({requestDetails.offers.length})</h3>
-            <div className="space-y-4">
-              {requestDetails.offers.map((offer) => (
-                <motion.div 
-                  key={offer.id}
-                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-2">
-                          {offer.merchant_name.charAt(0)}
+        {requestDetails?.offers && requestDetails.offers.length > 0 && (
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                Offers
+                <Badge variant="outline" className="bg-gray-100 dark:bg-gray-800">
+                  {requestDetails.offers.length}
+                </Badge>
+              </h3>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {requestDetails.offers.map((offer) => (
+                  <motion.div 
+                    key={offer.id}
+                    className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-uniOrange/50 transition-colors"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(offer.merchant_name)}&background=random`} />
+                            <AvatarFallback>{getInitials(offer.merchant_name)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{offer.merchant_name}</p>
+                            <p className="text-sm text-gray-500">{formatDate(offer.created_at)}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{offer.merchant_name}</p>
-                          <p className="text-sm text-gray-500">{formatDate(offer.created_at)}</p>
+                        <div className="pl-12">
+                          <p className="text-gray-700 dark:text-gray-300">{offer.description}</p>
                         </div>
                       </div>
-                      <div className="mt-3">
-                        <p className="text-gray-700 dark:text-gray-300">{offer.description}</p>
+                      <div className="text-xl font-bold text-uniOrange">
+                        ₦{offer.price.toLocaleString()}
                       </div>
                     </div>
-                    <div className="text-xl font-bold text-uniOrange">
-                      ${offer.price.toLocaleString()}
-                    </div>
-                  </div>
-                  
-                  {offer.status === 'ACCEPTED' && (
-                    <div className="mt-4 space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-500" />
-                          <span>{offer.merchant_phone || 'No phone number'}</span>
-                        </div>
-                        {offer.merchant_phone && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(offer.merchant_phone)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        )}
+                    
+                    {offer.status === 'ACCEPTED' && (
+                      <div className="mt-4 space-y-3 pl-12">
+                        <TooltipProvider>
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-4 w-4 text-gray-500" />
+                              <span>{offer.merchant_phone || 'No phone number'}</span>
+                            </div>
+                            {offer.merchant_phone && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => copyToClipboard(offer.merchant_phone)}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Copy phone number</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4 text-gray-500" />
+                              <span>{offer.merchant_email}</span>
+                            </div>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(offer.merchant_email)}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Copy email</TooltipContent>
+                            </Tooltip>
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            {offer.merchant_phone && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => window.location.href = `tel:${offer.merchant_phone}`}
+                              >
+                                <Phone className="h-4 w-4 mr-2" />
+                                Call
+                              </Button>
+                            )}
+                            
+                            <Button 
+                              className="flex-1 bg-uniOrange hover:bg-uniOrange/90 text-white"
+                              size="sm"
+                              onClick={() => {
+                                setCurrentMerchant(offer.merchant_id)
+                                setShowMessageModal(true)
+                              }}
+                            >
+                              <MessageSquareIcon className="h-4 w-4 mr-2" />
+                              Message
+                            </Button>
+                          </div>
+                        </TooltipProvider>
                       </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-500" />
-                          <span>{offer.merchant_email}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(offer.merchant_email)}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        {offer.merchant_phone && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => window.location.href = `tel:${offer.merchant_phone}`}
-                          >
-                            <Phone className="h-4 w-4 mr-2" />
-                            Call
-                          </Button>
-                        )}
-                        
+                    )}
+                    
+                    {requestDetails.is_owner && offer.status === 'PENDING' && (
+                      <div className="mt-4 flex items-center space-x-2 pl-12">
                         <Button 
-                          className="flex-1 bg-uniOrange hover:bg-uniOrange-600 text-white"
+                          variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setCurrentMerchant(offer.merchant_id)
-                            setShowMessageModal(true)
-                          }}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                          onClick={() => handleDeclineOffer(offer.id)}
                         >
-                          <MessageSquareIcon className="h-4 w-4 mr-2" />
-                          Message
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Decline
+                        </Button>
+                        <Button 
+                          className="bg-uniOrange hover:bg-uniOrange/90 text-white"
+                          size="sm"
+                          onClick={() => handleAcceptOffer(offer.id)}
+                          disabled={selectedOffer === offer.id}
+                        >
+                          {selectedOffer === offer.id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                          )}
+                          Accept Offer
                         </Button>
                       </div>
-                    </div>
-                  )}
-                  
-                  {offer.status === 'DECLINED' && (
-                    <div className="mt-3 flex items-center text-red-600 dark:text-red-400">
-                      <XCircle className="h-4 w-4 mr-1" />
-                      <span>Offer declined</span>
-                    </div>
-                  )}
-                  
-                  {requestDetails.is_owner && (
-                    <div className="mt-3 flex items-center space-x-2">
-                      {/* Only show accept/decline buttons for pending offers */}
-                      {offer.status === 'PENDING' && (
-                        <>
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                        onClick={() => handleDeclineOffer(offer.id)}
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Decline
-                      </Button>
-                      <Button 
-                        className="bg-uniOrange hover:bg-uniOrange-600 text-white"
-                        size="sm"
-                        onClick={() => handleAcceptOffer(offer.id)}
-                        disabled={selectedOffer === offer.id}
-                      >
-                        {selectedOffer === offer.id ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                        )}
-                        Accept Offer
-                      </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </div>
-          </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Views Section */}
-        {requestDetails.views && requestDetails.views.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-            <h3 className="text-lg font-semibold mb-4">Recent Views</h3>
-            <div className="space-y-2">
-              {requestDetails.views.map((view) => (
-                <div key={view.id} className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-2">
-                      {view.merchant_name.charAt(0)}
+        {requestDetails?.views && requestDetails.views.length > 0 && (
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                Recent Views
+                <Badge variant="outline" className="bg-gray-100 dark:bg-gray-800">
+                  {requestDetails.views.length}
+                </Badge>
+              </h3>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {requestDetails.views.map((view) => (
+                  <div key={view.id} className="flex justify-between items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(view.merchant_name)}&background=random`} />
+                        <AvatarFallback>{getInitials(view.merchant_name)}</AvatarFallback>
+                      </Avatar>
+                      <p className="font-medium">{view.merchant_name}</p>
                     </div>
-                    <p>{view.merchant_name}</p>
+                    <p className="text-sm text-gray-500">
+                      {formatDate(view.viewed_at)}
+                    </p>
                   </div>
-                  <p className="text-sm text-gray-500">
-                    {formatDate(view.viewed_at)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </motion.div>
 
+      {/* Message Modal */}
       <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
         <DialogContent>
           <DialogHeader>
@@ -675,16 +717,16 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+              className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-uniOrange focus:border-transparent"
               placeholder="Type your message..."
               rows={4}
             />
-            <div className="flex justify-end space-x-3">
+            <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setShowMessageModal(false)}>
                 Cancel
               </Button>
               <Button 
-                className="bg-uniBlue hover:bg-uniBlue-600 text-white"
+                className="bg-uniOrange hover:bg-uniOrange/90 text-white min-w-[100px]"
                 onClick={handleSendMessage}
                 disabled={isMessageLoading}
               >
