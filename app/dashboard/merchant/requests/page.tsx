@@ -29,6 +29,19 @@ import { useRouter } from "next/navigation"
 import { useStartConversation } from "@/utils/start-conversation"
 import { useSubscription } from "@/providers/subscription-provider"
 import { Progress } from "@/components/ui/progress"
+import { useAuth } from "@/providers/auth-provider"
+
+// Add these types at the top of the file
+interface Offer {
+  merchant_id: string;
+  status: string;
+}
+
+interface Request {
+  id: string;
+  status: string;
+  offers?: Offer[];
+}
 
 // Add these functions at the top of the file
 async function makeOffer(requestId: string) {
@@ -98,6 +111,7 @@ export default function MerchantRequestsPage() {
   const router = useRouter()
   const { startChatWithMerchant } = useStartConversation()
   const { subscriptionData, setSubscriptionData } = useSubscription()
+  const { user } = useAuth()
 
   const categories = [
     "📚 Textbooks",
@@ -139,18 +153,29 @@ export default function MerchantRequestsPage() {
   }, [])
 
   useEffect(() => {
-    // Set loading state based on connection and data availability
+    // Set loading state based on connection and data availability 
     setIsLoading(!isConnected || pendingRequests.length === 0)
   }, [isConnected, pendingRequests])
 
   useEffect(() => {
     // Format and filter requests when pendingRequests changes
     let formattedRequests = pendingRequests
-      .filter((request, index, self) => 
+      .filter((request: Request, index: number, self: Request[]) => 
         // Remove duplicates based on request ID
         index === self.findIndex(r => r.id === request.id)
       )
-      .filter(request => request.status !== 'CANCELLED') // Filter out cancelled requests
+      .filter((request: Request) => {
+        // Filter out cancelled requests
+        if (request.status === 'CANCELLED') return false;
+        
+        // Filter out requests where merchant's offer was accepted or declined
+        const merchantOffer = request.offers?.find(offer => offer.merchant_id === user?.id);
+        if (merchantOffer && (merchantOffer.status === 'ACCEPTED' || merchantOffer.status === 'DECLINED')) {
+          return false;
+        }
+        
+        return true;
+      })
       .map(formatRequestData);
     
     // Apply search and category filters
@@ -166,7 +191,7 @@ export default function MerchantRequestsPage() {
     }
     
     setFilteredRequests(formattedRequests);
-  }, [pendingRequests, searchQuery, selectedCategory, formatRequestData]);
+  }, [pendingRequests, searchQuery, selectedCategory, formatRequestData, user?.id]);
 
   useEffect(() => {
     if (!wsInstance) return;
@@ -232,7 +257,7 @@ export default function MerchantRequestsPage() {
         // Calculate remaining time
         const { days, hours } = getRemainingTime(data.data.end_date);
         
-        // Update subscription data with remaining time
+        // Update subscription data with remaining time 
         setSubscriptionData({
           ...data.data,
           days_remaining: days,
@@ -588,7 +613,7 @@ export default function MerchantRequestsPage() {
                     ) : (
                       <Button
                         className={`bg-uniOrange hover:bg-uniOrange-600 text-white ${
-                          hasOfferedOnRequest(request.id) ? 'opacity-50 cursor-not-allowed' : ''
+                          hasOfferedOnRequest(request.id) ? 'opacity-50' : ''
                         }`}
                         onClick={(e) => {
                           e.stopPropagation();

@@ -103,7 +103,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     console.log(`Fetching request details for ID: ${params.id}`)
     
     if (isRequestConnected && requestWs) {
-      // Set up message handler for request details
+      // Set up message handler for request detailsnnhhhh
       const handleRequestDetails = (data: any) => {
         if (data.type === 'request_details' && data.request) {
           console.log("Received request details:", data.request)
