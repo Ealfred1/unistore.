@@ -88,8 +88,14 @@ const getRemainingTime = (endDate: string) => {
   const end = new Date(endDate);
   const now = new Date();
   const diffTime = end.getTime() - now.getTime();
-  const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  
+  // Calculate total hours first
+  const totalHours = Math.floor(diffTime / (1000 * 60 * 60));
+  
+  // Then calculate days (capped at 30) and remaining hours
+  const days = Math.min(Math.floor(totalHours / 24), 30);
+  const hours = totalHours % 24;
+  
   return { days, hours };
 };
 
@@ -170,7 +176,12 @@ export default function MerchantRequestsPage() {
         
         // Filter out requests where merchant's offer was accepted or declined
         const merchantOffer = request.offers?.find(offer => offer.merchant_id === user?.id);
-        if (merchantOffer && (merchantOffer.status === 'ACCEPTED' || merchantOffer.status === 'DECLINED')) {
+        if (merchantOffer && ['ACCEPTED', 'DECLINED'].includes(merchantOffer.status)) {
+          return false;
+        }
+        
+        // Filter out requests that are no longer pending (have an accepted offer)
+        if (request.status !== 'PENDING') {
           return false;
         }
         
@@ -197,30 +208,11 @@ export default function MerchantRequestsPage() {
     if (!wsInstance) return;
 
     const handleOfferStatusUpdate = (data: any) => {
-      if (data.type === 'offer_status_update' && data.status === 'ACCEPTED') {
-        // Show modal with user details for the merchant who made the offer
-        setAcceptedRequestDetails({
-          requestId: data.request_id,
-          offerId: data.offer_id,
-          timestamp: data.timestamp,
-          user: data.request_user // This now contains user contact details
-        });
-        setShowAcceptedModal(true);
-        
-        // Update the request status in the list
-        setFilteredRequests(prev => prev.map(request => {
-          if (request.id === data.request_id) {
-            return {
-              ...request,
-              status: 'ONGOING',
-              accepted_offer: {
-                id: data.offer_id,
-                merchant_id: data.merchant_id
-              }
-            };
-          }
-          return request;
-        }));
+      if (data.type === 'offer_status_update') {
+        // If an offer is accepted, remove the request from the list
+        if (data.status === 'ACCEPTED') {
+          setFilteredRequests(prev => prev.filter(request => request.id !== data.request_id));
+        }
       }
     };
 
@@ -271,7 +263,7 @@ export default function MerchantRequestsPage() {
       } else if (data.type === 'subscription.expired') {
         // Show expired notification
         toast.error(data.message, {
-          duration: 0, // Keep until user dismisses
+          duration: 0, // Keep until user dismisses 
           action: {
             label: "Renew Now",
             onClick: () => router.push("/pricing")

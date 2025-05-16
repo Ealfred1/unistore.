@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
@@ -52,6 +52,12 @@ import { useToast } from "@/components/ui/use-toast"
 import { useUniversities } from "@/providers/university-provider"
 import { useMessagingContext } from "@/providers/messaging-provider"
 import { cn } from "@/lib/utils"
+import { gsap } from "gsap"
+import { Physics2DPlugin } from "gsap/Physics2DPlugin"
+import { useGSAP } from "@gsap/react"
+
+// Register GSAP plugins
+gsap.registerPlugin(Physics2DPlugin)
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, upgradeToMerchant } = useAuth()
@@ -77,6 +83,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [universityAbbreviation, setUniversityAbbreviation] = useState<string | null>(null)
   const [aiButtonHovered, setAiButtonHovered] = useState(false)
   const [showAIButton, setShowAIButton] = useState(true)
+
+  const buttonRef = useRef(null)
+
+  useGSAP(() => {
+    gsap.to(buttonRef.current, {
+      y: "-10px",
+      duration: 1.5,
+      repeat: -1,
+      yoyo: true,
+      ease: "power1.inOut"
+    })
+  }, [])
 
   useEffect(() => {
     const getUniversityInfo = () => {
@@ -310,59 +328,80 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="flex items-center space-x-3">
           {/* AI Button with animation */}
-          {/* <motion.button
-            className="relative p-2 rounded-lg bg-gradient-to-r from-indigo-500 via-orange-500 to-indigo-500 text-white overflow-hidden"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onHoverStart={() => setAiButtonHovered(true)}
-            onHoverEnd={() => setAiButtonHovered(false)}
-            onClick={handleAiButtonClick}
-          >
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-orange-600 via-orange-300 to-purple-600"
-              animate={{
-                x: aiButtonHovered ? ["0%", "100%", "0%"] : "0%",
+          {showAIButton && (
+            <motion.button
+              ref={buttonRef}
+              initial={{ opacity: 0, scale: 1.2 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.2 }}
+              onMouseEnter={() => {
+                setAiButtonHovered(true);
+                gsap.to(buttonRef.current, {
+                  scale: 1.1,
+                  duration: 0.3,
+                  ease: "elastic.out(1, 0.3)",
+                  physics2D: {
+                    velocity: 30,
+                    angle: 45,
+                    gravity: 0
+                  }
+                });
               }}
-              transition={{
-                duration: 2,
-                repeat: Number.POSITIVE_INFINITY,
-                repeatType: "reverse",
-              }}
-            />
-            <motion.div className="relative flex items-center gap-1">
-              <motion.div
-                animate={{
-                  rotate: aiButtonHovered ? [0, 360] : 0,
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "linear",
-                }}
-              >
-                <Brain className="h-5 w-5" />
-              </motion.div>
-              <motion.span
-                animate={{
-                  opacity: aiButtonHovered ? 1 : 1,
-                }}
-                className="hidden sm:inline-block"
-              >
-                AI Request
-              </motion.span>
-              <motion.div
-                animate={{
-                  y: aiButtonHovered ? [-2, 2, -2] : 0,
-                }}
-                transition={{
+              onMouseLeave={() => {
+                setAiButtonHovered(false);
+                gsap.to(buttonRef.current, {
+                  scale: 1,
                   duration: 0.5,
-                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "elastic.out(1, 0.3)"
+                });
+              }}
+              onClick={() => {
+                if (user?.user_type === "MERCHANT") {
+                  router.push("/dashboard/merchant/requests");
+                } else {
+                  router.push("/dashboard/request/new");
+                }
+                
+                gsap.to(buttonRef.current, {
+                  scale: 0.95,
+                  duration: 0.1,
+                  yoyo: true,
+                  repeat: 1,
+                  ease: "power2.inOut"
+                });
+              }}
+              className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300 hover:shadow-lg"
+            >
+              <motion.div
+                animate={{ 
+                  opacity: aiButtonHovered ? 0 : 1,
+                  rotate: aiButtonHovered ? 180 : 0
                 }}
+                transition={{ 
+                  duration: 0.3,
+                  ease: "anticipate"
+                }}
+                className="absolute inset-0 flex items-center justify-center"
               >
-                <Zap className="h-4 w-4" />
+                <Brain className="h-8 w-8" />
               </motion.div>
-            </motion.div>
-          </motion.button> */}
+              <motion.div
+                animate={{ 
+                  opacity: aiButtonHovered ? 1 : 0,
+                  scale: aiButtonHovered ? 1.2 : 0.8,
+                  rotate: aiButtonHovered ? 0 : -180
+                }}
+                transition={{ 
+                  duration: 0.3,
+                  ease: "anticipate"
+                }}
+                className="absolute inset-0 flex items-center justify-center"
+              >
+                <Zap className="h-8 w-8" />
+              </motion.div>
+            </motion.button>
+          )}
 
           {/* <button
             onClick={() => setShowRequestModal(true)}
@@ -435,36 +474,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </div>
       </header>
-
-      <AnimatePresence>
-        {showAIButton && (
-          <motion.button
-            initial={{ opacity: 0, scale: 1.2 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.6 }}
-            transition={{ duration: 0.2 }}
-            onMouseEnter={() => setAiButtonHovered(true)}
-            onMouseLeave={() => setAiButtonHovered(false)}
-            onClick={() => router.push("/coming-soon")}
-            className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300"
-          >
-            <motion.div
-              animate={{ opacity: aiButtonHovered ? 0 : 1 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <Brain className="h-8 w-8" />
-            </motion.div>
-            <motion.div
-              animate={{ opacity: aiButtonHovered ? 1 : 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <Zap className="h-8 w-8" />
-            </motion.div>
-          </motion.button>
-        )}
-      </AnimatePresence>
 
       {/* Overlay for mobile - closes sidebar when clicked outside */}
       <AnimatePresence>
