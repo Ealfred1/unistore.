@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/providers/auth-provider"
@@ -201,6 +201,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }
 
+  // Handle AI button click
+  const handleAiButtonClick = () => {
+    if (user?.user_type === "MERCHANT") {
+      router.push("/dashboard/merchant-requests")
+    } else {
+      router.push("/dashboard/request-product")
+    }
+  }
+
   // Navigation items with authentication checks
   const navItems = [
     // Only show Dashboard, Messages, Notifications for authenticated users
@@ -300,37 +309,78 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* AI Button with animation */}
-          {showAIButton && (
-            <button
-              onMouseEnter={() => setAiButtonHovered(true)}
-              onMouseLeave={() => setAiButtonHovered(false)}
-              onClick={() => {
-                if (user?.user_type === "MERCHANT") {
-                  router.push("/dashboard/merchant/requests");
-                } else {
-                  router.push("/dashboard/request/new");
-                }
-              }}
-              className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 via-orange-500 to-indigo-500 text-white overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-105 group relative"
-              style={{
-                backgroundSize: "200% 100%",
-                animation: "gradientMove 3s linear infinite"
-              }}
-            >
-              <style jsx>{`
-                @keyframes gradientMove {
-                  0% { background-position: 0% 50%; }
-                  50% { background-position: 100% 50%; }
-                  100% { background-position: 0% 50%; }
-                }
-              `}</style>
-              <div className="relative flex items-center justify-center">
-                <Brain className={`h-8 w-8 transition-opacity duration-300 ${aiButtonHovered ? 'opacity-0' : 'opacity-100'}`} />
-                <Zap className={`h-8 w-8 absolute inset-0 m-auto transition-opacity duration-300 ${aiButtonHovered ? 'opacity-100' : 'opacity-0'}`} />
-              </div>
-            </button>
-          )}
+          {/* Fixed position AI button */}
+          <AnimatePresence>
+            {showAIButton && (
+              <motion.button
+                initial={{ opacity: 0, scale: 1.2 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={{ duration: 0.2 }}
+                onMouseEnter={() => setAiButtonHovered(true)}
+                onMouseLeave={() => setAiButtonHovered(false)}
+                onClick={(e) => {
+                  // Create ripple effect
+                  const button = e.currentTarget;
+                  const circle = document.createElement('span');
+                  const diameter = Math.max(button.clientWidth, button.clientHeight);
+                  const radius = diameter / 2;
+
+                  circle.style.width = circle.style.height = `${diameter}px`;
+                  circle.style.left = `${e.clientX - button.offsetLeft - radius}px`;
+                  circle.style.top = `${e.clientY - button.offsetTop - radius}px`;
+                  circle.classList.add('ripple');
+
+                  const ripple = button.getElementsByClassName('ripple')[0];
+                  if (ripple) {
+                    ripple.remove();
+                  }
+
+                  button.appendChild(circle);
+
+                  // Navigate based on user type
+                  if (user?.user_type === "MERCHANT") {
+                    router.push("/dashboard/merchant/requests");
+                  } else {
+                    router.push("/dashboard/request/new");
+                  }
+                }}
+                className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300 relative"
+              >
+                <style jsx>{`
+                  .ripple {
+                    position: absolute;
+                    background: rgba(255, 255, 255, 0.3);
+                    border-radius: 50%;
+                    transform: scale(0);
+                    animation: ripple 0.6s linear;
+                    pointer-events: none;
+                  }
+
+                  @keyframes ripple {
+                    to {
+                      transform: scale(4);
+                      opacity: 0;
+                    }
+                  }
+                `}</style>
+                <motion.div
+                  animate={{ opacity: aiButtonHovered ? 0 : 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute inset-0 flex items-center justify-center"
+                >
+                  <Brain className="h-8 w-8" />
+                </motion.div>
+                <motion.div
+                  animate={{ opacity: aiButtonHovered ? 1 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute inset-0 flex items-center justify-center"
+                >
+                  <Zap className="h-8 w-8" />
+                </motion.div>
+              </motion.button>
+            )}
+          </AnimatePresence>
 
           {/* <button
             onClick={() => setShowRequestModal(true)}

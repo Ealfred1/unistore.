@@ -462,14 +462,14 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
     <div className="container max-w-5xl py-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            onClick={() => router.push('/dashboard/requests')}
+      <Button 
+        variant="ghost" 
+        onClick={() => router.push('/dashboard/requests')}
             className="hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Requests
-          </Button>
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Requests
+      </Button>
         </div>
         <Badge variant="outline" className={getStatusConfig(requestDetails?.status || 'PENDING').color}>
           {requestDetails?.status || 'PENDING'}
@@ -485,7 +485,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
         {/* Request Header */}
         <Card>
           <CardHeader className="space-y-4">
-            <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <h1 className="text-2xl font-bold">{requestDetails?.title}</h1>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -500,11 +500,11 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                       <Badge variant="outline" className="bg-uniOrange/10 text-uniOrange">
                         {requestDetails.category_name}
                       </Badge>
-                    </>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
-              
+            </div>
+            
               {requestDetails?.is_owner && requestDetails?.status === 'PENDING' && (
                 <Button 
                   variant="outline" 
@@ -520,7 +520,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
           
           <CardContent className="space-y-6">
             <div className="prose dark:prose-invert max-w-none">
-              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                 {requestDetails?.description}
               </p>
             </div>
@@ -539,44 +539,44 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
               </h3>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {requestDetails.offers.map((offer) => (
-                  <motion.div 
-                    key={offer.id}
+            <div className="space-y-4">
+              {requestDetails.offers.map((offer) => (
+                <motion.div 
+                  key={offer.id}
                     className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-uniOrange/50 transition-colors"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <div className="flex justify-between items-start">
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="flex justify-between items-start">
                       <div className="space-y-4">
                         <div className="flex items-center gap-3">
                           <Avatar>
                             <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(offer.merchant_name)}&background=random`} />
                             <AvatarFallback>{getInitials(offer.merchant_name)}</AvatarFallback>
                           </Avatar>
-                          <div>
-                            <p className="font-medium">{offer.merchant_name}</p>
-                            <p className="text-sm text-gray-500">{formatDate(offer.created_at)}</p>
-                          </div>
-                        </div>
-                        <div className="pl-12">
-                          <p className="text-gray-700 dark:text-gray-300">{offer.description}</p>
+                        <div>
+                          <p className="font-medium">{offer.merchant_name}</p>
+                          <p className="text-sm text-gray-500">{formatDate(offer.created_at)}</p>
                         </div>
                       </div>
-                      <div className="text-xl font-bold text-uniOrange">
-                        ₦{offer.price.toLocaleString()}
+                        <div className="pl-12">
+                        <p className="text-gray-700 dark:text-gray-300">{offer.description}</p>
                       </div>
                     </div>
-                    
-                    {offer.status === 'ACCEPTED' && (
+                    <div className="text-xl font-bold text-uniOrange">
+                        ₦{offer.price.toLocaleString()}
+                      </div>
+                  </div>
+                  
+                  {offer.status === 'ACCEPTED' && (
                       <div className="mt-4 space-y-3 pl-12">
                         <TooltipProvider>
                           <div className="flex items-center justify-between text-sm">
                             <div className="flex items-center gap-2">
                               <Phone className="h-4 w-4 text-gray-500" />
                               <span>{offer.merchant_phone || 'No phone number'}</span>
-                            </div>
+                    </div>
                             {offer.merchant_phone && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -610,12 +610,12 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                               </TooltipTrigger>
                               <TooltipContent>Copy email</TooltipContent>
                             </Tooltip>
-                          </div>
-                          
+                    </div>
+                  
                           <div className="flex gap-2">
                             {offer.merchant_phone && (
-                              <Button
-                                variant="outline"
+                      <Button 
+                        variant="outline"
                                 size="sm"
                                 className="flex-1"
                                 onClick={() => window.location.href = `tel:${offer.merchant_phone}`}
@@ -627,15 +627,15 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                             
                             <Button 
                               className="flex-1 bg-uniOrange hover:bg-uniOrange/90 text-white"
-                              size="sm"
-                              onClick={() => {
-                                setCurrentMerchant(offer.merchant_id)
-                                setShowMessageModal(true)
-                              }}
-                            >
+                        size="sm"
+                        onClick={() => {
+                          setCurrentMerchant(offer.merchant_id)
+                          setShowMessageModal(true)
+                        }}
+                      >
                               <MessageSquareIcon className="h-4 w-4 mr-2" />
-                              Message
-                            </Button>
+                        Message
+                      </Button>
                           </div>
                         </TooltipProvider>
                       </div>
@@ -643,33 +643,33 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                     
                     {requestDetails.is_owner && offer.status === 'PENDING' && (
                       <div className="mt-4 flex items-center space-x-2 pl-12">
-                        <Button 
-                          variant="outline"
-                          size="sm"
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                          onClick={() => handleDeclineOffer(offer.id)}
-                        >
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Decline
-                        </Button>
-                        <Button 
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                        onClick={() => handleDeclineOffer(offer.id)}
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Decline
+                      </Button>
+                      <Button 
                           className="bg-uniOrange hover:bg-uniOrange/90 text-white"
-                          size="sm"
-                          onClick={() => handleAcceptOffer(offer.id)}
-                          disabled={selectedOffer === offer.id}
-                        >
-                          {selectedOffer === offer.id ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                          )}
-                          Accept Offer
-                        </Button>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </div>
+                        size="sm"
+                        onClick={() => handleAcceptOffer(offer.id)}
+                        disabled={selectedOffer === offer.id}
+                      >
+                        {selectedOffer === offer.id ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                        )}
+                        Accept Offer
+                      </Button>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
             </CardContent>
           </Card>
         )}
@@ -687,7 +687,7 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {requestDetails.views.map((view) => (
+              {requestDetails.views.map((view) => (
                   <div key={view.id} className="flex justify-between items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg">
                     <div className="flex items-center gap-3">
                       <Avatar>
@@ -695,13 +695,13 @@ export default function RequestDetailsPage({ params }: { params: { id: string } 
                         <AvatarFallback>{getInitials(view.merchant_name)}</AvatarFallback>
                       </Avatar>
                       <p className="font-medium">{view.merchant_name}</p>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      {formatDate(view.viewed_at)}
-                    </p>
                   </div>
-                ))}
-              </div>
+                  <p className="text-sm text-gray-500">
+                    {formatDate(view.viewed_at)}
+                  </p>
+                </div>
+              ))}
+            </div>
             </CardContent>
           </Card>
         )}

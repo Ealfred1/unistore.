@@ -159,7 +159,7 @@ export default function MerchantRequestsPage() {
   }, [])
 
   useEffect(() => {
-    // Set loading state based on connection and data availability 
+    // Set loading state based on connection and data availability
     setIsLoading(!isConnected || pendingRequests.length === 0)
   }, [isConnected, pendingRequests])
 
@@ -423,8 +423,8 @@ export default function MerchantRequestsPage() {
               <p className="text-xs text-right text-gray-500">
                 {subscriptionData?.views_used ?? 0} / {subscriptionData?.view_limit ?? 0}
               </p>
-            </div>
-          </div>
+              </div>
+              </div>
 
           <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex flex-col">
@@ -515,7 +515,7 @@ export default function MerchantRequestsPage() {
           </div>
         </div>
       </div>
-  
+
       {/* Connection Status */}
       {!isConnected && (
         <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
