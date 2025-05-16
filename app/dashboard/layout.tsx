@@ -342,7 +342,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   if (user?.user_type === "MERCHANT") {
                     router.push("/dashboard/merchant/requests");
                   } else {
-                    router.push("/dashboard/request/new");
+                    router.push("/dashboard/requests/new");
                   }
                 }}
                 className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300"
