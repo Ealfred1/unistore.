@@ -52,12 +52,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { useUniversities } from "@/providers/university-provider"
 import { useMessagingContext } from "@/providers/messaging-provider"
 import { cn } from "@/lib/utils"
-import { gsap } from "gsap"
-import { Physics2DPlugin } from "gsap/Physics2DPlugin"
-import { useGSAP } from "@gsap/react"
-
-// Register GSAP plugins
-gsap.registerPlugin(Physics2DPlugin)
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, upgradeToMerchant } = useAuth()
@@ -83,18 +77,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [universityAbbreviation, setUniversityAbbreviation] = useState<string | null>(null)
   const [aiButtonHovered, setAiButtonHovered] = useState(false)
   const [showAIButton, setShowAIButton] = useState(true)
-
-  const buttonRef = useRef(null)
-
-  useGSAP(() => {
-    gsap.to(buttonRef.current, {
-      y: "-10px",
-      duration: 1.5,
-      repeat: -1,
-      yoyo: true,
-      ease: "power1.inOut"
-    })
-  }, [])
 
   useEffect(() => {
     const getUniversityInfo = () => {
@@ -219,15 +201,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }
 
-  // Handle AI button click
-  const handleAiButtonClick = () => {
-    if (user?.user_type === "MERCHANT") {
-      router.push("/dashboard/merchant-requests")
-    } else {
-      router.push("/dashboard/request-product")
-    }
-  }
-
   // Navigation items with authentication checks
   const navItems = [
     // Only show Dashboard, Messages, Notifications for authenticated users
@@ -329,78 +302,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex items-center space-x-3">
           {/* AI Button with animation */}
           {showAIButton && (
-            <motion.button
-              ref={buttonRef}
-              initial={{ opacity: 0, scale: 1.2 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.6 }}
-              transition={{ duration: 0.2 }}
-              onMouseEnter={() => {
-                setAiButtonHovered(true);
-                gsap.to(buttonRef.current, {
-                  scale: 1.1,
-                  duration: 0.3,
-                  ease: "elastic.out(1, 0.3)",
-                  physics2D: {
-                    velocity: 30,
-                    angle: 45,
-                    gravity: 0
-                  }
-                });
-              }}
-              onMouseLeave={() => {
-                setAiButtonHovered(false);
-                gsap.to(buttonRef.current, {
-                  scale: 1,
-                  duration: 0.5,
-                  ease: "elastic.out(1, 0.3)"
-                });
-              }}
+            <button
+              onMouseEnter={() => setAiButtonHovered(true)}
+              onMouseLeave={() => setAiButtonHovered(false)}
               onClick={() => {
                 if (user?.user_type === "MERCHANT") {
                   router.push("/dashboard/merchant/requests");
                 } else {
                   router.push("/dashboard/request/new");
                 }
-                
-                gsap.to(buttonRef.current, {
-                  scale: 0.95,
-                  duration: 0.1,
-                  yoyo: true,
-                  repeat: 1,
-                  ease: "power2.inOut"
-                });
               }}
-              className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300 hover:shadow-lg"
+              className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 via-orange-500 to-indigo-500 text-white overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-105 group relative"
+              style={{
+                backgroundSize: "200% 100%",
+                animation: "gradientMove 3s linear infinite"
+              }}
             >
-              <motion.div
-                animate={{ 
-                  opacity: aiButtonHovered ? 0 : 1,
-                  rotate: aiButtonHovered ? 180 : 0
-                }}
-                transition={{ 
-                  duration: 0.3,
-                  ease: "anticipate"
-                }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <Brain className="h-8 w-8" />
-              </motion.div>
-              <motion.div
-                animate={{ 
-                  opacity: aiButtonHovered ? 1 : 0,
-                  scale: aiButtonHovered ? 1.2 : 0.8,
-                  rotate: aiButtonHovered ? 0 : -180
-                }}
-                transition={{ 
-                  duration: 0.3,
-                  ease: "anticipate"
-                }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <Zap className="h-8 w-8" />
-              </motion.div>
-            </motion.button>
+              <style jsx>{`
+                @keyframes gradientMove {
+                  0% { background-position: 0% 50%; }
+                  50% { background-position: 100% 50%; }
+                  100% { background-position: 0% 50%; }
+                }
+              `}</style>
+              <div className="relative flex items-center justify-center">
+                <Brain className={`h-8 w-8 transition-opacity duration-300 ${aiButtonHovered ? 'opacity-0' : 'opacity-100'}`} />
+                <Zap className={`h-8 w-8 absolute inset-0 m-auto transition-opacity duration-300 ${aiButtonHovered ? 'opacity-100' : 'opacity-0'}`} />
+              </div>
+            </button>
           )}
 
           {/* <button
