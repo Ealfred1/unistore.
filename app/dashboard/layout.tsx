@@ -345,7 +345,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     router.push("/dashboard/request/new");
                   }
                 }}
-                className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300 relative"
+                className="fixed bottom-20 right-6 z-50 p-5 rounded-full bg-gradient-to-r from-indigo-500 to-orange-500 text-white overflow-hidden transition-all duration-300"
               >
                 <style jsx>{`
                   .ripple {
